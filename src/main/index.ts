@@ -1,74 +1,106 @@
-import { app, BrowserWindow, dialog, ipcMain, safeStorage } from 'electron'
-import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { join, resolve } from 'node:path'
-import { parse, stringify } from 'yaml'
-import { DEFAULT_CONFIG, type KeyStatus, type ProjectConfig, type VaultSummary } from '../core/types/ipc'
-import { resolveInside } from '../core/vault/paths'
+import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { readFileSync, writeFileSync } from 'node:fs'
+import { basename, extname, join } from 'node:path'
+import { fdxToMd, fountainToMd } from '../core/convert'
+import type { AiRequest, FileEntry, VaultChange, VaultSummary, Version } from '../core/types/ipc'
+import { runAi } from './ai'
+import { getGraph, graphBuild, graphStatus, markStale } from './graph'
+import { keyStatus, setKey } from './keys'
+import { createFile, listFiles, listVersions, openVault, readConfig, readFile, readVersion, writeFile } from './vault'
 
-let vaultRoot: string | null = null
+let win: BrowserWindow | null = null
 
-const sha = (s: string) => createHash('sha256').update(s).digest('hex')
-
-function inVault(rel: string): string {
-  if (!vaultRoot) throw new Error('Sin vault abierto')
-  return resolveInside(vaultRoot, rel)
-}
-
-function openVault(root: string): VaultSummary {
-  vaultRoot = resolve(root)
-  for (const d of ['scripts', 'entities/characters', 'entities/locations', 'entities/props', 'outline', 'knowledge', 'assets', '.narrative/versions']) {
-    mkdirSync(join(vaultRoot, d), { recursive: true })
-  }
-  const cfgPath = join(vaultRoot, '.narrative/project.yaml')
-  if (!existsSync(cfgPath)) writeFileSync(cfgPath, stringify(DEFAULT_CONFIG))
-  const config = { ...DEFAULT_CONFIG, ...(parse(readFileSync(cfgPath, 'utf8')) as Partial<ProjectConfig>) }
-  const scripts = readdirSync(join(vaultRoot, 'scripts')).filter((f) => f.endsWith('.md')).map((f) => `scripts/${f}`)
-  return { root: vaultRoot, config, scripts }
-}
-
-// Claves BYOK (I3): cifradas con el keychain del SO, guardadas en userData, nunca en el vault.
-const keysFile = () => join(app.getPath('userData'), 'keys.json')
-function readKeys(): Record<string, string> {
-  return existsSync(keysFile()) ? JSON.parse(readFileSync(keysFile(), 'utf8')) : {}
+const notify = (e: VaultChange) => {
+  markStale()
+  win?.webContents.send('vault.changed', e)
 }
 
 ipcMain.handle('vault.open', async (): Promise<VaultSummary | null> => {
   const r = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] })
   const dir = r.filePaths[0]
-  return dir ? openVault(dir) : null
+  if (!dir) return null
+  markStale()
+  return openVault(dir, notify)
 })
-
-ipcMain.handle('file.read', (_e, rel: string) => {
-  const content = readFileSync(inVault(rel), 'utf8')
-  return { content, hash: sha(content) }
+ipcMain.handle('vault.list', () => listFiles())
+ipcMain.handle('file.read', (_e, rel: string) => readFile(rel))
+ipcMain.handle('file.write', (_e, rel: string, content: string, expectedHash?: string, origin?: Version['origin']) => {
+  const r = writeFile(rel, content, expectedHash, origin)
+  markStale()
+  return r
 })
-
-ipcMain.handle('file.write', (_e, rel: string, content: string) => {
-  writeFileSync(inVault(rel), content)
-  return { hash: sha(content) }
+ipcMain.handle('file.create', (_e, rel: string, content: string) => {
+  const r = createFile(rel, content)
+  markStale()
+  return r
 })
+ipcMain.handle('keys.set', (_e, provider: string, key: string) => setKey(provider, key))
+ipcMain.handle('keys.status', (_e, provider: string) => keyStatus(provider))
+ipcMain.handle('version.list', (_e, rel: string) => listVersions(rel))
+ipcMain.handle('version.read', (_e, rel: string, id: string) => readVersion(rel, id))
+ipcMain.handle('ai.run', (_e, req: AiRequest) => runAi(req, readConfig()))
+ipcMain.handle('graph.status', () => graphStatus())
+ipcMain.handle('graph.build', () => graphBuild())
+ipcMain.handle('graph.get', () => getGraph())
 
-ipcMain.handle('keys.set', (_e, provider: string, key: string): KeyStatus => {
-  if (!safeStorage.isEncryptionAvailable()) throw new Error('safeStorage no disponible en este SO')
-  const keys = readKeys()
-  keys[provider] = safeStorage.encryptString(key).toString('base64')
-  writeFileSync(keysFile(), JSON.stringify(keys))
-  return { provider, present: true }
+// Export PDF: ventana oculta + printToPDF nativo (sin dependencia externa).
+ipcMain.handle('export.pdf', async (_e, html: string, suggested: string) => {
+  const r = await dialog.showSaveDialog({ defaultPath: suggested, filters: [{ name: 'PDF', extensions: ['pdf'] }] })
+  if (!r.filePath) return null
+  const w = new BrowserWindow({ show: false })
+  await w.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html))
+  const pdf = await w.webContents.printToPDF({ pageSize: 'Letter', printBackground: false })
+  w.destroy()
+  writeFileSync(r.filePath, pdf)
+  return r.filePath
 })
-
-ipcMain.handle('keys.status', (_e, provider: string): KeyStatus => ({ provider, present: provider in readKeys() }))
+ipcMain.handle('export.text', async (_e, content: string, suggested: string) => {
+  const r = await dialog.showSaveDialog({ defaultPath: suggested })
+  if (!r.filePath) return null
+  writeFileSync(r.filePath, content)
+  return r.filePath
+})
+ipcMain.handle('import.script', async (): Promise<FileEntry | null> => {
+  const r = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: 'Guión', extensions: ['fountain', 'fdx', 'txt'] }] })
+  const src = r.filePaths[0]
+  if (!src) return null
+  const name = basename(src, extname(src))
+  const raw = readFileSync(src, 'utf8')
+  const md = extname(src).toLowerCase() === '.fdx' ? fdxToMd(raw, name) : fountainToMd(raw, name)
+  const rel = `scripts/${name}.md`
+  createFile(rel, md)
+  markStale()
+  return { path: rel, kind: 'script', name }
+})
 
 function createWindow() {
-  const win = new BrowserWindow({
-    width: 1400,
-    height: 900,
+  win = new BrowserWindow({
+    width: 1500,
+    height: 950,
     backgroundColor: '#0f1115',
     webPreferences: { preload: join(__dirname, '../preload/index.js'), contextIsolation: true, nodeIntegration: false }
   })
   const devUrl = process.env['ELECTRON_RENDERER_URL']
   if (devUrl) void win.loadURL(devUrl)
   else void win.loadFile(join(__dirname, '../renderer/index.html'))
+  // Ganchos de desarrollo: WRITTER_VAULT abre un vault al arrancar; WRITTER_SHOT guarda una captura y sale.
+  win.webContents.on('console-message', (_e, level, msg) => level >= 2 && console.log('[renderer]', msg))
+  win.webContents.once('did-finish-load', () => {
+    const v = process.env['WRITTER_VAULT']
+    if (v) win?.webContents.send('vault.opened', openVault(v, notify))
+    const shot = process.env['WRITTER_SHOT']
+    if (shot) {
+      setTimeout(async () => {
+        win?.show()
+        win?.focus()
+        console.log('[dom]', await win?.webContents.executeJavaScript('document.body.innerText'))
+        const img = await win?.webContents.capturePage()
+        if (img && !img.isEmpty()) writeFileSync(shot, img.toPNG())
+        else console.log('[shot] captura vacía')
+        app.quit()
+      }, 3500)
+    }
+  })
 }
 
 void app.whenReady().then(createWindow)
