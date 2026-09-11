@@ -93,6 +93,8 @@ function createWindow() {
       setTimeout(async () => {
         win?.show()
         win?.focus()
+        const ev = process.env['WRITTER_EVAL']
+        if (ev) console.log('[eval]', await win?.webContents.executeJavaScript(readFileSync(ev, 'utf8')))
         console.log('[dom]', await win?.webContents.executeJavaScript('document.body.innerText'))
         const img = await win?.webContents.capturePage()
         if (img && !img.isEmpty()) writeFileSync(shot, img.toPNG())
