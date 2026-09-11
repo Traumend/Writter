@@ -1,20 +1,18 @@
 import { app, BrowserWindow, dialog, ipcMain, safeStorage } from 'electron'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { join, resolve, sep } from 'node:path'
+import { join, resolve } from 'node:path'
 import { parse, stringify } from 'yaml'
 import { DEFAULT_CONFIG, type KeyStatus, type ProjectConfig, type VaultSummary } from '../core/types/ipc'
+import { resolveInside } from '../core/vault/paths'
 
 let vaultRoot: string | null = null
 
 const sha = (s: string) => createHash('sha256').update(s).digest('hex')
 
-// Rutas relativas al vault; rechaza escapes fuera de la raíz (frontera de confianza).
 function inVault(rel: string): string {
   if (!vaultRoot) throw new Error('Sin vault abierto')
-  const abs = resolve(vaultRoot, rel)
-  if (abs !== vaultRoot && !abs.startsWith(vaultRoot + sep)) throw new Error('Ruta fuera del vault')
-  return abs
+  return resolveInside(vaultRoot, rel)
 }
 
 function openVault(root: string): VaultSummary {
