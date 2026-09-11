@@ -119,8 +119,8 @@ const theme = EditorView.theme(
     '.cm-activeLine': { backgroundColor: 'transparent' },
     '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': { backgroundColor: '#2b4a80 !important' },
     '.fx-frontmatter': { color: 'var(--dim)', fontSize: '11px', fontFamily: 'system-ui, sans-serif' },
-    '.fx-heading': { fontWeight: 'bold', textTransform: 'uppercase', marginTop: '1.2em' },
-    '.fx-character': { paddingLeft: '20ch', textTransform: 'uppercase', marginTop: '0.8em' },
+    '.fx-heading': { fontWeight: 'bold', textTransform: 'uppercase', paddingTop: '1.2em' },
+    '.fx-character': { paddingLeft: '20ch', textTransform: 'uppercase', paddingTop: '0.8em' },
     '.fx-parenthetical': { paddingLeft: '15ch', color: 'var(--dim)' },
     '.fx-dialogue': { paddingLeft: '10ch', paddingRight: '10ch' },
     '.fx-transition': { textAlign: 'right', textTransform: 'uppercase' },
@@ -131,8 +131,8 @@ const theme = EditorView.theme(
     '.fx-link': { color: 'var(--accent)', textDecoration: 'underline dotted', cursor: 'pointer' },
     '.fx-entity': { textDecoration: 'underline', textDecorationColor: '#3ddc97', textDecorationStyle: 'dotted', textUnderlineOffset: '3px' },
     '.fx-landing': { backgroundColor: 'rgba(79,140,255,0.12)', borderLeft: '2px solid var(--accent)' },
-    '.fx-pagebreak': { borderTop: '1px dashed var(--line)', marginTop: '1.5em', paddingTop: '1em', position: 'relative' },
-    '.fx-pagebreak::before': { content: 'attr(data-page)', position: 'absolute', right: '0', top: '-0.7em', fontSize: '10px', color: 'var(--dim)', fontFamily: 'system-ui, sans-serif' }
+    '.fx-pagebreak': { borderTop: '1px dashed var(--line)', paddingTop: '2.2em', position: 'relative' },
+    '.fx-pagebreak::before': { content: 'attr(data-page)', position: 'absolute', right: '0', top: '0.4em', fontSize: '10px', color: 'var(--dim)', fontFamily: 'system-ui, sans-serif' }
   },
   { dark: true }
 )
