@@ -45,8 +45,13 @@ export function fountainToMd(f: string, title: string): string {
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
-// HTML con formato de industria para imprimir a PDF (Courier 12pt, márgenes estándar).
-export function mdToHtml(md: string, title: string): string {
+export type Cover = { title: string; author: string; contact: string; draft: string; imageDataUrl?: string }
+
+// HTML con formato de industria para imprimir a PDF (Courier 12pt, márgenes estándar). Portada opcional (G).
+export function mdToHtml(md: string, title: string, cover?: Cover): string {
+  const coverHtml = cover && (cover.title || cover.author)
+    ? `<section class="cover">${cover.imageDataUrl ? `<img src="${cover.imageDataUrl}" alt="">` : ''}<div class="ct">${esc(cover.title || title)}</div><div class="by">by</div><div class="au">${esc(cover.author)}</div><div class="ft"><div>${esc(cover.contact).replace(/\n/g, '<br>')}</div><div class="dr">${esc(cover.draft)}</div></div></section>`
+    : ''
   const { tokens } = parseFountain(md)
   const cls: Record<Token['type'], string> = {
     frontmatter: '', blank: '', heading: 'h', action: 'a', character: 'c', parenthetical: 'p', dialogue: 'd', transition: 't', centered: 'ce', section: '', synopsis: '', note: ''
@@ -59,5 +64,7 @@ export function mdToHtml(md: string, title: string): string {
 @page{size:Letter;margin:1in 1in 1in 1.5in}body{font:12pt "Courier New",Courier,monospace;line-height:1;color:#000}
 div{white-space:pre-wrap;margin:0}.h{font-weight:bold;text-transform:uppercase;margin-top:2em}.a{margin-top:1em}
 .c{margin:1em 0 0 2.2in;text-transform:uppercase}.p{margin-left:1.6in;width:2in}.d{margin-left:1in;width:3.5in}.t{text-align:right;margin-top:1em}.ce{text-align:center;margin-top:1em}
-</style></head><body>${body}</body></html>`
+.cover{page-break-after:always;text-align:center;padding-top:2.5in;height:8in;position:relative}.cover img{max-width:4in;max-height:2.5in;display:block;margin:0 auto 1em}
+.ct{font-weight:bold;font-size:14pt}.by{margin:1em 0}.au{font-weight:bold}.ft{position:absolute;bottom:0;left:0;right:0;display:flex;justify-content:space-between;text-align:left;font-size:11pt}.dr{text-align:right}
+</style></head><body>${coverHtml}${body}</body></html>`
 }

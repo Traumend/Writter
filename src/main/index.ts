@@ -2,11 +2,11 @@ import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { basename, extname, join } from 'node:path'
 import { fdxToMd, fountainToMd } from '../core/convert'
-import type { AiRequest, FileEntry, VaultChange, VaultSummary, Version } from '../core/types/ipc'
-import { runAi } from './ai'
+import type { AiRequest, Analysis, FileEntry, ProjectConfig, VaultChange, VaultSummary, Version } from '../core/types/ipc'
+import { aiText, analyze, runAi } from './ai'
 import { getGraph, graphBuild, graphStatus, markStale } from './graph'
 import { keyStatus, setKey } from './keys'
-import { createFile, listFiles, listVersions, openVault, readConfig, readFile, readVersion, writeFile } from './vault'
+import * as V from './vault'
 
 let win: BrowserWindow | null = null
 
@@ -20,36 +20,53 @@ ipcMain.handle('vault.open', async (): Promise<VaultSummary | null> => {
   const dir = r.filePaths[0]
   if (!dir) return null
   markStale()
-  return openVault(dir, notify)
+  return V.openVault(dir, notify)
 })
-ipcMain.handle('vault.list', () => listFiles())
-ipcMain.handle('file.read', (_e, rel: string) => readFile(rel))
+ipcMain.handle('vault.list', () => V.listFiles())
+ipcMain.handle('vault.readAll', () => V.readAll())
+ipcMain.handle('config.write', (_e, c: ProjectConfig) => V.writeConfig(c))
+ipcMain.handle('file.read', (_e, rel: string) => V.readFile(rel))
 ipcMain.handle('file.write', (_e, rel: string, content: string, expectedHash?: string, origin?: Version['origin']) => {
-  const r = writeFile(rel, content, expectedHash, origin)
+  const r = V.writeFile(rel, content, expectedHash, origin)
   markStale()
   return r
 })
 ipcMain.handle('file.create', (_e, rel: string, content: string) => {
-  const r = createFile(rel, content)
+  const r = V.createFile(rel, content)
   markStale()
   return r
 })
 ipcMain.handle('keys.set', (_e, provider: string, key: string) => setKey(provider, key))
 ipcMain.handle('keys.status', (_e, provider: string) => keyStatus(provider))
-ipcMain.handle('version.list', (_e, rel: string) => listVersions(rel))
-ipcMain.handle('version.read', (_e, rel: string, id: string) => readVersion(rel, id))
-ipcMain.handle('ai.run', (_e, req: AiRequest) => runAi(req, readConfig()))
+ipcMain.handle('version.list', (_e, rel: string) => V.listVersions(rel))
+ipcMain.handle('version.read', (_e, rel: string, id: string) => V.readVersion(rel, id))
+ipcMain.handle('version.snapshot', (_e, rel: string, label: string) => V.snapshot(rel, label))
+ipcMain.handle('ai.run', (_e, req: AiRequest) => runAi(req, V.readConfig()))
+ipcMain.handle('ai.text', (_e, instruction: string, context: string) => aiText(instruction, context, V.readConfig()))
+ipcMain.handle('ai.analyze', async (_e, rel: string, text: string): Promise<Analysis> => {
+  const a = await analyze(text, V.readConfig())
+  const ts = Date.now()
+  const id = V.saveAnalysis(rel, { ...a, ts })
+  return { ...a, id, ts }
+})
+ipcMain.handle('analysis.list', (_e, rel: string) => V.listAnalyses(rel))
+ipcMain.handle('analysis.read', (_e, rel: string, id: string) => ({ ...(V.readAnalysis(rel, id) as Omit<Analysis, 'id'>), id }))
 ipcMain.handle('graph.status', () => graphStatus())
 ipcMain.handle('graph.build', () => graphBuild())
 ipcMain.handle('graph.get', () => getGraph())
+ipcMain.handle('asset.pick', async () => {
+  const r = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: 'Imagen', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'] }] })
+  return r.filePaths[0] ? V.importAsset(r.filePaths[0]) : null
+})
+ipcMain.handle('asset.read', (_e, rel: string) => V.readAsset(rel))
 
 // Export PDF: ventana oculta + printToPDF nativo (sin dependencia externa).
-ipcMain.handle('export.pdf', async (_e, html: string, suggested: string) => {
+ipcMain.handle('export.pdf', async (_e, html: string, suggested: string, paper: 'Letter' | 'A4') => {
   const r = await dialog.showSaveDialog({ defaultPath: suggested, filters: [{ name: 'PDF', extensions: ['pdf'] }] })
   if (!r.filePath) return null
   const w = new BrowserWindow({ show: false })
   await w.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html))
-  const pdf = await w.webContents.printToPDF({ pageSize: 'Letter', printBackground: false })
+  const pdf = await w.webContents.printToPDF({ pageSize: paper, printBackground: true })
   w.destroy()
   writeFileSync(r.filePath, pdf)
   return r.filePath
@@ -68,7 +85,7 @@ ipcMain.handle('import.script', async (): Promise<FileEntry | null> => {
   const raw = readFileSync(src, 'utf8')
   const md = extname(src).toLowerCase() === '.fdx' ? fdxToMd(raw, name) : fountainToMd(raw, name)
   const rel = `scripts/${name}.md`
-  createFile(rel, md)
+  V.createFile(rel, md)
   markStale()
   return { path: rel, kind: 'script', name }
 })
@@ -83,11 +100,11 @@ function createWindow() {
   const devUrl = process.env['ELECTRON_RENDERER_URL']
   if (devUrl) void win.loadURL(devUrl)
   else void win.loadFile(join(__dirname, '../renderer/index.html'))
-  // Ganchos de desarrollo: WRITTER_VAULT abre un vault al arrancar; WRITTER_SHOT guarda una captura y sale.
+  // Ganchos de desarrollo: WRITTER_VAULT abre un vault al arrancar; WRITTER_EVAL ejecuta JS en el renderer; WRITTER_SHOT captura y sale.
   win.webContents.on('console-message', (_e, level, msg) => level >= 2 && console.log('[renderer]', msg))
   win.webContents.once('did-finish-load', () => {
     const v = process.env['WRITTER_VAULT']
-    if (v) win?.webContents.send('vault.opened', openVault(v, notify))
+    if (v) win?.webContents.send('vault.opened', V.openVault(v, notify))
     const shot = process.env['WRITTER_SHOT']
     if (shot) {
       setTimeout(async () => {
