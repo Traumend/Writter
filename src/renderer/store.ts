@@ -4,7 +4,8 @@ import { paginate, type Pagination } from '../core/paginate'
 import { parseFountain } from '../core/parser/fountain'
 import { project, type Projection } from '../core/projection'
 import { moveScene as moveSceneText } from '../core/scenes'
-import type { AiProposal, Doc, FileEntry, GraphStatus, KeyStatus, ProjectConfig, Scope, VaultSummary, Version } from '../core/types/ipc'
+import { roleDir as roleDirOf } from '../core/types/ipc'
+import type { AdoptionProposal, AdoptRole, AiProposal, Doc, FileEntry, FileKind, GraphStatus, KeyStatus, ProjectConfig, Scope, VaultSummary, Version } from '../core/types/ipc'
 
 export type Proposal = AiProposal & { from: number; to: number; target: string }
 export type Tab = 'desk' | 'breakdown' | 'dev' | 'production' | 'settings'
@@ -36,12 +37,17 @@ type State = {
   versions: Version[]
   status: string
   showTags: boolean
+  adoption: AdoptionProposal | null
 }
 
 type Actions = {
   setTab(t: Tab): void
   setDevTab(t: DevTab): void
-  openVault(pre?: VaultSummary): Promise<void>
+  openVault(): Promise<void>
+  applySummary(v: VaultSummary): Promise<void>
+  adopt(roles: Record<AdoptRole, string[]>): Promise<void>
+  cancelAdopt(): void
+  roleDir(kind: Exclude<FileKind, 'other'>): string
   refreshFiles(): Promise<void>
   refreshDocs(): Promise<void>
   openFile(path: string, gotoLine?: number): Promise<void>
@@ -120,13 +126,33 @@ export const useStore = create<State & Actions>((set, get) => ({
   versions: [],
   status: '',
   showTags: true,
+  adoption: null,
 
   setTab: (tab) => set({ tab }),
   setDevTab: (devTab) => set({ devTab }),
 
-  async openVault(pre) {
-    const v = pre ?? (await window.api.vaultOpen())
-    if (!v) return
+  async openVault() {
+    const r = await window.api.vaultOpen()
+    if (!r) return
+    if (r.kind === 'adopt') set({ adoption: r }) // carpeta con contenido sin proyecto -> asistente
+    else await get().applySummary(r.summary)
+  },
+
+  async adopt(roles) {
+    const a = get().adoption
+    if (!a) return
+    set({ adoption: null })
+    await get().applySummary(await window.api.vaultAdopt(a.root, roles))
+  },
+
+  cancelAdopt: () => set({ adoption: null }),
+
+  roleDir: (kind) => {
+    const v = get().vault
+    return v ? roleDirOf(v.config, kind) : kind
+  },
+
+  async applySummary(v) {
     set({ vault: v, files: v.files, path: null, text: '', diskHash: null, dirty: false, proposal: null, projection: EMPTY, pagination: NOPAG })
     set({ keyStatus: await window.api.keysStatus(v.config.byok.provider) })
     await get().refreshDocs()
@@ -310,7 +336,8 @@ export const useStore = create<State & Actions>((set, get) => ({
 
 export const cleanErr = (e: unknown) => String(e).replace(/^Error: (Error invoking remote method '[^']+': )?(Error: )?/, '')
 
-window.addEventListener('vault.opened', (e) => void useStore.getState().openVault((e as CustomEvent<VaultSummary>).detail))
+window.addEventListener('vault.opened', (e) => void useStore.getState().applySummary((e as CustomEvent<VaultSummary>).detail))
+window.addEventListener('vault.adopt', (e) => useStore.setState({ adoption: (e as CustomEvent<AdoptionProposal>).detail }))
 
 // Cambios externos (Obsidian u otro editor): recargar si no hay cambios locales; si los hay, marcar conflicto (I10).
 window.api.onVaultChange((e) => {

@@ -1,8 +1,8 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { readFileSync, writeFileSync } from 'node:fs'
-import { basename, extname, join } from 'node:path'
+import { basename, extname, join, resolve } from 'node:path'
 import { fdxToMd, fountainToMd } from '../core/convert'
-import type { AiRequest, Analysis, FileEntry, ProjectConfig, VaultChange, VaultSummary, Version } from '../core/types/ipc'
+import type { AdoptRole, AiRequest, Analysis, FileEntry, OpenResult, ProjectConfig, VaultChange, Version } from '../core/types/ipc'
 import { aiText, analyze, runAi } from './ai'
 import { getGraph, graphBuild, graphStatus, markStale } from './graph'
 import { keyStatus, setKey } from './keys'
@@ -15,12 +15,20 @@ const notify = (e: VaultChange) => {
   win?.webContents.send('vault.changed', e)
 }
 
-ipcMain.handle('vault.open', async (): Promise<VaultSummary | null> => {
+ipcMain.handle('vault.open', async (): Promise<OpenResult> => {
   const r = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] })
   const dir = r.filePaths[0]
   if (!dir) return null
   markStale()
-  return V.openVault(dir, notify)
+  if (V.hasProject(dir)) return { kind: 'opened', summary: V.openVault(dir, notify) }
+  const folders = V.scanFolder(dir)
+  // Carpeta con contenido y sin proyecto -> proponer adopción; vacía -> crear layout por defecto directo.
+  if (folders.length > 0) return { kind: 'adopt', root: dir, folders }
+  return { kind: 'opened', summary: V.openVault(dir, notify) }
+})
+ipcMain.handle('vault.adopt', (_e, root: string, roles: Record<AdoptRole, string[]>) => {
+  markStale()
+  return V.adopt(root, roles, notify)
 })
 ipcMain.handle('vault.list', () => V.listFiles())
 ipcMain.handle('vault.readAll', () => V.readAll())
@@ -104,7 +112,15 @@ function createWindow() {
   win.webContents.on('console-message', (_e, level, msg) => level >= 2 && console.log('[renderer]', msg))
   win.webContents.once('did-finish-load', () => {
     const v = process.env['WRITTER_VAULT']
-    if (v) win?.webContents.send('vault.opened', V.openVault(v, notify))
+    if (v) {
+      // Igual que el diálogo: proyecto existente -> abrir; carpeta ajena con contenido -> proponer adopción.
+      if (V.hasProject(v)) win?.webContents.send('vault.opened', V.openVault(v, notify))
+      else {
+        const folders = V.scanFolder(v)
+        if (folders.length > 0) win?.webContents.send('vault.adopt', { kind: 'adopt', root: resolve(v), folders })
+        else win?.webContents.send('vault.opened', V.openVault(v, notify))
+      }
+    }
     const shot = process.env['WRITTER_SHOT']
     if (shot) {
       setTimeout(async () => {

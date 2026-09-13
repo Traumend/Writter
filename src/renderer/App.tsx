@@ -1,3 +1,4 @@
+import { Adoption } from './views/Adoption'
 import { Analysis } from './views/Analysis'
 import { BeatTimeline } from './views/BeatTimeline'
 import { Breakdown } from './views/Breakdown'
@@ -43,6 +44,7 @@ export function App() {
       {s.tab === 'dev' && s.devTab === 'analysis' && <Analysis />}
       {s.tab === 'production' && <Production />}
       {s.tab === 'settings' && <Settings />}
+      <Adoption />
       <footer>
         <span>{s.status || '—'}</span>
         <span className="grow" />

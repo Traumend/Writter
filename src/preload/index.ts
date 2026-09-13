@@ -4,6 +4,7 @@ import type { Api, VaultChange } from '../core/types/ipc'
 // Superficie mínima: el renderer solo ve estas funciones, nunca fs/claves/red.
 const api: Api = {
   vaultOpen: () => ipcRenderer.invoke('vault.open'),
+  vaultAdopt: (root, roles) => ipcRenderer.invoke('vault.adopt', root, roles),
   vaultList: () => ipcRenderer.invoke('vault.list'),
   vaultReadAll: () => ipcRenderer.invoke('vault.readAll'),
   configWrite: (c) => ipcRenderer.invoke('config.write', c),
@@ -37,3 +38,4 @@ const api: Api = {
 
 contextBridge.exposeInMainWorld('api', api)
 ipcRenderer.on('vault.opened', (_e, v) => window.dispatchEvent(new CustomEvent('vault.opened', { detail: v })))
+ipcRenderer.on('vault.adopt', (_e, p) => window.dispatchEvent(new CustomEvent('vault.adopt', { detail: p })))

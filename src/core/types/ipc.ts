@@ -1,4 +1,6 @@
 // Contrato IPC (plan §3.2). Tipos compartidos main <-> renderer, sin dependencias de Node.
+export type AdoptRole = 'script' | 'character' | 'location' | 'prop' | 'outline' | 'knowledge' | 'assets'
+
 export type ProjectConfig = {
   format: { default: 'md' | 'fountain'; live_format: boolean }
   tags: { entity_link: string; note: string }
@@ -7,6 +9,7 @@ export type ProjectConfig = {
   prompts: { assistant: string; analysis: string }
   cover: { title: string; author: string; contact: string; draft: string; image: string }
   pdf: { paper: 'Letter' | 'A4' }
+  roles: Record<AdoptRole, string[]> // carpetas por rol (adopción, Pieza 1); Writter lee desde aquí
 }
 
 export type FileKind = 'script' | 'character' | 'location' | 'prop' | 'outline' | 'knowledge' | 'other'
@@ -14,6 +17,11 @@ export type FileEntry = { path: string; kind: FileKind; name: string }
 export type Doc = { path: string; content: string }
 
 export type VaultSummary = { root: string; config: ProjectConfig; files: FileEntry[] }
+
+// Asistente de adopción: una fila por carpeta con contenido, con rol propuesto editable.
+export type FolderGuess = { path: string; role: AdoptRole | 'ignore'; mdCount: number; imageCount: number; hint: string }
+export type AdoptionProposal = { kind: 'adopt'; root: string; folders: FolderGuess[] }
+export type OpenResult = { kind: 'opened'; summary: VaultSummary } | AdoptionProposal | null
 
 export type KeyStatus = { provider: string; present: boolean }
 
@@ -58,7 +66,8 @@ export type GraphEdge = { source: string; target: string; kind: 'references' | '
 export type Graph = { nodes: GraphNode[]; edges: GraphEdge[] }
 
 export type Api = {
-  vaultOpen(): Promise<VaultSummary | null>
+  vaultOpen(): Promise<OpenResult>
+  vaultAdopt(root: string, roles: Record<AdoptRole, string[]>): Promise<VaultSummary>
   vaultList(): Promise<FileEntry[]>
   vaultReadAll(): Promise<Doc[]>
   configWrite(config: ProjectConfig): Promise<ProjectConfig>
@@ -103,7 +112,16 @@ export const DEFAULT_CONFIG: ProjectConfig = {
   byok: { provider: 'anthropic' },
   prompts: DEFAULT_PROMPTS,
   cover: { title: '', author: '', contact: '', draft: '', image: '' },
-  pdf: { paper: 'Letter' }
+  pdf: { paper: 'Letter' },
+  roles: {
+    script: ['scripts'],
+    character: ['entities/characters'],
+    location: ['entities/locations'],
+    prop: ['entities/props'],
+    outline: ['outline'],
+    knowledge: ['knowledge'],
+    assets: ['assets']
+  }
 }
 
 export const KIND_DIR: Record<Exclude<FileKind, 'other'>, string> = {
@@ -113,4 +131,9 @@ export const KIND_DIR: Record<Exclude<FileKind, 'other'>, string> = {
   prop: 'entities/props',
   outline: 'outline',
   knowledge: 'knowledge'
+}
+
+// Carpeta primaria por rol para crear archivos nuevos, según el mapa configurado (fallback al default).
+export function roleDir(config: ProjectConfig, kind: Exclude<FileKind, 'other'>): string {
+  return config.roles[kind]?.[0] ?? KIND_DIR[kind]
 }

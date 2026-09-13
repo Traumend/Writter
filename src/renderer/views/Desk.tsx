@@ -23,11 +23,12 @@ function NewFile({ kind, onDone }: { kind: Exclude<FileKind, 'other'>; onDone: (
   const [season, setSeason] = useState('1')
   const [episode, setEpisode] = useState('1')
   const createFile = useStore((s) => s.createFile)
+  const roleDir = useStore((s) => s.roleDir)
   const go = () => {
     if (!name.trim()) return
     const n = name.trim()
     const file = kind === 'script' ? `S${season.padStart(2, '0')}E${episode.padStart(2, '0')} ${n}` : n
-    void createFile(`${KIND_DIR[kind]}/${file}.md`, TEMPLATE[kind](n, { season: Number(season), episode: Number(episode) })).then(onDone)
+    void createFile(`${roleDir(kind)}/${file}.md`, TEMPLATE[kind](n, { season: Number(season), episode: Number(episode) })).then(onDone)
   }
   return (
     <div className="newfile">
@@ -43,7 +44,7 @@ function NewFile({ kind, onDone }: { kind: Exclude<FileKind, 'other'>; onDone: (
 }
 
 function LeftPanel() {
-  const { vault, files, docs, path, projection, pagination, cursorLine, openFile, createFile, setCursor, moveScene } = useStore()
+  const { vault, files, docs, path, projection, pagination, cursorLine, openFile, createFile, setCursor, moveScene, roleDir } = useStore()
   const [adding, setAdding] = useState<Exclude<FileKind, 'other'> | null>(null)
   const [q, setQ] = useState('')
   const [inContent, setInContent] = useState(false)
@@ -97,7 +98,7 @@ function LeftPanel() {
             {scene.links.map((l) => (
               <li key={l} className={resolved.has(l.toLowerCase()) ? '' : 'muted'}>
                 [[{l}]]
-                {!resolved.has(l.toLowerCase()) && <button className="mini" onClick={() => void createFile(`${KIND_DIR.character}/${l}.md`, TEMPLATE.character(l), false)}>+ ficha</button>}
+                {!resolved.has(l.toLowerCase()) && <button className="mini" onClick={() => void createFile(`${roleDir('character')}/${l}.md`, TEMPLATE.character(l), false)}>+ ficha</button>}
               </li>
             ))}
           </ul>

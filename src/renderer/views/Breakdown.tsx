@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { breakdown, extractMissing, toCsv, type EntityCard } from '../../core/breakdown'
 import { writeFrontmatter } from '../../core/frontmatter'
-import { KIND_DIR, type FileKind } from '../../core/types/ipc'
+import type { FileKind } from '../../core/types/ipc'
 import { useStore } from '../store'
 import { BlurInput, useAsset } from '../ui'
 import { TEMPLATE } from './Desk'
@@ -50,7 +50,7 @@ function Card({ c }: { c: EntityCard }) {
 }
 
 export function Breakdown() {
-  const { files, docs, createFile } = useStore()
+  const { files, docs, createFile, roleDir } = useStore()
   const [kind, setKind] = useState<FileKind>('character')
   const [group, setGroup] = useState('all')
   const [q, setQ] = useState('')
@@ -61,12 +61,12 @@ export function Breakdown() {
     .filter((c) => c.kind === kind && (group === 'all' || c.group === group) && (!q || c.name.toLowerCase().includes(q.toLowerCase())))
     .sort((a, b) => b.appearances.length - a.appearances.length)
   const extract = async () => {
-    for (const n of missing.characters) await createFile(`${KIND_DIR.character}/${n}.md`, TEMPLATE.character(n), false)
-    for (const n of missing.locations) await createFile(`${KIND_DIR.location}/${n}.md`, TEMPLATE.location(n), false)
+    for (const n of missing.characters) await createFile(`${roleDir('character')}/${n}.md`, TEMPLATE.character(n), false)
+    for (const n of missing.locations) await createFile(`${roleDir('location')}/${n}.md`, TEMPLATE.location(n), false)
   }
   const add = () => {
     if (!newName.trim() || kind === 'script' || kind === 'other') return
-    void createFile(`${KIND_DIR[kind]}/${newName.trim()}.md`, TEMPLATE[kind](newName.trim()), false)
+    void createFile(`${roleDir(kind)}/${newName.trim()}.md`, TEMPLATE[kind](newName.trim()), false)
     setNewName('')
   }
   return (

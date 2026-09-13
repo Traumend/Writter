@@ -2,8 +2,11 @@ import { createHash } from 'node:crypto'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, watch, writeFileSync, type FSWatcher } from 'node:fs'
 import { basename, extname, join, relative, resolve } from 'node:path'
 import { parse, stringify } from 'yaml'
-import { DEFAULT_CONFIG, KIND_DIR, type Doc, type FileEntry, type FileKind, type ProjectConfig, type VaultChange, type VaultSummary, type Version } from '../core/types/ipc'
+import { guessRole, roleOf } from '../core/adopt'
+import { DEFAULT_CONFIG, KIND_DIR, type AdoptRole, type Doc, type FileEntry, type FolderGuess, type ProjectConfig, type VaultChange, type VaultSummary, type Version } from '../core/types/ipc'
 import { resolveInside } from '../core/vault/paths'
+
+const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'])
 
 export const sha = (s: string) => createHash('sha256').update(s).digest('hex')
 
@@ -30,7 +33,8 @@ export function readConfig(): ProjectConfig {
     byok: { ...DEFAULT_CONFIG.byok, ...c.byok },
     prompts: { ...DEFAULT_CONFIG.prompts, ...c.prompts },
     cover: { ...DEFAULT_CONFIG.cover, ...c.cover },
-    pdf: { ...DEFAULT_CONFIG.pdf, ...c.pdf }
+    pdf: { ...DEFAULT_CONFIG.pdf, ...c.pdf },
+    roles: { ...DEFAULT_CONFIG.roles, ...c.roles }
   }
 }
 
@@ -39,12 +43,8 @@ export function writeConfig(c: ProjectConfig): ProjectConfig {
   return readConfig()
 }
 
-function kindOf(rel: string): FileKind {
-  for (const [k, dir] of Object.entries(KIND_DIR)) if (rel.startsWith(dir + '/')) return k as FileKind
-  return 'other'
-}
-
 export function listFiles(): FileEntry[] {
+  const roles = readConfig().roles
   const out: FileEntry[] = []
   const walk = (dir: string) => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
@@ -53,7 +53,8 @@ export function listFiles(): FileEntry[] {
       if (e.isDirectory()) walk(abs)
       else if (e.name.endsWith('.md')) {
         const rel = toRel(abs)
-        out.push({ path: rel, kind: kindOf(rel), name: basename(e.name, '.md') })
+        const role = roleOf(rel, roles) // null (fuera del mapa) o 'assets' -> se ignora en la lista de contenido
+        if (role && role !== 'assets') out.push({ path: rel, kind: role, name: basename(e.name, '.md') })
       }
     }
   }
@@ -61,23 +62,85 @@ export function listFiles(): FileEntry[] {
   return out.sort((a, b) => a.path.localeCompare(b.path))
 }
 
+// Escaneo de solo lectura para el asistente de adopción: una fila por carpeta con contenido, con rol propuesto.
+export function scanFolder(dir: string): FolderGuess[] {
+  const base = resolve(dir)
+  type Acc = { md: string[]; images: number; headings: number; fmTypes: string[] }
+  const byDir = new Map<string, Acc>()
+  const acc = (rel: string): Acc => {
+    let a = byDir.get(rel)
+    if (!a) byDir.set(rel, (a = { md: [], images: 0, headings: 0, fmTypes: [] }))
+    return a
+  }
+  const walk = (abs: string) => {
+    for (const e of readdirSync(abs, { withFileTypes: true })) {
+      if (e.name.startsWith('.') || e.name === 'node_modules') continue
+      const child = join(abs, e.name)
+      if (e.isDirectory()) walk(child)
+      else {
+        const rel = relative(base, abs).split('\\').join('/') || '.'
+        const a = acc(rel)
+        const ext = extname(e.name).toLowerCase()
+        if (ext === '.md') {
+          a.md.push(e.name)
+          if (a.md.length <= 5) {
+            const text = readFileSync(child, 'utf8')
+            if (/^\s*(INT|EXT|EST|I\/E)[.\s]/im.test(text)) a.headings++
+            const m = /^---\r?\n[\s\S]*?\btype:\s*([\w-]+)/m.exec(text)
+            if (m?.[1]) a.fmTypes.push(m[1])
+          }
+        } else if (IMAGE_EXT.has(ext)) a.images++
+      }
+    }
+  }
+  walk(base)
+  return [...byDir.entries()]
+    .filter(([, a]) => a.md.length > 0 || a.images > 0)
+    .map(([path, a]) => {
+      const name = path === '.' ? basename(base) : (path.split('/').pop() ?? path)
+      const role = guessRole({ name, mdCount: a.md.length, imageCount: a.images, headingCount: a.headings, fmTypes: a.fmTypes })
+      const hint = a.md.length ? `${a.md.length} .md${a.images ? `, ${a.images} img` : ''}` : `${a.images} img`
+      return { path, role, mdCount: a.md.length, imageCount: a.images, hint }
+    })
+    .sort((x, y) => x.path.localeCompare(y.path))
+}
+
+
 // ponytail: lee todo el vault en memoria para breakdown/análisis; índice incremental si un vault real lo pide.
 export function readAll(): Doc[] {
   return listFiles().map((f) => ({ path: f.path, content: readFileSync(inVault(f.path), 'utf8') }))
 }
 
-export function openVault(dir: string, onChange: (e: VaultChange) => void): VaultSummary {
-  root = resolve(dir)
-  for (const d of [...Object.values(KIND_DIR), 'assets', '.narrative/versions', '.narrative/analysis']) mkdirSync(join(root, d), { recursive: true })
-  const config = readConfig()
+export const hasProject = (dir: string) => existsSync(join(resolve(dir), '.narrative/project.yaml'))
+
+function startWatcher(onChange: (e: VaultChange) => void) {
   watcher?.close()
   // ponytail: fs.watch recursivo nativo (Win/mac/Linux>=20); chokidar solo si falla en algún FS.
-  watcher = watch(root, { recursive: true }, (_ev, file) => {
+  watcher = watch(root!, { recursive: true }, (_ev, file) => {
     if (!file || !file.toString().endsWith('.md') || file.toString().startsWith('.narrative')) return
     const rel = file.toString().split('\\').join('/')
     const abs = join(root!, rel)
     onChange({ path: rel, hash: existsSync(abs) ? sha(readFileSync(abs, 'utf8')) : null })
   })
+}
+
+// Abre un proyecto existente, o inicializa el layout por defecto si la carpeta no es un proyecto Writter.
+export function openVault(dir: string, onChange: (e: VaultChange) => void): VaultSummary {
+  root = resolve(dir)
+  const fresh = !existsSync(cfgPath())
+  for (const d of ['.narrative/versions', '.narrative/analysis']) mkdirSync(join(root, d), { recursive: true })
+  if (fresh) for (const d of [...Object.values(KIND_DIR), 'assets']) mkdirSync(join(root, d), { recursive: true })
+  const config = readConfig()
+  startWatcher(onChange)
+  return { root, config, files: listFiles() }
+}
+
+// Adopta una carpeta existente con el mapa rol -> carpetas que confirmó el usuario. No mueve ni crea contenido.
+export function adopt(dir: string, roles: Record<AdoptRole, string[]>, onChange: (e: VaultChange) => void): VaultSummary {
+  root = resolve(dir)
+  for (const d of ['.narrative/versions', '.narrative/analysis']) mkdirSync(join(root, d), { recursive: true })
+  const config = writeConfig({ ...readConfig(), roles })
+  startWatcher(onChange)
   return { root, config, files: listFiles() }
 }
 

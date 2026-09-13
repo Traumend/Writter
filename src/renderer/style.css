@@ -140,3 +140,8 @@ ul.bullets li:hover { background: transparent; }
 .preview .ct { font-weight: bold; font-size: 13px; margin-bottom: 8px; }
 .preview .au { font-weight: bold; margin-top: 8px; }
 .preview .ft { position: absolute; bottom: 6%; left: 8%; right: 8%; display: flex; justify-content: space-between; text-align: left; white-space: pre-wrap; font-size: 9px; }
+/* modal (asistente de adopción) */
+.modal-backdrop { position: fixed; inset: 0; background: #000a; display: grid; place-items: center; z-index: 50; }
+.modal { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px 24px; width: min(720px, 92vw); box-shadow: 0 12px 40px #000a; }
+.modal h1 { font-size: 20px; }
+.modal .table select { width: 100%; }
