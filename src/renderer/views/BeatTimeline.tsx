@@ -87,8 +87,9 @@ export function BeatTimeline() {
           <div className="lanelabel">Beats</div>
           <div className="track beats">
             {beats.map((b) => (
-              <div className="beat" key={b.id} style={{ left: pct(b.scene), borderColor: KINDS[b.kind] ?? KINDS['other'] }}>
+              <div className="beat" key={b.id} style={{ left: pct(b.scene) }}>
                 <div className="row">
+                  <span className="dot" title={b.kind} style={{ background: KINDS[b.kind] ?? KINDS['other'] }} />
                   <select value={b.kind} onChange={(e) => save({ beats: beats.map((x) => (x.id === b.id ? { ...x, kind: e.target.value } : x)) })}>{Object.keys(KINDS).map((k) => <option key={k}>{k}</option>)}</select>
                   <select value={b.scene} onChange={(e) => save({ beats: beats.map((x) => (x.id === b.id ? { ...x, scene: Number(e.target.value) } : x)) })}>{proj.scenes.map((s) => <option key={s.index} value={s.index}>#{s.index + 1}</option>)}</select>
                   <button className="mini ghost" onClick={() => save({ beats: beats.filter((x) => x.id !== b.id) })}>×</button>
