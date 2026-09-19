@@ -102,7 +102,7 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1500,
     height: 950,
-    backgroundColor: '#0f1115',
+    backgroundColor: '#1a1c20',
     webPreferences: { preload: join(__dirname, '../preload/index.js'), contextIsolation: true, nodeIntegration: false }
   })
   const devUrl = process.env['ELECTRON_RENDERER_URL']
