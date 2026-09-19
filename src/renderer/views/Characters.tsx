@@ -107,11 +107,12 @@ export function Characters() {
           </div>
 
           <h2>Apariencia</h2>
-          <BlurInput textarea rows={3} value={str('appearance')} placeholder="Casting, vestuario, marcas visibles…" onCommit={(v) => patch({ appearance: v })} />
+          {/* div contenedor: evita que el textarea colapse como hijo directo del section flex-column */}
+          <div><BlurInput textarea rows={5} value={str('appearance')} placeholder="Casting, vestuario, marcas visibles…" onCommit={(v) => patch({ appearance: v })} /></div>
           <AiSuggest instruction="Describe la apariencia física y el vestuario de este personaje en un párrafo, solo con lo que el guión soporte." context={context} onAccept={(t) => patch({ appearance: t })} />
 
           <h2>Biografía · {body.trim().split(/\s+/).filter(Boolean).length} palabras</h2>
-          <BlurInput textarea rows={8} value={body.replace(/^\n+/, '')} placeholder="Biografía en prosa (cuerpo del .md)" onCommit={(v) => setBody('\n' + v + '\n')} />
+          <div><BlurInput textarea rows={14} value={body.replace(/^\n+/, '')} placeholder="Biografía en prosa (cuerpo del .md)" onCommit={(v) => setBody('\n' + v + '\n')} /></div>
           <AiSuggest instruction="Escribe una biografía breve (100-150 palabras) de este personaje basada en las escenas." context={context} onAccept={(t) => setBody('\n' + t + '\n')} />
 
           <h2>Want / Need</h2>
