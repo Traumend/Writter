@@ -8,7 +8,7 @@ const SCALES: [Scale, string][] = [['compact', 'Compacta'], ['normal', 'Normal']
 const CATS = ['Interfaz', 'Editor'] as const
 
 export function Preferences() {
-  const { prefsOpen, closePrefs, prefs, setPref, showTags, toggleTags } = useStore()
+  const { prefsOpen, closePrefs, prefs, setPref, showTags, toggleTags, resetLayout } = useStore()
   const [cat, setCat] = useState<(typeof CATS)[number]>('Interfaz')
   if (!prefsOpen) return null
   return (
@@ -35,6 +35,9 @@ export function Preferences() {
                   ))}
                 </div>
                 <p className="muted tiny">Ajusta el tamaño de todo el texto e interfaz. Se guarda en este equipo.</p>
+                <h2>Disposición</h2>
+                <button className="ghost" onClick={resetLayout}>Restablecer paneles</button>
+                <p className="muted tiny">En el Escritorio puedes arrastrar los bordes entre paneles para redimensionarlos, y arrastrar las cabeceras de la biblioteca (Episodios, Personajes…) para reordenarlas o plegarlas. Esto las devuelve a su lugar.</p>
               </>
             )}
             {cat === 'Editor' && (

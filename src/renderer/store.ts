@@ -13,7 +13,10 @@ export type Tab = 'desk' | 'breakdown' | 'dev' | 'production' | 'settings'
 // Preferencias de interfaz (solo renderer, localStorage): no son datos del proyecto.
 export type AccentName = 'naranja' | 'ambar' | 'azul' | 'verde' | 'rosa'
 export type Scale = 'compact' | 'normal' | 'large'
-export type Prefs = { accent: AccentName; scale: Scale }
+export const DEFAULT_SECTIONS = ['script', 'character', 'location', 'prop', 'outline', 'knowledge']
+// deskLeft/deskRight: ancho de los paneles laterales del Escritorio (arrastrables).
+// sectionOrder/collapsed: orden y plegado de las secciones de biblioteca (arrastrables).
+export type Prefs = { accent: AccentName; scale: Scale; deskLeft: number; deskRight: number; sectionOrder: string[]; collapsed: string[] }
 export const ACCENTS: Record<AccentName, [string, string, string]> = {
   naranja: ['#ff5a1f', '#e64d13', '#1a1000'],
   ambar: ['#f5a623', '#e0930f', '#1a1200'],
@@ -22,7 +25,8 @@ export const ACCENTS: Record<AccentName, [string, string, string]> = {
   rosa: ['#ff5a8a', '#e64878', '#1a0410']
 }
 const SCALE_PX: Record<Scale, string> = { compact: '12.5px', normal: '13.5px', large: '15px' }
-const DEFAULT_PREFS: Prefs = { accent: 'naranja', scale: 'normal' }
+const DEFAULT_PREFS: Prefs = { accent: 'naranja', scale: 'normal', deskLeft: 268, deskRight: 350, sectionOrder: DEFAULT_SECTIONS, collapsed: [] }
+export const DEFAULT_LAYOUT = { deskLeft: 268, deskRight: 350, sectionOrder: DEFAULT_SECTIONS, collapsed: [] as string[] }
 
 function loadPrefs(): Prefs {
   try {
@@ -103,6 +107,7 @@ type Actions = {
   saveConfig(c: ProjectConfig): Promise<void>
   toggleTags(): void
   setPref<K extends keyof Prefs>(k: K, v: Prefs[K]): void
+  resetLayout(): void
   openPrefs(): void
   closePrefs(): void
 }
@@ -170,6 +175,11 @@ export const useStore = create<State & Actions>((set, get) => ({
     const prefs = { ...get().prefs, [k]: v }
     localStorage.setItem('writter.prefs', JSON.stringify(prefs))
     applyPrefs(prefs)
+    set({ prefs })
+  },
+  resetLayout() {
+    const prefs = { ...get().prefs, ...DEFAULT_LAYOUT }
+    localStorage.setItem('writter.prefs', JSON.stringify(prefs))
     set({ prefs })
   },
   openPrefs: () => set({ prefsOpen: true }),

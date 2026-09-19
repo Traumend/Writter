@@ -1,11 +1,11 @@
 import { diffLines } from 'diff'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { mdToFountain, mdToHtml } from '../../core/convert'
 import { readFrontmatter } from '../../core/frontmatter'
 import { estimateTokens } from '../../core/safeguards'
-import { KIND_DIR, type FileKind, type Scope } from '../../core/types/ipc'
+import { type FileKind, type Scope } from '../../core/types/ipc'
 import { Editor } from '../editor/Editor'
-import { useStore } from '../store'
+import { DEFAULT_SECTIONS, useStore } from '../store'
 import { useAsset } from '../ui'
 
 const KIND_LABEL: Record<FileKind, string> = { script: 'Episodios', character: 'Personajes', location: 'Locaciones', prop: 'Props', outline: 'Escaleta', knowledge: 'Conocimiento', other: 'Otros' }
@@ -43,8 +43,43 @@ function NewFile({ kind, onDone }: { kind: Exclude<FileKind, 'other'>; onDone: (
   )
 }
 
+let dragId: string | null = null // sección en arrastre (reordenamiento nativo)
+
+// Sección de biblioteca: cabecera arrastrable (reordenar) + plegable (colapsar). Estado en prefs.
+function LibrarySection({ id, label, onAdd, children }: { id: string; label: string; onAdd: () => void; children: ReactNode }) {
+  const { prefs, setPref } = useStore()
+  const [over, setOver] = useState(false)
+  const collapsed = prefs.collapsed.includes(id)
+  const toggle = () => setPref('collapsed', collapsed ? prefs.collapsed.filter((x) => x !== id) : [...prefs.collapsed, id])
+  const drop = () => {
+    setOver(false)
+    if (!dragId || dragId === id) return
+    const order = orderedSections(prefs.sectionOrder)
+    const next = order.filter((x) => x !== dragId)
+    next.splice(next.indexOf(id), 0, dragId)
+    setPref('sectionOrder', next)
+    dragId = null
+  }
+  return (
+    <div className={`block lib ${over ? 'dragover' : ''}`} onDragOver={(e) => { e.preventDefault(); setOver(true) }} onDragLeave={() => setOver(false)} onDrop={drop}>
+      <h2 draggable onDragStart={() => (dragId = id)} onDragEnd={() => (dragId = null)} title="Arrastra para reordenar · clic para plegar">
+        <span className="drag" aria-hidden>⠿</span>
+        <span className="grow link" onClick={toggle}>{collapsed ? '▸' : '▾'} {label}</span>
+        <button className="mini" onClick={(e) => { e.stopPropagation(); onAdd() }}>+</button>
+      </h2>
+      {!collapsed && children}
+    </div>
+  )
+}
+
+// Orden de secciones saneado: válidas del pref + las que falten (prefs antiguas), sin duplicados.
+function orderedSections(order: string[]): string[] {
+  const valid = order.filter((x) => DEFAULT_SECTIONS.includes(x))
+  return [...valid, ...DEFAULT_SECTIONS.filter((x) => !valid.includes(x))]
+}
+
 function LeftPanel() {
-  const { vault, files, docs, path, projection, pagination, cursorLine, openFile, createFile, setCursor, moveScene, roleDir } = useStore()
+  const { vault, files, docs, path, projection, pagination, cursorLine, openFile, createFile, setCursor, moveScene, roleDir, prefs } = useStore()
   const [adding, setAdding] = useState<Exclude<FileKind, 'other'> | null>(null)
   const [q, setQ] = useState('')
   const [inContent, setInContent] = useState(false)
@@ -61,19 +96,34 @@ function LeftPanel() {
   }
   const ql = q.toLowerCase()
   const scenes = projection.scenes.filter((s) => !ql || s.heading.toLowerCase().includes(ql) || (inContent && lines.slice(s.startLine, s.endLine).join('\n').toLowerCase().includes(ql)))
-  const kinds = (Object.keys(KIND_DIR) as Exclude<FileKind, 'other'>[]).filter((k) => k !== 'script')
+
+  // Cuerpo de cada sección de biblioteca por id.
+  const body = (id: string) => {
+    if (id === 'script') {
+      return (
+        <>
+          {adding === 'script' && <NewFile kind="script" onDone={() => setAdding(null)} />}
+          {[...seasons.entries()].sort().map(([season, list]) => (
+            <div key={season}>
+              <div className="muted tiny">{season}</div>
+              <ul>{list.map((f) => <li key={f.path} className={f.path === path ? 'active' : ''} onClick={() => void openFile(f.path)}>{f.name}</li>)}</ul>
+            </div>
+          ))}
+        </>
+      )
+    }
+    const k = id as Exclude<FileKind, 'other'>
+    return (
+      <>
+        {adding === k && <NewFile kind={k} onDone={() => setAdding(null)} />}
+        <ul>{files.filter((f) => f.kind === k).map((f) => <li key={f.path} className={f.path === path ? 'active' : ''} onClick={() => void openFile(f.path)}>{f.name}</li>)}</ul>
+      </>
+    )
+  }
+
   return (
     <>
-      <div className="block">
-        <h2>Episodios <button className="mini" onClick={() => setAdding('script')}>+</button></h2>
-        {adding === 'script' && <NewFile kind="script" onDone={() => setAdding(null)} />}
-        {[...seasons.entries()].sort().map(([season, list]) => (
-          <div key={season}>
-            <div className="muted tiny">{season}</div>
-            <ul>{list.map((f) => <li key={f.path} className={f.path === path ? 'active' : ''} onClick={() => void openFile(f.path)}>{f.name}</li>)}</ul>
-          </div>
-        ))}
-      </div>
+      {/* Contextuales al documento abierto: fijas arriba. */}
       {path && projection.scenes.length > 0 && (
         <div className="block">
           <h2>Escenas · {projection.scenes.length}</h2>
@@ -104,12 +154,11 @@ function LeftPanel() {
           </ul>
         </div>
       )}
-      {kinds.map((k) => (
-        <div className="block" key={k}>
-          <h2>{KIND_LABEL[k]} <button className="mini" onClick={() => setAdding(k)}>+</button></h2>
-          {adding === k && <NewFile kind={k} onDone={() => setAdding(null)} />}
-          <ul>{files.filter((f) => f.kind === k).map((f) => <li key={f.path} className={f.path === path ? 'active' : ''} onClick={() => void openFile(f.path)}>{f.name}</li>)}</ul>
-        </div>
+      {/* Biblioteca: secciones reordenables y plegables (arrastra la cabecera). */}
+      {orderedSections(prefs.sectionOrder).map((id) => (
+        <LibrarySection key={id} id={id} label={KIND_LABEL[id as FileKind]} onAdd={() => setAdding(id as Exclude<FileKind, 'other'>)}>
+          {body(id)}
+        </LibrarySection>
       ))}
     </>
   )
@@ -229,11 +278,44 @@ function RightPanel() {
   )
 }
 
+const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v))
+
 export function Desk() {
   const s = useStore()
+  const { prefs, setPref } = s
+  const mainRef = useRef<HTMLElement>(null)
+  const cols = (l: number, r: number) => `${l}px 6px minmax(360px, 1fr) 6px ${r}px`
+  useEffect(() => {
+    if (mainRef.current) mainRef.current.style.gridTemplateColumns = cols(prefs.deskLeft, prefs.deskRight)
+  }, [prefs.deskLeft, prefs.deskRight])
+
+  // Divisor arrastrable: mueve el DOM en vivo, persiste al soltar (una escritura, sin re-render por frame).
+  const resizer = (side: 'left' | 'right') => (e: React.PointerEvent) => {
+    e.preventDefault()
+    const startX = e.clientX
+    const l0 = prefs.deskLeft
+    const r0 = prefs.deskRight
+    let l = l0
+    let r = r0
+    const move = (ev: PointerEvent) => {
+      if (side === 'left') l = clamp(l0 + (ev.clientX - startX), 200, 520)
+      else r = clamp(r0 - (ev.clientX - startX), 240, 560)
+      if (mainRef.current) mainRef.current.style.gridTemplateColumns = cols(l, r)
+    }
+    const up = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      setPref('deskLeft', l)
+      setPref('deskRight', r)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
+
   return (
-    <main className="desk">
+    <main className="desk" ref={mainRef} style={{ gridTemplateColumns: cols(prefs.deskLeft, prefs.deskRight) }}>
       <aside><LeftPanel /></aside>
+      <div className="resizer" onPointerDown={resizer('left')} title="Arrastra para redimensionar" />
       <section>
         {s.conflict && (
           <div className="banner">
@@ -251,6 +333,7 @@ export function Desk() {
           <p className="muted center">Selecciona o crea un archivo. Ctrl+clic en un [[enlace]] abre la ficha.</p>
         )}
       </section>
+      <div className="resizer" onPointerDown={resizer('right')} title="Arrastra para redimensionar" />
       <aside className="right"><RightPanel /></aside>
     </main>
   )
