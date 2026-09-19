@@ -197,3 +197,21 @@ ul.bullets li:hover { background: transparent; }
 .modal { background: var(--panel); border-radius: var(--r); padding: 24px 28px; width: min(720px, 92vw); box-shadow: 10px 10px 30px rgba(0, 0, 0, 0.7), -10px -10px 30px var(--sh-l); }
 .modal h1 { font-size: 21px; }
 .modal .table select { width: 100%; }
+/* menú desplegable de la barra superior */
+.appmenu { position: relative; }
+.menu { position: absolute; top: calc(100% + 8px); right: 0; min-width: 200px; background: var(--panel); border-radius: var(--r); padding: 6px; z-index: 40; box-shadow: 8px 8px 22px rgba(0,0,0,.6), -6px -6px 18px var(--sh-l); display: flex; flex-direction: column; gap: 2px; }
+.menu-item { background: transparent; color: var(--fg); font-weight: 500; text-align: left; box-shadow: none; padding: 8px 10px; border-radius: var(--r-sm); }
+.menu-item:hover { background: rgba(255,255,255,.06); filter: none; }
+.menu-item:active { transform: none; box-shadow: none; }
+.menu-sep { height: 1px; background: var(--line); margin: 4px 6px; }
+/* preferencias */
+.prefs { width: min(680px, 92vw); }
+.prefs-body { display: grid; grid-template-columns: 150px 1fr; gap: 18px; margin-top: 12px; }
+.prefs-cats li { padding: 9px 12px; border-radius: var(--r-sm); }
+.prefs-cats li.active { background: var(--sink); color: #fff; box-shadow: var(--inset); }
+.prefs-panel { min-height: 220px; max-height: 60vh; }
+.swatches { display: flex; gap: 12px; margin-bottom: 8px; }
+.swatch { width: 34px; height: 34px; border-radius: 50%; padding: 0; box-shadow: var(--raise-sm); border: 2px solid transparent; }
+.swatch.on { border-color: var(--fg); }
+.swatch:active { transform: translateY(1px); }
+.segmented { display: inline-flex; gap: 6px; }

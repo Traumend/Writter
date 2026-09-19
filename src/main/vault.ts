@@ -3,6 +3,7 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSyn
 import { basename, extname, join, relative, resolve } from 'node:path'
 import { parse, stringify } from 'yaml'
 import { guessRole, roleOf } from '../core/adopt'
+import { seedFiles } from '../core/seed'
 import { DEFAULT_CONFIG, KIND_DIR, type AdoptRole, type Doc, type FileEntry, type FolderGuess, type ProjectConfig, type VaultChange, type VaultSummary, type Version } from '../core/types/ipc'
 import { resolveInside } from '../core/vault/paths'
 
@@ -41,6 +42,20 @@ export function readConfig(): ProjectConfig {
 export function writeConfig(c: ProjectConfig): ProjectConfig {
   writeFileSync(cfgPath(), stringify(c))
   return readConfig()
+}
+
+// Conteo crudo de .md bajo una carpeta (para no sembrar sobre contenido existente).
+function listFilesUnder(dir: string): string[] {
+  const out: string[] = []
+  const walk = (d: string) => {
+    for (const e of readdirSync(d, { withFileTypes: true })) {
+      if (e.name.startsWith('.')) continue
+      if (e.isDirectory()) walk(join(d, e.name))
+      else if (e.name.endsWith('.md')) out.push(e.name)
+    }
+  }
+  walk(dir)
+  return out
 }
 
 export function listFiles(): FileEntry[] {
@@ -129,7 +144,11 @@ export function openVault(dir: string, onChange: (e: VaultChange) => void): Vaul
   root = resolve(dir)
   const fresh = !existsSync(cfgPath())
   for (const d of ['.narrative/versions', '.narrative/analysis']) mkdirSync(join(root, d), { recursive: true })
-  if (fresh) for (const d of [...Object.values(KIND_DIR), 'assets']) mkdirSync(join(root, d), { recursive: true })
+  if (fresh) {
+    for (const d of [...Object.values(KIND_DIR), 'assets']) mkdirSync(join(root, d), { recursive: true })
+    // Proyecto nuevo y carpeta sin .md: sembrar contenido de ejemplo, borrable, para que la interfaz no arranque vacía.
+    if (listFilesUnder(root).length === 0) for (const f of seedFiles()) writeFileSync(join(root, f.path), f.content)
+  }
   const config = readConfig()
   startWatcher(onChange)
   return { root, config, files: listFiles() }

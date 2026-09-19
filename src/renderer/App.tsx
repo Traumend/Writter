@@ -1,6 +1,8 @@
+import { useEffect, useRef, useState } from 'react'
 import { Adoption } from './views/Adoption'
 import { Analysis } from './views/Analysis'
 import { BeatTimeline } from './views/BeatTimeline'
+import { Preferences } from './views/Preferences'
 import { Breakdown } from './views/Breakdown'
 import { Characters } from './views/Characters'
 import { Desk } from './views/Desk'
@@ -11,6 +13,36 @@ import { useStore, type DevTab, type Tab } from './store'
 
 const TABS: [Tab, string][] = [['desk', 'Escritorio'], ['breakdown', 'Breakdown'], ['dev', 'Desarrollo'], ['production', 'Producción'], ['settings', 'Ajustes']]
 const DEV: [DevTab, string][] = [['characters', 'Personajes'], ['beats', 'Beat Timeline'], ['map', 'Mapa neural'], ['analysis', 'Análisis']]
+
+// Menú desplegable de la barra superior (estilo suite Adobe).
+function AppMenu() {
+  const { openVault, openPrefs, setTab } = useStore()
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const close = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
+    window.addEventListener('mousedown', close)
+    return () => window.removeEventListener('mousedown', close)
+  }, [open])
+  const item = (label: string, fn: () => void) => (
+    <button className="menu-item" onClick={() => { setOpen(false); fn() }}>{label}</button>
+  )
+  return (
+    <div className="appmenu" ref={ref}>
+      <button className="ghost" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>☰ Menú</button>
+      {open && (
+        <div className="menu" role="menu">
+          {item('Preferencias…', openPrefs)}
+          {item('Abrir vault…', () => void openVault())}
+          {item('Ajustes del proyecto', () => setTab('settings'))}
+          <div className="menu-sep" />
+          {item('Recargar', () => location.reload())}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export function App() {
   const s = useStore()
@@ -35,6 +67,7 @@ export function App() {
         <span className="muted crumb">{s.vault ? s.vault.root.split(/[\\/]/).pop() : 'Sin proyecto'}</span>
         {s.graph && <span className="pill" title={s.graph.reason}>índice {s.graph.stale ? 'reindexando' : 'al día'}</span>}
         <button className="ghost" onClick={() => void s.openVault()}>Abrir vault</button>
+        <AppMenu />
       </header>
       {s.tab === 'desk' && <Desk />}
       {s.tab === 'breakdown' && <Breakdown />}
@@ -45,6 +78,7 @@ export function App() {
       {s.tab === 'production' && <Production />}
       {s.tab === 'settings' && <Settings />}
       <Adoption />
+      <Preferences />
       <footer>
         <span>{s.status || '—'}</span>
         <span className="grow" />

@@ -9,6 +9,37 @@ import type { AdoptionProposal, AdoptRole, AiProposal, Doc, FileEntry, FileKind,
 
 export type Proposal = AiProposal & { from: number; to: number; target: string }
 export type Tab = 'desk' | 'breakdown' | 'dev' | 'production' | 'settings'
+
+// Preferencias de interfaz (solo renderer, localStorage): no son datos del proyecto.
+export type AccentName = 'naranja' | 'ambar' | 'azul' | 'verde' | 'rosa'
+export type Scale = 'compact' | 'normal' | 'large'
+export type Prefs = { accent: AccentName; scale: Scale }
+export const ACCENTS: Record<AccentName, [string, string, string]> = {
+  naranja: ['#ff5a1f', '#e64d13', '#1a1000'],
+  ambar: ['#f5a623', '#e0930f', '#1a1200'],
+  azul: ['#4f8cff', '#3f79e6', '#08122a'],
+  verde: ['#2fc784', '#28ad72', '#04140d'],
+  rosa: ['#ff5a8a', '#e64878', '#1a0410']
+}
+const SCALE_PX: Record<Scale, string> = { compact: '12.5px', normal: '13.5px', large: '15px' }
+const DEFAULT_PREFS: Prefs = { accent: 'naranja', scale: 'normal' }
+
+function loadPrefs(): Prefs {
+  try {
+    return { ...DEFAULT_PREFS, ...(JSON.parse(localStorage.getItem('writter.prefs') || '{}') as Partial<Prefs>) }
+  } catch {
+    return DEFAULT_PREFS
+  }
+}
+
+export function applyPrefs(p: Prefs) {
+  const [a, ap, on] = ACCENTS[p.accent]
+  const r = document.documentElement.style
+  r.setProperty('--accent', a)
+  r.setProperty('--accent-press', ap)
+  r.setProperty('--on-accent', on)
+  r.setProperty('font-size', SCALE_PX[p.scale])
+}
 export type DevTab = 'characters' | 'beats' | 'map' | 'analysis'
 
 type State = {
@@ -38,6 +69,8 @@ type State = {
   status: string
   showTags: boolean
   adoption: AdoptionProposal | null
+  prefs: Prefs
+  prefsOpen: boolean
 }
 
 type Actions = {
@@ -69,6 +102,9 @@ type Actions = {
   saveKey(key: string): Promise<void>
   saveConfig(c: ProjectConfig): Promise<void>
   toggleTags(): void
+  setPref<K extends keyof Prefs>(k: K, v: Prefs[K]): void
+  openPrefs(): void
+  closePrefs(): void
 }
 
 const EMPTY: Projection = { scenes: [], characters: [], links: [], wordCount: 0 }
@@ -127,6 +163,17 @@ export const useStore = create<State & Actions>((set, get) => ({
   status: '',
   showTags: true,
   adoption: null,
+  prefs: loadPrefs(),
+  prefsOpen: false,
+
+  setPref(k, v) {
+    const prefs = { ...get().prefs, [k]: v }
+    localStorage.setItem('writter.prefs', JSON.stringify(prefs))
+    applyPrefs(prefs)
+    set({ prefs })
+  },
+  openPrefs: () => set({ prefsOpen: true }),
+  closePrefs: () => set({ prefsOpen: false }),
 
   setTab: (tab) => set({ tab }),
   setDevTab: (devTab) => set({ devTab }),
@@ -335,6 +382,8 @@ export const useStore = create<State & Actions>((set, get) => ({
 }))
 
 export const cleanErr = (e: unknown) => String(e).replace(/^Error: (Error invoking remote method '[^']+': )?(Error: )?/, '')
+
+applyPrefs(useStore.getState().prefs) // aplica acento y tamaño al cargar
 
 window.addEventListener('vault.opened', (e) => void useStore.getState().applySummary((e as CustomEvent<VaultSummary>).detail))
 window.addEventListener('vault.adopt', (e) => useStore.setState({ adoption: (e as CustomEvent<AdoptionProposal>).detail }))
