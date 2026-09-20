@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { appendFileSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, watch, writeFileSync, type FSWatcher } from 'node:fs'
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, watch, writeFileSync, type FSWatcher } from 'node:fs'
 import { basename, extname, join, relative, resolve } from 'node:path'
 import { parse, stringify } from 'yaml'
 import { guessRole, roleOf } from '../core/adopt'
@@ -225,6 +225,17 @@ export function createFile(rel: string, content: string) {
   mkdirSync(join(abs, '..'), { recursive: true })
   writeFileSync(abs, content)
   return { hash: sha(content) }
+}
+
+// Renombra/mueve un .md dentro del vault (para renombrado inteligente de fichas).
+export function renameFile(oldRel: string, newRel: string) {
+  const from = inVault(oldRel)
+  const to = inVault(newRel)
+  if (!existsSync(from)) throw new Error('no existe')
+  if (existsSync(to)) throw new Error('exists')
+  mkdirSync(join(to, '..'), { recursive: true })
+  renameSync(from, to)
+  return { path: newRel }
 }
 
 export function listVersions(rel: string): Version[] {

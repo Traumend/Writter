@@ -80,9 +80,20 @@ export function Settings() {
             <button className="ghost" onClick={() => void window.api.assetPick().then((rel) => rel && set('cover', { image: rel }))}>Imagen…</button>
             {c.cover.image && <button className="mini ghost" onClick={() => set('cover', { image: '' })}>quitar</button>}
           </div>
-          <Field label="Papel">
-            <select value={c.pdf.paper} onChange={(e) => set('pdf', { paper: e.target.value as 'Letter' | 'A4' })}><option>Letter</option><option>A4</option></select>
-          </Field>
+          <div className="row">
+            <Field label="Papel">
+              <select value={c.pdf.paper} onChange={(e) => set('pdf', { paper: e.target.value as 'Letter' | 'A4' })}><option>Letter</option><option>A4</option></select>
+            </Field>
+            <Field label="Interlineado">
+              <select value={c.pdf.lineSpacing} onChange={(e) => set('pdf', { lineSpacing: Number(e.target.value) })}>
+                <option value={1}>1.0 (estándar)</option><option value={1.15}>1.15</option><option value={1.5}>1.5</option>
+              </select>
+            </Field>
+          </div>
+          <Field label="Encabezado de página"><input value={c.pdf.header} placeholder="{title} · {episode}" onChange={(e) => set('pdf', { header: e.target.value })} /></Field>
+          <Field label="Pie de página"><input value={c.pdf.footer} placeholder="{page} / {pages}" onChange={(e) => set('pdf', { footer: e.target.value })} /></Field>
+          <Field label="Marca de agua"><input value={c.pdf.watermark} placeholder="BORRADOR" onChange={(e) => set('pdf', { watermark: e.target.value })} /></Field>
+          <p className="muted tiny">Variables: {'{title} {episode} {author} {date} {page} {pages}'}. El encabezado y pie se aplican al exportar PDF.</p>
         </div>
         <div className="panelbox preview">
           <h2>Vista previa</h2>

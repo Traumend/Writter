@@ -1,6 +1,6 @@
 import { diffLines } from 'diff'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { mdToFdx, mdToFountain, mdToHtml, mdToTxt } from '../../core/convert'
+import { mdToFdx, mdToFountain, mdToHtml, mdToTxt, pdfVars } from '../../core/convert'
 import { mdToDocx } from '../../core/docx'
 import { readFrontmatter } from '../../core/frontmatter'
 import { estimateTokens } from '../../core/safeguards'
@@ -276,7 +276,14 @@ function RightPanel() {
         <div className="block">
           <h2>Exportar {name}</h2>
           <div className="col">
-            <button disabled={!s.path} onClick={() => void window.api.exportPdf(mdToHtml(s.text, name, cfg ? { ...cfg.cover, imageDataUrl: coverImg } : undefined), `${name}.pdf`, cfg?.pdf.paper ?? 'Letter')}>PDF (formato industria{cfg?.cover.title ? ' + portada' : ''})</button>
+            <button disabled={!s.path} onClick={() => {
+              const vars = { title: cfg?.cover.title || name, episode: name, author: cfg?.cover.author }
+              void window.api.exportPdf(
+                mdToHtml(s.text, name, cfg ? { ...cfg.cover, imageDataUrl: coverImg } : undefined, cfg?.pdf),
+                `${name}.pdf`,
+                { paper: cfg?.pdf.paper ?? 'Letter', headerTemplate: pdfVars(cfg?.pdf.header ?? '', vars), footerTemplate: pdfVars(cfg?.pdf.footer ?? '', vars) }
+              )
+            }}>PDF (formato industria{cfg?.cover.title ? ' + portada' : ''})</button>
             <div className="row">
               <button disabled={!s.path} className="ghost" onClick={() => void window.api.exportBytes(toB64(mdToDocx(s.text)), `${name}.docx`)}>DOCX</button>
               <button disabled={!s.path} className="ghost" onClick={() => void window.api.exportText(mdToFdx(s.text), `${name}.fdx`)}>FDX</button>

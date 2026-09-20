@@ -95,6 +95,25 @@ export async function aiText(instruction: string, context: string, cfg: ProjectC
   return call(cfg, system, `CONTEXTO:\n${context}\n\nPETICIÓN:\n${instruction}`)
 }
 
+// Documentos de desarrollo (Nivel 2): logline, sinopsis, treatment a partir del guion.
+const DEVDOC: Record<string, string> = {
+  logline: 'Escribe UNA logline (1-2 frases) que capture protagonista, conflicto y lo que está en juego. Solo la logline.',
+  sinopsis: 'Escribe una sinopsis de 1 a 3 párrafos: planteamiento, desarrollo y desenlace, sin listar escena por escena.',
+  treatment: 'Escribe un treatment en prosa presente, por secuencias, cubriendo toda la historia con su arco dramático. Usa subtítulos por acto si ayuda.'
+}
+export async function devDoc(kind: string, text: string, cfg: ProjectConfig): Promise<AiText> {
+  const system = 'Eres un consultor de desarrollo de guion. Escribe en el mismo idioma del guion, en prosa profesional, sin preámbulos.'
+  const instr = DEVDOC[kind] ?? kind
+  return call(cfg, system, `GUION:\n${text}\n\nTAREA:\n${instr}`)
+}
+
+// Script Doctor con IA (Nivel 2): informe crítico en Markdown, además de las heurísticas locales.
+export async function doctorAi(text: string, focus: string, cfg: ProjectConfig): Promise<AiText> {
+  const system = 'Eres un script doctor profesional. Devuelve un informe en Markdown claro y accionable, en el idioma del guion. Sé concreto y cita escenas cuando puedas. No reescribas el guion.'
+  const areas = focus.trim() || 'estructura, ritmo, personajes, diálogo, claridad y coherencia'
+  return call(cfg, system, `GUION:\n${text}\n\nENCARGO: Diagnostica el guion enfocándote en: ${areas}. Estructura el informe con secciones y viñetas.`)
+}
+
 export async function analyze(text: string, cfg: ProjectConfig): Promise<Omit<Analysis, 'id' | 'ts'>> {
   const r = await call(cfg, cfg.prompts.analysis, text)
   const m = /\{[\s\S]*\}/.exec(r.text)

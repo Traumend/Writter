@@ -72,9 +72,26 @@ export function Analysis() {
   const [err, setErr] = useState('')
   const [pick, setPick] = useState<number | null>(null)
   const [tab, setTab] = useState<'ai' | 'doctor'>('ai')
+  const [docFocus, setDocFocus] = useState('')
+  const [docReport, setDocReport] = useState('')
+  const [docBusy, setDocBusy] = useState(false)
+  const [docErr, setDocErr] = useState('')
+  const runDoctorAi = async () => {
+    if (!doc) return
+    setDocBusy(true)
+    setDocErr('')
+    try {
+      setDocReport((await window.api.aiDoctor(doc.content, docFocus)).text)
+    } catch (e) {
+      setDocErr(cleanErr(e))
+    } finally {
+      setDocBusy(false)
+    }
+  }
 
   useEffect(() => {
     setCur(null)
+    setDocReport('')
     if (!script) return
     void window.api.analysisList(script).then((l) => { setList(l); if (l[0]) void window.api.analysisRead(script, l[0].id).then(setCur) })
   }, [script])
@@ -160,6 +177,14 @@ export function Analysis() {
 
       {tab === 'doctor' && (
         <div className="grid2">
+          <div className="block panelbox">
+            <div className="row"><h2>Diagnóstico con IA</h2><span className="grow" />
+              <input style={{ width: 220 }} placeholder="Enfoque (ritmo, diálogo…)" value={docFocus} onChange={(e) => setDocFocus(e.target.value)} />
+              <button disabled={!doc || docBusy} onClick={() => void runDoctorAi()}>{docBusy ? 'Analizando…' : 'Analizar con IA'}</button>
+            </div>
+            {docErr && <p className="err">{docErr}</p>}
+            {docReport ? <div className="report">{docReport.split('\n').map((l, i) => <p key={i}>{l}</p>)}</div> : <p className="muted">Pulsa "Analizar con IA" para un informe crítico del guion (usa tu clave BYOK).</p>}
+          </div>
           <div className="block panelbox">
             <h2>Hallazgos (heurísticas locales, sin IA)</h2>
             {dr.findings.length === 0 && <p className="muted">Nada que señalar.</p>}

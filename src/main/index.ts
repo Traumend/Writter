@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { basename, extname, join, resolve } from 'node:path'
 import { fdxToMd, fountainToMd } from '../core/convert'
 import type { AdoptRole, AiRequest, Analysis, FileEntry, OpenResult, ProjectConfig, VaultChange, Version } from '../core/types/ipc'
-import { aiText, analyze, runAi } from './ai'
+import { aiText, analyze, devDoc, doctorAi, runAi } from './ai'
 import { getGraph, graphBuild, graphStatus, markStale } from './graph'
 import { keyStatus, setKey } from './keys'
 import * as V from './vault'
@@ -58,6 +58,13 @@ ipcMain.handle('version.read', (_e, rel: string, id: string) => V.readVersion(re
 ipcMain.handle('version.snapshot', (_e, rel: string, label: string) => V.snapshot(rel, label))
 ipcMain.handle('ai.run', (_e, req: AiRequest) => runAi(req, V.readConfig()))
 ipcMain.handle('ai.text', (_e, instruction: string, context: string) => aiText(instruction, context, V.readConfig()))
+ipcMain.handle('ai.devdoc', (_e, kind: string, text: string) => devDoc(kind, text, V.readConfig()))
+ipcMain.handle('ai.doctor', (_e, text: string, focus: string) => doctorAi(text, focus, V.readConfig()))
+ipcMain.handle('file.rename', (_e, oldPath: string, newPath: string) => {
+  const r = V.renameFile(oldPath, newPath)
+  markStale()
+  return r
+})
 ipcMain.handle('ai.analyze', async (_e, rel: string, text: string): Promise<Analysis> => {
   const a = await analyze(text, V.readConfig())
   const ts = Date.now()
@@ -76,12 +83,20 @@ ipcMain.handle('asset.pick', async () => {
 ipcMain.handle('asset.read', (_e, rel: string) => V.readAsset(rel))
 
 // Export PDF: ventana oculta + printToPDF nativo (sin dependencia externa).
-ipcMain.handle('export.pdf', async (_e, html: string, suggested: string, paper: 'Letter' | 'A4') => {
+ipcMain.handle('export.pdf', async (_e, html: string, suggested: string, opts: { paper: 'Letter' | 'A4'; headerTemplate?: string; footerTemplate?: string }) => {
   const r = await dialog.showSaveDialog({ defaultPath: suggested, filters: [{ name: 'PDF', extensions: ['pdf'] }] })
   if (!r.filePath) return null
   const w = new BrowserWindow({ show: false })
   await w.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html))
-  const pdf = await w.webContents.printToPDF({ pageSize: paper, printBackground: true })
+  const hf = !!(opts.headerTemplate || opts.footerTemplate)
+  const pdf = await w.webContents.printToPDF({
+    pageSize: opts.paper,
+    printBackground: true,
+    displayHeaderFooter: hf,
+    headerTemplate: opts.headerTemplate || '<span></span>',
+    footerTemplate: opts.footerTemplate || '<span></span>',
+    margins: hf ? { top: 0.7, bottom: 0.7, left: 1, right: 1 } : undefined
+  })
   w.destroy()
   writeFileSync(r.filePath, pdf)
   return r.filePath

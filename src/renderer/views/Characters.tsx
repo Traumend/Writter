@@ -89,7 +89,10 @@ export function Characters() {
               <Field label="Logline"><BlurInput textarea rows={2} value={str('logline')} onCommit={(v) => patch({ logline: v })} /></Field>
               <AiSuggest instruction="Escribe un logline de una o dos frases para este personaje, en español." context={context} onAccept={(t) => patch({ logline: t })} />
             </div>
-            <button className="ghost" onClick={() => { void openFile(card.path); setTab('desk') }}>Abrir .md</button>
+            <div className="col">
+              <button className="ghost mini" onClick={() => useStore.getState().openRename(card.path, card.name, [card.name, ...card.aliases])}>Renombrar…</button>
+              <button className="ghost mini" onClick={() => { void openFile(card.path); setTab('desk') }}>Abrir .md</button>
+            </div>
           </div>
 
           <h2>Información básica</h2>

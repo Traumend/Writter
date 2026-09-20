@@ -63,9 +63,23 @@ export function fountainToMd(f: string, title: string): string {
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
 export type Cover = { title: string; author: string; contact: string; draft: string; imageDataUrl?: string }
+export type PdfOpts = { lineSpacing?: number; watermark?: string }
 
-// HTML con formato de industria para imprimir a PDF (Courier 12pt, márgenes estándar). Portada opcional (G).
-export function mdToHtml(md: string, title: string, cover?: Cover): string {
+// Sustituye variables de encabezado/pie. {page}/{pages} usan las clases nativas de printToPDF.
+export function pdfVars(tpl: string, vars: { title: string; episode?: string; author?: string }): string {
+  if (!tpl.trim()) return ''
+  const html = esc(tpl)
+    .replace(/\{title\}/g, esc(vars.title))
+    .replace(/\{episode\}/g, esc(vars.episode ?? ''))
+    .replace(/\{author\}/g, esc(vars.author ?? ''))
+    .replace(/\{date\}/g, new Date().toLocaleDateString())
+    .replace(/\{page\}/g, '<span class="pageNumber"></span>')
+    .replace(/\{pages\}/g, '<span class="totalPages"></span>')
+  return `<div style="font:9pt 'Courier New',monospace;width:100%;padding:0 1in;color:#444">${html}</div>`
+}
+
+// HTML con formato de industria para imprimir a PDF (Courier 12pt, márgenes estándar). Portada e interlineado/marca de agua opcionales.
+export function mdToHtml(md: string, title: string, cover?: Cover, pdf?: PdfOpts): string {
   const coverHtml = cover && (cover.title || cover.author)
     ? `<section class="cover">${cover.imageDataUrl ? `<img src="${cover.imageDataUrl}" alt="">` : ''}<div class="ct">${esc(cover.title || title)}</div><div class="by">by</div><div class="au">${esc(cover.author)}</div><div class="ft"><div>${esc(cover.contact).replace(/\n/g, '<br>')}</div><div class="dr">${esc(cover.draft)}</div></div></section>`
     : ''
@@ -77,11 +91,15 @@ export function mdToHtml(md: string, title: string, cover?: Cover): string {
     .filter((t) => cls[t.type])
     .map((t) => `<div class="${cls[t.type]}">${esc(t.text.trim().replace(/^[.@!>]/, '').replace(/<$/, ''))}</div>`)
     .join('\n')
+  const lh = pdf?.lineSpacing && pdf.lineSpacing > 0 ? pdf.lineSpacing : 1
+  const wm = pdf?.watermark?.trim()
+    ? `<div style="position:fixed;top:45%;left:0;right:0;text-align:center;font:48pt 'Courier New',monospace;color:rgba(0,0,0,0.08);transform:rotate(-30deg);pointer-events:none">${esc(pdf.watermark)}</div>`
+    : ''
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>
-@page{size:Letter;margin:1in 1in 1in 1.5in}body{font:12pt "Courier New",Courier,monospace;line-height:1;color:#000}
+@page{size:Letter;margin:1in 1in 1in 1.5in}body{font:12pt "Courier New",Courier,monospace;line-height:${lh};color:#000}
 div{white-space:pre-wrap;margin:0}.h{font-weight:bold;text-transform:uppercase;margin-top:2em}.a{margin-top:1em}
 .c{margin:1em 0 0 2.2in;text-transform:uppercase}.p{margin-left:1.6in;width:2in}.d{margin-left:1in;width:3.5in}.t{text-align:right;margin-top:1em}.ce{text-align:center;margin-top:1em}
 .cover{page-break-after:always;text-align:center;padding-top:2.5in;height:8in;position:relative}.cover img{max-width:4in;max-height:2.5in;display:block;margin:0 auto 1em}
 .ct{font-weight:bold;font-size:14pt}.by{margin:1em 0}.au{font-weight:bold}.ft{position:absolute;bottom:0;left:0;right:0;display:flex;justify-content:space-between;text-align:left;font-size:11pt}.dr{text-align:right}
-</style></head><body>${coverHtml}${body}</body></html>`
+</style></head><body>${wm}${coverHtml}${body}</body></html>`
 }

@@ -5,6 +5,8 @@ import { parseFountain } from '../core/parser/fountain'
 import { project, type Projection } from '../core/projection'
 import { moveScene as moveSceneText } from '../core/scenes'
 import { guessesToRoleMap } from '../core/adopt'
+import { renameEntity } from '../core/rename'
+import { writeFrontmatter } from '../core/frontmatter'
 import { roleDir as roleDirOf } from '../core/types/ipc'
 import type { AdoptionProposal, AdoptRole, AiProposal, Doc, FileEntry, FileKind, GraphStatus, KeyStatus, ProjectConfig, Scope, VaultSummary, Version } from '../core/types/ipc'
 
@@ -50,7 +52,7 @@ export function applyPrefs(p: Prefs) {
   r.setProperty('--on-accent', on)
   r.setProperty('font-size', SCALE_PX[p.scale])
 }
-export type DevTab = 'characters' | 'beats' | 'map' | 'analysis'
+export type DevTab = 'characters' | 'beats' | 'map' | 'analysis' | 'docs'
 
 type State = {
   tab: Tab
@@ -82,6 +84,7 @@ type State = {
   prefs: Prefs
   prefsOpen: boolean
   searchOpen: boolean
+  rename: { path: string; name: string; terms: string[] } | null
 }
 
 type Actions = {
@@ -121,6 +124,9 @@ type Actions = {
   closePrefs(): void
   openSearch(): void
   closeSearch(): void
+  openRename(path: string, name: string, terms: string[]): void
+  closeRename(): void
+  applyRename(to: string): Promise<void>
 }
 
 const EMPTY: Projection = { scenes: [], characters: [], links: [], wordCount: 0 }
@@ -182,6 +188,33 @@ export const useStore = create<State & Actions>((set, get) => ({
   prefs: loadPrefs(),
   prefsOpen: false,
   searchOpen: false,
+  rename: null,
+
+  openRename: (path, name, terms) => set({ rename: { path, name, terms } }),
+  closeRename: () => set({ rename: null }),
+  async applyRename(to) {
+    const r = get().rename
+    if (!r || !to.trim() || to === r.name) return set({ rename: null })
+    const results = renameEntity(get().docs, r.terms, to)
+    // Escribe todos los archivos cambiados salvo la propia ficha (se renombra aparte).
+    for (const res of results) if (res.path !== r.path) await window.api.fileWrite(res.path, res.content, undefined, 'user')
+    // Ficha: actualiza su contenido (nombre en frontmatter) y renombra el archivo.
+    const fichaContent = results.find((x) => x.path === r.path)?.content ?? get().docs.find((d) => d.path === r.path)?.content ?? ''
+    await window.api.fileWrite(r.path, writeFrontmatter(fichaContent, { name: to }), undefined, 'user')
+    const dir = r.path.slice(0, r.path.lastIndexOf('/') + 1)
+    const newPath = `${dir}${to}.md`
+    if (newPath !== r.path) {
+      try {
+        await window.api.fileRename(r.path, newPath)
+      } catch {
+        /* si ya existe un archivo con ese nombre, deja la ficha con el nombre nuevo pero sin renombrar */
+      }
+    }
+    set({ rename: null, status: `Renombrado a "${to}"` })
+    await get().refreshFiles()
+    await get().refreshDocs()
+    if (get().path === r.path) await get().openFile(newPath)
+  },
 
   setPref(k, v) {
     const prefs = { ...get().prefs, [k]: v }

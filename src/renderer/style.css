@@ -247,3 +247,7 @@ textarea { min-height: 2.6em; } /* red de seguridad: ningún textarea colapsa a 
 /* buscar y reemplazar */
 .search { width: min(720px, 94vw); }
 .search .grid2 { margin-bottom: 6px; }
+/* informe del script doctor con IA */
+.report { max-height: 60vh; overflow: auto; }
+.report p { margin: 0 0 4px; white-space: pre-wrap; }
+.report p:empty { height: 6px; }

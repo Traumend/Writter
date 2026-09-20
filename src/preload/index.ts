@@ -14,6 +14,7 @@ const api: Api = {
   fileRead: (path) => ipcRenderer.invoke('file.read', path),
   fileWrite: (path, content, expectedHash, origin) => ipcRenderer.invoke('file.write', path, content, expectedHash, origin),
   fileCreate: (path, content) => ipcRenderer.invoke('file.create', path, content),
+  fileRename: (oldPath, newPath) => ipcRenderer.invoke('file.rename', oldPath, newPath),
   onVaultChange: (cb) => {
     const h = (_e: unknown, e: VaultChange) => cb(e)
     ipcRenderer.on('vault.changed', h)
@@ -26,6 +27,8 @@ const api: Api = {
   versionSnapshot: (path, label) => ipcRenderer.invoke('version.snapshot', path, label),
   aiRun: (req) => ipcRenderer.invoke('ai.run', req),
   aiText: (instruction, context) => ipcRenderer.invoke('ai.text', instruction, context),
+  aiDevDoc: (kind, text) => ipcRenderer.invoke('ai.devdoc', kind, text),
+  aiDoctor: (text, focus) => ipcRenderer.invoke('ai.doctor', text, focus),
   aiAnalyze: (path, text) => ipcRenderer.invoke('ai.analyze', path, text),
   analysisList: (path) => ipcRenderer.invoke('analysis.list', path),
   analysisRead: (path, id) => ipcRenderer.invoke('analysis.read', path, id),
@@ -34,7 +37,7 @@ const api: Api = {
   graphGet: () => ipcRenderer.invoke('graph.get'),
   assetPick: () => ipcRenderer.invoke('asset.pick'),
   assetRead: (rel) => ipcRenderer.invoke('asset.read', rel),
-  exportPdf: (html, name, paper) => ipcRenderer.invoke('export.pdf', html, name, paper),
+  exportPdf: (html, name, opts) => ipcRenderer.invoke('export.pdf', html, name, opts),
   exportText: (content, name) => ipcRenderer.invoke('export.text', content, name),
   exportBytes: (base64, name) => ipcRenderer.invoke('export.bytes', base64, name),
   importScript: () => ipcRenderer.invoke('import.script'),

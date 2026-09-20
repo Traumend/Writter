@@ -10,7 +10,13 @@ export type ProjectConfig = {
   byok: { provider: Provider; model?: string; baseUrl?: string }
   prompts: { assistant: string; analysis: string }
   cover: { title: string; author: string; contact: string; draft: string; image: string }
-  pdf: { paper: 'Letter' | 'A4' }
+  pdf: {
+    paper: 'Letter' | 'A4'
+    lineSpacing: number // 1.0 estándar
+    watermark: string // vacío = sin marca de agua
+    header: string // admite variables {title} {episode} {author} {date} {page} {pages}
+    footer: string
+  }
   roles: Record<AdoptRole, string[]> // carpetas por rol (adopción, Pieza 1); Writter lee desde aquí
 }
 
@@ -81,6 +87,7 @@ export type Api = {
   fileRead(path: string): Promise<{ content: string; hash: string }>
   fileWrite(path: string, content: string, expectedHash?: string, origin?: Version['origin']): Promise<{ hash: string }>
   fileCreate(path: string, content: string): Promise<{ hash: string }>
+  fileRename(oldPath: string, newPath: string): Promise<{ path: string }>
   onVaultChange(cb: (e: VaultChange) => void): () => void
   keysSet(provider: string, key: string): Promise<KeyStatus>
   keysStatus(provider: string): Promise<KeyStatus>
@@ -89,6 +96,8 @@ export type Api = {
   versionSnapshot(path: string, label: string): Promise<Version[]>
   aiRun(req: AiRequest): Promise<AiProposal>
   aiText(instruction: string, context: string): Promise<AiText>
+  aiDevDoc(kind: string, text: string): Promise<AiText>
+  aiDoctor(text: string, focus: string): Promise<AiText>
   aiAnalyze(path: string, text: string): Promise<Analysis>
   analysisList(path: string): Promise<{ id: string; ts: number }[]>
   analysisRead(path: string, id: string): Promise<Analysis>
@@ -97,7 +106,7 @@ export type Api = {
   graphGet(): Promise<Graph>
   assetPick(): Promise<string | null>
   assetRead(rel: string): Promise<string>
-  exportPdf(html: string, suggestedName: string, paper: 'Letter' | 'A4'): Promise<string | null>
+  exportPdf(html: string, suggestedName: string, opts: { paper: 'Letter' | 'A4'; headerTemplate?: string; footerTemplate?: string }): Promise<string | null>
   exportText(content: string, suggestedName: string): Promise<string | null>
   exportBytes(base64: string, suggestedName: string): Promise<string | null>
   importScript(): Promise<FileEntry | null>
@@ -122,7 +131,7 @@ export const DEFAULT_CONFIG: ProjectConfig = {
   byok: { provider: 'anthropic' },
   prompts: DEFAULT_PROMPTS,
   cover: { title: '', author: '', contact: '', draft: '', image: '' },
-  pdf: { paper: 'Letter' },
+  pdf: { paper: 'Letter', lineSpacing: 1, watermark: '', header: '', footer: '' },
   roles: {
     script: ['scripts'],
     character: ['entities/characters'],

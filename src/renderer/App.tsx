@@ -4,6 +4,8 @@ import { Analysis } from './views/Analysis'
 import { BeatTimeline } from './views/BeatTimeline'
 import { Preferences } from './views/Preferences'
 import { SearchReplace } from './views/SearchReplace'
+import { Rename } from './views/Rename'
+import { DevDocs } from './views/DevDocs'
 import { Breakdown } from './views/Breakdown'
 import { Characters } from './views/Characters'
 import { Desk } from './views/Desk'
@@ -13,7 +15,7 @@ import { Settings } from './views/Settings'
 import { useStore, type DevTab, type Tab } from './store'
 
 const TABS: [Tab, string][] = [['desk', 'Escritorio'], ['breakdown', 'Breakdown'], ['dev', 'Desarrollo'], ['production', 'Producción'], ['settings', 'Ajustes']]
-const DEV: [DevTab, string][] = [['characters', 'Personajes'], ['beats', 'Beat Timeline'], ['map', 'Mapa neural'], ['analysis', 'Análisis']]
+const DEV: [DevTab, string][] = [['characters', 'Personajes'], ['beats', 'Beat Timeline'], ['map', 'Mapa neural'], ['analysis', 'Análisis'], ['docs', 'Documentos']]
 
 // Menú desplegable de la barra superior (estilo suite Adobe).
 function AppMenu() {
@@ -78,11 +80,13 @@ export function App() {
       {s.tab === 'dev' && s.devTab === 'beats' && <BeatTimeline />}
       {s.tab === 'dev' && s.devTab === 'map' && <NeuralMap />}
       {s.tab === 'dev' && s.devTab === 'analysis' && <Analysis />}
+      {s.tab === 'dev' && s.devTab === 'docs' && <DevDocs />}
       {s.tab === 'production' && <Production />}
       {s.tab === 'settings' && <Settings />}
       <Adoption />
       <Preferences />
       <SearchReplace />
+      <Rename />
       <footer>
         <span>{s.status || '—'}</span>
         <span className="grow" />
