@@ -3,6 +3,7 @@ import { readFrontmatter } from '../core/frontmatter'
 import { parseFountain } from '../core/parser/fountain'
 import { project, type Projection } from '../core/projection'
 import type { Doc } from '../core/types/ipc'
+import { t } from './i18n'
 import { useStore } from './store'
 
 // Piezas compartidas entre vistas.
@@ -73,7 +74,7 @@ export function EpisodeSelect({ value, onChange }: { value: string | null; onCha
   const scripts = files.filter((f) => f.kind === 'script')
   return (
     <select value={value ?? ''} onChange={(e) => onChange(e.target.value)}>
-      <option value="">— episodio —</option>
+      <option value="">— {t('episodio')} —</option>
       {scripts.map((f) => (
         <option key={f.path} value={f.path}>{f.name}</option>
       ))}
@@ -99,14 +100,14 @@ export function AiSuggest({ instruction, context, onAccept }: { instruction: str
   }
   return (
     <div className="suggest">
-      <button className="mini ghost" disabled={busy} onClick={() => void run()}>{busy ? '…' : '✦ Sugerir con IA'}</button>
+      <button className="mini ghost" disabled={busy} onClick={() => void run()}>{busy ? '…' : `✦ ${t('Sugerir con IA')}`}</button>
       {err && <span className="err">{err}</span>}
       {text !== null && (
         <div className="proposal">
           <p>{text}</p>
           <div className="row">
-            <button className="mini" onClick={() => { onAccept(text); setText(null) }}>Aceptar</button>
-            <button className="mini ghost" onClick={() => setText(null)}>Rechazar</button>
+            <button className="mini" onClick={() => { onAccept(text); setText(null) }}>{t('Aceptar')}</button>
+            <button className="mini ghost" onClick={() => setText(null)}>{t('Rechazar')}</button>
           </div>
         </div>
       )}

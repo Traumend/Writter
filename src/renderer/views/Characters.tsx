@@ -3,6 +3,7 @@ import { breakdown } from '../../core/breakdown'
 import { readFrontmatter, writeFrontmatter } from '../../core/frontmatter'
 import { extractLinks, parseFountain } from '../../core/parser/fountain'
 import { joinSections, splitSections, type Section } from '../../core/sections'
+import { t } from '../i18n'
 import { useStore } from '../store'
 import { AiSuggest, BlurInput, Field, Icon, useAsset } from '../ui'
 
@@ -135,10 +136,10 @@ export function Characters() {
   return (
     <main className="split">
       <aside>
-        <h2>Personajes</h2>
-        <input placeholder="Buscar…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <h2>{t('Personajes')}</h2>
+        <input placeholder={t('Buscar…')} value={q} onChange={(e) => setQ(e.target.value)} />
         <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ width: '100%', marginBottom: 8 }}>
-          {SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          {SORTS.map(([v, l]) => <option key={v} value={v}>{t(l)}</option>)}
         </select>
         <ul>
           {cards.filter((c) => !q || c.name.toLowerCase().includes(q.toLowerCase())).map((c) => {
@@ -146,7 +147,7 @@ export function Characters() {
             return (
               <li key={c.path} className={c.path === path ? 'active' : ''} onClick={() => setSel(c.path)}>
                 <span className="cdot" style={{ background: cc || 'var(--line)' }} />
-                <span className="grow ell">{c.name}</span> <span className="muted tiny">{c.appearances.length} esc.</span>
+                <span className="grow ell">{c.name}</span> <span className="muted tiny">{c.appearances.length} {t('esc.')}</span>
               </li>
             )
           })}
@@ -160,123 +161,123 @@ export function Characters() {
               <h1>{card.name}</h1>
               <div className="chips" style={{ marginBottom: 6 }}>
                 {card.aliases.map((a) => (
-                  <span key={a} className="chip alias">{a}<button className="x" title="Quitar alias" onClick={() => patch({ aliases: card.aliases.filter((x) => x !== a) })}><Icon name="close" size={11} /></button></span>
+                  <span key={a} className="chip alias">{a}<button className="x" title={t('Quitar alias')} onClick={() => patch({ aliases: card.aliases.filter((x) => x !== a) })}><Icon name="close" size={11} /></button></span>
                 ))}
                 <input className="aliasin" placeholder="+ alias" value={alias} onChange={(e) => setAlias(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && alias.trim()) { patch({ aliases: [...card.aliases, alias.trim()] }); setAlias('') } }} />
               </div>
-              <Field label="Logline (conectado con la descripción del Breakdown)"><BlurInput textarea rows={2} value={str('description')} onCommit={(v) => patch({ description: v })} /></Field>
-              <AiSuggest instruction="Escribe un logline de una o dos frases para este personaje, en español." context={context} onAccept={(t) => patch({ description: t })} />
+              <Field label={t('Logline (conectado con la descripción del Breakdown)')}><BlurInput textarea rows={2} value={str('description')} onCommit={(v) => patch({ description: v })} /></Field>
+              <AiSuggest instruction="Escribe un logline de una o dos frases para este personaje, en español." context={context} onAccept={(v) => patch({ description: v })} />
               <div className="row" style={{ marginTop: 4 }}>
-                <span className="tiny muted">Actor/actriz:</span>
-                <BlurInput value={str('actor')} placeholder="No asignado" onCommit={(v) => patch({ actor: v })} />
+                <span className="tiny muted">{t('Actor/actriz:')}</span>
+                <BlurInput value={str('actor')} placeholder={t('No asignado')} onCommit={(v) => patch({ actor: v })} />
               </div>
               <div className="row" style={{ marginTop: 6 }}>
-                <span className="tiny muted">Color:</span>
+                <span className="tiny muted">{t('Color:')}</span>
                 {COLORS.map((cc) => <span key={cc} className={`swatch ${color === cc ? 'on' : ''}`} style={{ background: cc, width: 20, height: 20 }} onClick={() => patch({ color: cc })} />)}
               </div>
             </div>
             <div className="col">
-              <button className="ghost mini" onClick={() => useStore.getState().openRename(card.path, card.name, [card.name, ...card.aliases])}>Renombrar…</button>
-              <button className="ghost mini" onClick={() => { void openFile(card.path); setTab('desk') }}>Abrir .md</button>
+              <button className="ghost mini" onClick={() => useStore.getState().openRename(card.path, card.name, [card.name, ...card.aliases])}>{t('Renombrar…')}</button>
+              <button className="ghost mini" onClick={() => { void openFile(card.path); setTab('desk') }}>{t('Abrir .md')}</button>
             </div>
           </div>
 
-          <h2>Información básica</h2>
+          <h2>{t('Información básica')}</h2>
           <div className="grid6">
             {SEL.map(([k, l, opts]) => (
-              <Field key={k} label={l}>
+              <Field key={k} label={t(l)}>
                 <select value={str(k)} onChange={(e) => patch({ [k]: e.target.value })}>
                   <option value="">—</option>
-                  {opts.map((o) => <option key={o}>{o}</option>)}
+                  {opts.map((o) => <option key={o} value={o}>{t(o)}</option>)}
                 </select>
               </Field>
             ))}
-            <Field label="Nacimiento (fecha / lugar)"><BlurInput value={str('birth')} onCommit={(v) => patch({ birth: v })} /></Field>
-            <Field label="Ocupación"><BlurInput value={str('occupation')} onCommit={(v) => patch({ occupation: v })} /></Field>
-            <Field label="Origen / cultura"><BlurInput value={str('origin')} onCommit={(v) => patch({ origin: v })} /></Field>
+            <Field label={t('Nacimiento (fecha / lugar)')}><BlurInput value={str('birth')} onCommit={(v) => patch({ birth: v })} /></Field>
+            <Field label={t('Ocupación')}><BlurInput value={str('occupation')} onCommit={(v) => patch({ occupation: v })} /></Field>
+            <Field label={t('Origen / cultura')}><BlurInput value={str('origin')} onCommit={(v) => patch({ origin: v })} /></Field>
           </div>
 
-          <h2>Apariencia</h2>
+          <h2>{t('Apariencia')}</h2>
           <div className="row" style={{ marginBottom: 8 }}>
-            <span className="tiny muted">Estado:</span>
+            <span className="tiny muted">{t('Estado:')}</span>
             <select value={str('appearance_state')} onChange={(e) => patch({ appearance_state: e.target.value })}>
               <option value="">—</option>
-              {APPEARANCE_STATES.map((o) => <option key={o}>{o}</option>)}
+              {APPEARANCE_STATES.map((o) => <option key={o} value={o}>{t(o)}</option>)}
             </select>
           </div>
-          <div><BlurInput textarea rows={4} value={str('appearance')} placeholder="Casting, vestuario, marcas visibles…" onCommit={(v) => patch({ appearance: v })} /></div>
-          <AiSuggest instruction="Describe la apariencia física y el vestuario de este personaje en un párrafo, solo con lo que el guión soporte." context={context} onAccept={(t) => patch({ appearance: t })} />
+          <div><BlurInput textarea rows={4} value={str('appearance')} placeholder={t('Casting, vestuario, marcas visibles…')} onCommit={(v) => patch({ appearance: v })} /></div>
+          <AiSuggest instruction="Describe la apariencia física y el vestuario de este personaje en un párrafo, solo con lo que el guión soporte." context={context} onAccept={(v) => patch({ appearance: v })} />
 
-          <h2>Biografía · {intro.trim().split(/\s+/).filter(Boolean).length} palabras</h2>
-          <div><BlurInput textarea rows={10} value={intro} placeholder="Biografía en prosa (cuerpo del .md)" onCommit={setIntro} /></div>
-          <AiSuggest instruction="Escribe una biografía breve (100-150 palabras) de este personaje basada en las escenas." context={context} onAccept={(t) => setIntro(t)} />
+          <h2>{t('Biografía')} · {intro.trim().split(/\s+/).filter(Boolean).length} {t('palabras')}</h2>
+          <div><BlurInput textarea rows={10} value={intro} placeholder={t('Biografía en prosa (cuerpo del .md)')} onCommit={setIntro} /></div>
+          <AiSuggest instruction="Escribe una biografía breve (100-150 palabras) de este personaje basada en las escenas." context={context} onAccept={(v) => setIntro(v)} />
 
           <h2>Want / Need</h2>
           <div className="grid2">
-            <Field label="Quiere (externo)"><BlurInput textarea rows={2} value={str('want')} onCommit={(v) => patch({ want: v })} /></Field>
-            <Field label="Necesita (interno)"><BlurInput textarea rows={2} value={str('need')} onCommit={(v) => patch({ need: v })} /></Field>
+            <Field label={t('Quiere (externo)')}><BlurInput textarea rows={2} value={str('want')} onCommit={(v) => patch({ want: v })} /></Field>
+            <Field label={t('Necesita (interno)')}><BlurInput textarea rows={2} value={str('need')} onCommit={(v) => patch({ need: v })} /></Field>
           </div>
-          <AiSuggest instruction='Responde en dos líneas: "Quiere: …" (deseo externo) y "Necesita: …" (necesidad interna).' context={context} onAccept={(t) => {
-            const w = /Quiere:\s*(.*)/i.exec(t)?.[1] ?? ''
-            const n = /Necesita:\s*(.*)/i.exec(t)?.[1] ?? ''
+          <AiSuggest instruction='Responde en dos líneas: "Quiere: …" (deseo externo) y "Necesita: …" (necesidad interna).' context={context} onAccept={(v) => {
+            const w = /Quiere:\s*(.*)/i.exec(v)?.[1] ?? ''
+            const n = /Necesita:\s*(.*)/i.exec(v)?.[1] ?? ''
             patch({ want: w.trim(), need: n.trim() })
           }} />
 
-          <h2>Profundización
-            <button className="mini ghost" onClick={() => setSections([...sections, { title: 'Nueva sección', body: '' }])}><Icon name="plus" size={12} /> Añadir sección</button>
-            <button className="mini ghost" onClick={() => setShowGuide((s) => !s)}><Icon name="question" size={12} /> Preguntas guía</button>
+          <h2>{t('Profundización')}
+            <button className="mini ghost" onClick={() => setSections([...sections, { title: t('Nueva sección'), body: '' }])}><Icon name="plus" size={12} /> {t('Añadir sección')}</button>
+            <button className="mini ghost" onClick={() => setShowGuide((s) => !s)}><Icon name="question" size={12} /> {t('Preguntas guía')}</button>
           </h2>
           {showGuide && (
             <div className="panelbox" style={{ marginBottom: 10 }}>
-              <p className="muted tiny">Añade una pregunta como sección para responderla:</p>
-              <div className="chips">{GUIDE_QUESTIONS.map((qq) => <button key={qq} className="mini ghost" onClick={() => { setSections([...sections, { title: qq, body: '' }]); setShowGuide(false) }}>{qq}</button>)}</div>
+              <p className="muted tiny">{t('Añade una pregunta como sección para responderla:')}</p>
+              <div className="chips">{GUIDE_QUESTIONS.map((qq) => <button key={qq} className="mini ghost" onClick={() => { setSections([...sections, { title: t(qq), body: '' }]); setShowGuide(false) }}>{t(qq)}</button>)}</div>
             </div>
           )}
           {sections.map((s, i) => (
             <div className="section-card" key={i}>
               <div className="row">
                 <BlurInput value={s.title} onCommit={(v) => setSections(sections.map((x, j) => (j === i ? { ...x, title: v } : x)))} />
-                <button className="del" title="Eliminar sección" onClick={() => setSections(sections.filter((_, j) => j !== i))}><Icon name="trash" size={14} /></button>
+                <button className="del" title={t('Eliminar sección')} onClick={() => setSections(sections.filter((_, j) => j !== i))}><Icon name="trash" size={14} /></button>
               </div>
-              <BlurInput textarea rows={4} value={s.body} placeholder="Contenido…" onCommit={(v) => setSections(sections.map((x, j) => (j === i ? { ...x, body: v } : x)))} />
+              <BlurInput textarea rows={4} value={s.body} placeholder={t('Contenido…')} onCommit={(v) => setSections(sections.map((x, j) => (j === i ? { ...x, body: v } : x)))} />
             </div>
           ))}
         </section>
-      ) : <section><p className="muted center">Sin personajes. Créalos en Breakdown.</p></section>}
+      ) : <section><p className="muted center">{t('Sin personajes. Créalos en Breakdown.')}</p></section>}
       {card && doc && (
         <aside className="right scroll">
-          <h2>Perfil creativo</h2>
+          <h2>{t('Perfil creativo')}</h2>
           {PROFILE.map(([k, l, opts]) => (
-            <Field key={k} label={l}>
+            <Field key={k} label={t(l)}>
               <select value={str(k)} onChange={(e) => patch({ [k]: e.target.value })} style={{ width: '100%' }}>
                 <option value="">—</option>
-                {opts.map((o) => <option key={o}>{o}</option>)}
+                {opts.map((o) => <option key={o} value={o}>{t(o)}</option>)}
               </select>
             </Field>
           ))}
 
-          <h2>Sliders</h2>
+          <h2>{t('Sliders')}</h2>
           {TRAITS.map(([k, l, lo, hi, c]) => (
             <div className="slider" key={k}>
-              <div className="row"><span>{l}</span><span className="grow" /><strong style={{ color: c }}>{traits[k] ?? 50}</strong></div>
+              <div className="row"><span>{t(l)}</span><span className="grow" /><strong style={{ color: c }}>{traits[k] ?? 50}</strong></div>
               <input type="range" min={0} max={100} value={traits[k] ?? 50} style={{ accentColor: c }} onChange={(e) => patch({ traits: { ...traits, [k]: Number(e.target.value) } })} />
-              <div className="row tiny muted"><span>{lo}</span><span className="grow" /><span>{hi}</span></div>
+              <div className="row tiny muted"><span>{t(lo)}</span><span className="grow" /><span>{t(hi)}</span></div>
             </div>
           ))}
           {customSliders.map((cs) => (
             <div className="slider" key={cs.id}>
-              <div className="row"><span>{cs.label}</span><span className="grow" /><strong style={{ color: cs.color }}>{traits[cs.id] ?? 50}</strong><button className="del" title="Quitar métrica del proyecto" onClick={() => delSlider(cs.id)}><Icon name="close" size={12} /></button></div>
+              <div className="row"><span>{cs.label}</span><span className="grow" /><strong style={{ color: cs.color }}>{traits[cs.id] ?? 50}</strong><button className="del" title={t('Quitar métrica del proyecto')} onClick={() => delSlider(cs.id)}><Icon name="close" size={12} /></button></div>
               <input type="range" min={0} max={100} value={traits[cs.id] ?? 50} style={{ accentColor: cs.color }} onChange={(e) => patch({ traits: { ...traits, [cs.id]: Number(e.target.value) } })} />
               <div className="row tiny muted"><span>{cs.lo}</span><span className="grow" /><span>{cs.hi}</span></div>
             </div>
           ))}
           <div className="row">
-            <input placeholder="Nueva métrica del proyecto…" value={newSlider} onChange={(e) => setNewSlider(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addSlider()} />
+            <input placeholder={t('Nueva métrica del proyecto…')} value={newSlider} onChange={(e) => setNewSlider(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addSlider()} />
             <button className="mini" onClick={addSlider}><Icon name="plus" size={12} /></button>
           </div>
 
-          <h2>Relaciones · {rels.length + auto.length}
-            <button className="mini ghost" title="Ampliar mapa" onClick={() => setMapBig(true)}><Icon name="expand" size={12} /></button>
+          <h2>{t('Relaciones')} · {rels.length + auto.length}
+            <button className="mini ghost" title={t('Ampliar mapa')} onClick={() => setMapBig(true)}><Icon name="expand" size={12} /></button>
           </h2>
           <RelMap name={card.name} color={color} rels={rels} auto={auto} onOpen={openChar} />
           {rels.map((r, i) => (
@@ -285,23 +286,23 @@ export function Characters() {
                 <select className="grow" value={r.target} onChange={(e) => patch({ relationships: rels.map((x, j) => (j === i ? { ...x, target: e.target.value } : x)) })}>
                   {cards.filter((c) => c.path !== card.path).map((c) => <option key={c.path} value={c.name}>{c.name}</option>)}
                 </select>
-                <button className="del" title="Eliminar relación" onClick={() => patch({ relationships: rels.filter((_, j) => j !== i) })}><Icon name="close" size={14} /></button>
+                <button className="del" title={t('Eliminar relación')} onClick={() => patch({ relationships: rels.filter((_, j) => j !== i) })}><Icon name="close" size={14} /></button>
               </div>
               {r.kind && <span className="chip" style={{ color: kindColor(r.kind), borderColor: kindColor(r.kind) }}>{r.kind}</span>}
-              <BlurInput value={r.kind} placeholder="tipo (familia, rival…)" onCommit={(v) => patch({ relationships: rels.map((x, j) => (j === i ? { ...x, kind: v } : x)) })} />
-              <BlurInput textarea rows={2} value={r.note} placeholder="Nota" onCommit={(v) => patch({ relationships: rels.map((x, j) => (j === i ? { ...x, note: v } : x)) })} />
+              <BlurInput value={r.kind} placeholder={t('tipo (familia, rival…)')} onCommit={(v) => patch({ relationships: rels.map((x, j) => (j === i ? { ...x, kind: v } : x)) })} />
+              <BlurInput textarea rows={2} value={r.note} placeholder={t('Nota')} onCommit={(v) => patch({ relationships: rels.map((x, j) => (j === i ? { ...x, note: v } : x)) })} />
             </div>
           ))}
-          <button className="ghost" disabled={cards.length < 2} onClick={() => patch({ relationships: [...rels, { target: cards.find((c) => c.path !== card.path)?.name ?? '', kind: '', note: '' }] })}><Icon name="plus" size={12} /> Añadir relación</button>
+          <button className="ghost" disabled={cards.length < 2} onClick={() => patch({ relationships: [...rels, { target: cards.find((c) => c.path !== card.path)?.name ?? '', kind: '', note: '' }] })}><Icon name="plus" size={12} /> {t('Añadir relación')}</button>
 
           {auto.length > 0 && (
             <>
-              <h2>Detectadas en el texto · {auto.length}</h2>
-              <p className="muted tiny">Enlaces [[ ]] en la ficha. Formalízalas para darles tipo y nota, o edítalas quitando el enlace del texto.</p>
+              <h2>{t('Detectadas en el texto')} · {auto.length}</h2>
+              <p className="muted tiny">{t('Enlaces [[ ]] en la ficha. Formalízalas para darles tipo y nota, o edítalas quitando el enlace del texto.')}</p>
               {auto.map((n) => (
                 <div className="relcard auto" key={n}>
                   <span className="link grow ell" onClick={() => openChar(n)}>[[{n}]]</span>
-                  <button className="mini" title="Añadir como relación" onClick={() => patch({ relationships: [...rels, { target: n, kind: '', note: '' }] })}><Icon name="plus" size={12} /> relación</button>
+                  <button className="mini" title={t('Añadir como relación')} onClick={() => patch({ relationships: [...rels, { target: n, kind: '', note: '' }] })}><Icon name="plus" size={12} /> {t('relación')}</button>
                 </div>
               ))}
             </>
@@ -311,7 +312,7 @@ export function Characters() {
       {mapBig && card && (
         <div className="modal-backdrop" onClick={() => setMapBig(false)}>
           <div className="modal" style={{ width: 'min(760px,94vw)' }} onClick={(e) => e.stopPropagation()}>
-            <div className="row"><h1>Mapa de relaciones · {card.name}</h1><span className="grow" /><button className="ghost mini" onClick={() => setMapBig(false)}>Cerrar</button></div>
+            <div className="row"><h1>{t('Mapa de relaciones')} · {card.name}</h1><span className="grow" /><button className="ghost mini" onClick={() => setMapBig(false)}>{t('Cerrar')}</button></div>
             <RelMap name={card.name} color={color} rels={rels} auto={auto} onOpen={(n) => { setMapBig(false); openChar(n) }} big />
           </div>
         </div>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { readFrontmatter, writeFrontmatter } from '../../core/frontmatter'
+import { t } from '../i18n'
 import { useStore } from '../store'
 import { BlurInput, EpisodeSelect, useDoc, useProjection } from '../ui'
 import { TEMPLATE } from './Desk'
@@ -60,31 +61,31 @@ export function BeatTimeline() {
     <main className="page">
       <div className="toolbar">
         <EpisodeSelect value={script} onChange={setEp} />
-        <span className="muted">{proj.scenes.length} escenas · {acts.length} actos · {beats.length} beats</span>
+        <span className="muted">{proj.scenes.length} {t('escenas')} · {acts.length} {t('actos')} · {beats.length} beats</span>
         <span className="grow" />
-        <button className="ghost" onClick={() => save({ acts: [...acts, { title: `Acto ${acts.length + 1}`, summary: '', from: 0, to: n - 1 }] })}>+ Acto</button>
-        <button className="ghost" onClick={() => save({ beats: [...beats, { id: uid(), title: 'Nuevo beat', note: '', scene: selScene ?? 0, kind: 'setup' }] })}>+ Beat</button>
-        <button className="ghost" onClick={() => save({ notes: [...notes, { id: uid(), text: '', x: 20 + notes.length * 30, y: 20 + notes.length * 20, color: COLORS[notes.length % COLORS.length]! }] })}>+ Nota</button>
+        <button className="ghost" onClick={() => save({ acts: [...acts, { title: `${t('Acto')} ${acts.length + 1}`, summary: '', from: 0, to: n - 1 }] })}>+ {t('Acto')}</button>
+        <button className="ghost" onClick={() => save({ beats: [...beats, { id: uid(), title: t('Nuevo beat'), note: '', scene: selScene ?? 0, kind: 'setup' }] })}>+ {t('Beat')}</button>
+        <button className="ghost" onClick={() => save({ notes: [...notes, { id: uid(), text: '', x: 20 + notes.length * 30, y: 20 + notes.length * 20, color: COLORS[notes.length % COLORS.length]! }] })}>+ {t('Nota')}</button>
       </div>
       <div className="timeline">
         <div className="lane">
-          <div className="lanelabel">Actos</div>
+          <div className="lanelabel">{t('Actos')}</div>
           <div className="track">
             {acts.map((a, i) => (
               <div className="act" key={i} style={{ left: pct(a.from), width: pct(Math.max(1, a.to - a.from + 1)) }}>
                 <div className="row">
                   <BlurInput value={a.title} onCommit={(v) => save({ acts: acts.map((x, j) => (j === i ? { ...x, title: v } : x)) })} />
-                  <input type="number" min={1} max={n} value={a.from + 1} title="desde escena" onChange={(e) => save({ acts: acts.map((x, j) => (j === i ? { ...x, from: Number(e.target.value) - 1 } : x)) })} />
-                  <input type="number" min={1} max={n} value={a.to + 1} title="hasta escena" onChange={(e) => save({ acts: acts.map((x, j) => (j === i ? { ...x, to: Number(e.target.value) - 1 } : x)) })} />
+                  <input type="number" min={1} max={n} value={a.from + 1} title={t('desde escena')} onChange={(e) => save({ acts: acts.map((x, j) => (j === i ? { ...x, from: Number(e.target.value) - 1 } : x)) })} />
+                  <input type="number" min={1} max={n} value={a.to + 1} title={t('hasta escena')} onChange={(e) => save({ acts: acts.map((x, j) => (j === i ? { ...x, to: Number(e.target.value) - 1 } : x)) })} />
                   <button className="mini ghost" onClick={() => save({ acts: acts.filter((_, j) => j !== i) })}>×</button>
                 </div>
-                <BlurInput textarea rows={2} value={a.summary} placeholder="Resumen del acto" onCommit={(v) => save({ acts: acts.map((x, j) => (j === i ? { ...x, summary: v } : x)) })} />
+                <BlurInput textarea rows={2} value={a.summary} placeholder={t('Resumen del acto')} onCommit={(v) => save({ acts: acts.map((x, j) => (j === i ? { ...x, summary: v } : x)) })} />
               </div>
             ))}
           </div>
         </div>
         <div className="lane">
-          <div className="lanelabel">Beats</div>
+          <div className="lanelabel">Beats</div>{/* Beats: mismo término en inglés */}
           <div className="track beats">
             {beats.map((b) => (
               <div className="beat" key={b.id} style={{ left: pct(b.scene) }}>
@@ -95,13 +96,13 @@ export function BeatTimeline() {
                   <button className="mini ghost" onClick={() => save({ beats: beats.filter((x) => x.id !== b.id) })}>×</button>
                 </div>
                 <BlurInput value={b.title} onCommit={(v) => save({ beats: beats.map((x) => (x.id === b.id ? { ...x, title: v } : x)) })} />
-                <BlurInput textarea rows={2} value={b.note} placeholder="Nota" onCommit={(v) => save({ beats: beats.map((x) => (x.id === b.id ? { ...x, note: v } : x)) })} />
+                <BlurInput textarea rows={2} value={b.note} placeholder={t('Nota')} onCommit={(v) => save({ beats: beats.map((x) => (x.id === b.id ? { ...x, note: v } : x)) })} />
               </div>
             ))}
           </div>
         </div>
         <div className="lane">
-          <div className="lanelabel">Escenas</div>
+          <div className="lanelabel">{t('Escenas')}</div>
           <div className="track scenesrow">
             {proj.scenes.map((s) => (
               <div key={s.index} className={`scenechip ${selScene === s.index ? 'on' : ''}`} style={{ width: pct(1) }} onClick={() => setSelScene(s.index)} title={s.heading}>
@@ -119,17 +120,17 @@ export function BeatTimeline() {
                   <span className="grow" />
                   <button className="mini ghost" onClick={() => save({ notes: notes.filter((x) => x.id !== nt.id) })}>×</button>
                 </div>
-                <BlurInput textarea rows={4} value={nt.text} placeholder="Idea…" onCommit={(v) => save({ notes: notes.map((x) => (x.id === nt.id ? { ...x, text: v } : x)) })} />
+                <BlurInput textarea rows={4} value={nt.text} placeholder={t('Idea…')} onCommit={(v) => save({ notes: notes.map((x) => (x.id === nt.id ? { ...x, text: v } : x)) })} />
               </div>
             ))}
-            {notes.length === 0 && <p className="muted center">Muro creativo: añade notas y arrástralas.</p>}
+            {notes.length === 0 && <p className="muted center">{t('Muro creativo: añade notas y arrástralas.')}</p>}
           </div>
           {selScene !== null && proj.scenes[selScene] && (
             <aside className="inspector">
               <div className="row"><strong>#{selScene + 1} {proj.scenes[selScene]!.heading}</strong><span className="grow" /><button className="mini ghost" onClick={() => setSelScene(null)}>×</button></div>
-              <div className="muted tiny">{proj.scenes[selScene]!.characters.join(', ')} · {proj.scenes[selScene]!.wordCount} palabras</div>
+              <div className="muted tiny">{proj.scenes[selScene]!.characters.join(', ')} · {proj.scenes[selScene]!.wordCount} {t('palabras')}</div>
               <pre className="scenetext">{sceneLines.join('\n')}</pre>
-              <button onClick={() => { void openFile(script!, proj.scenes[selScene]!.startLine); setTab('desk') }}>Abrir en Escritorio</button>
+              <button onClick={() => { void openFile(script!, proj.scenes[selScene]!.startLine); setTab('desk') }}>{t('Abrir en Escritorio')}</button>
             </aside>
           )}
         </div>

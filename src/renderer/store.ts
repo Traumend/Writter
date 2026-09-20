@@ -8,6 +8,7 @@ import { guessesToRoleMap } from '../core/adopt'
 import { renameEntity } from '../core/rename'
 import { writeFrontmatter } from '../core/frontmatter'
 import { roleDir as roleDirOf } from '../core/types/ipc'
+import { setLang, type Lang } from './i18n'
 import type { AdoptionProposal, AdoptRole, AiProposal, Doc, FileEntry, FileKind, GraphStatus, KeyStatus, ProjectConfig, Scope, VaultSummary, Version } from '../core/types/ipc'
 
 // Vinculador de carpetas: raíz del Vault + una carpeta por rol (role-first, editable).
@@ -23,7 +24,7 @@ export type Scale = 'compact' | 'normal' | 'large'
 export const DEFAULT_SECTIONS = ['script', 'character', 'location', 'prop', 'outline', 'knowledge']
 // deskLeft/deskRight: ancho de los paneles laterales del Escritorio (arrastrables).
 // sectionOrder/collapsed: orden y plegado de las secciones de biblioteca (arrastrables).
-export type Prefs = { accent: AccentName; scale: Scale; deskLeft: number; deskRight: number; sectionOrder: string[]; collapsed: string[]; tabs: string[]; focus: boolean; page: boolean }
+export type Prefs = { accent: AccentName; scale: Scale; deskLeft: number; deskRight: number; sectionOrder: string[]; collapsed: string[]; tabs: string[]; focus: boolean; page: boolean; lang: Lang }
 export const ALL_TABS = ['desk', 'breakdown', 'dev', 'production', 'settings']
 export const ACCENTS: Record<AccentName, [string, string, string]> = {
   naranja: ['#ff5a1f', '#e64d13', '#1a1000'],
@@ -33,7 +34,7 @@ export const ACCENTS: Record<AccentName, [string, string, string]> = {
   rosa: ['#ff5a8a', '#e64878', '#1a0410']
 }
 const SCALE_PX: Record<Scale, string> = { compact: '12.5px', normal: '13.5px', large: '15px' }
-const DEFAULT_PREFS: Prefs = { accent: 'naranja', scale: 'normal', deskLeft: 268, deskRight: 350, sectionOrder: DEFAULT_SECTIONS, collapsed: [], tabs: ALL_TABS, focus: false, page: false }
+const DEFAULT_PREFS: Prefs = { accent: 'naranja', scale: 'normal', deskLeft: 268, deskRight: 350, sectionOrder: DEFAULT_SECTIONS, collapsed: [], tabs: ALL_TABS, focus: false, page: false, lang: 'en' }
 export const DEFAULT_LAYOUT = { deskLeft: 268, deskRight: 350, sectionOrder: DEFAULT_SECTIONS, collapsed: [] as string[] }
 
 function loadPrefs(): Prefs {
@@ -51,6 +52,8 @@ export function applyPrefs(p: Prefs) {
   r.setProperty('--accent-press', ap)
   r.setProperty('--on-accent', on)
   r.setProperty('font-size', SCALE_PX[p.scale])
+  setLang(p.lang)
+  document.documentElement.lang = p.lang
 }
 export type DevTab = 'characters' | 'beats' | 'map' | 'analysis' | 'docs'
 
@@ -123,6 +126,7 @@ type Actions = {
   saveConfig(c: ProjectConfig): Promise<void>
   toggleTags(): void
   setPref<K extends keyof Prefs>(k: K, v: Prefs[K]): void
+  setLanguage(l: Lang): void
   resetLayout(): void
   openPrefs(): void
   closePrefs(): void
@@ -226,6 +230,12 @@ export const useStore = create<State & Actions>((set, get) => ({
     localStorage.setItem('writter.prefs', JSON.stringify(prefs))
     applyPrefs(prefs)
     set({ prefs })
+  },
+  // Cambia el idioma y recarga para re-renderizar toda la interfaz en el nuevo idioma.
+  setLanguage(l) {
+    const prefs = { ...get().prefs, lang: l }
+    localStorage.setItem('writter.prefs', JSON.stringify(prefs))
+    location.reload()
   },
   resetLayout() {
     const prefs = { ...get().prefs, ...DEFAULT_LAYOUT }

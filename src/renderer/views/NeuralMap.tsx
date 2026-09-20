@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { breakdown } from '../../core/breakdown'
 import type { FileKind } from '../../core/types/ipc'
+import { t } from '../i18n'
 import { useStore } from '../store'
 
 // Mapa neural (F): grafo completo con capas, escenas como nodos, búsqueda, pan/zoom y arrastre. SVG propio.
@@ -98,13 +99,13 @@ export function NeuralMap() {
     <main className="page">
       <div className="toolbar">
         {LAYERS.map(([k, l]) => (
-          <button key={k} className={layers.has(k) ? 'on' : 'ghost'} style={{ borderColor: COLOR[k] }} onClick={() => setLayers((s) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n })}>● {l}</button>
+          <button key={k} className={layers.has(k) ? 'on' : 'ghost'} style={{ borderColor: COLOR[k] }} onClick={() => setLayers((s) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n })}>● {t(l)}</button>
         ))}
-        <input placeholder="Buscar nodo…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input placeholder={t('Buscar nodo…')} value={q} onChange={(e) => setQ(e.target.value)} />
         <span className="grow" />
         <span className="muted tiny">{graph?.reason}</span>
-        <button className="ghost" onClick={() => void refreshGraph(true)}>Reindexar</button>
-        <button className="ghost" onClick={() => { setView({ x: 0, y: 0, k: 1 }); setNodes(built.ns.map((n) => ({ ...n }))) }}>Reordenar</button>
+        <button className="ghost" onClick={() => void refreshGraph(true)}>{t('Reindexar')}</button>
+        <button className="ghost" onClick={() => { setView({ x: 0, y: 0, k: 1 }); setNodes(built.ns.map((n) => ({ ...n }))) }}>{t('Reordenar')}</button>
       </div>
       <svg ref={svg} className="map" viewBox={`0 0 ${W} ${H}`} onPointerDown={pan} onWheel={wheel}>
         <g transform={`translate(${view.x},${view.y}) scale(${view.k})`}>

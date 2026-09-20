@@ -13,6 +13,7 @@ import { NeuralMap } from './views/NeuralMap'
 import { Production } from './views/Production'
 import { Settings } from './views/Settings'
 import { estimateTokens } from '../core/safeguards'
+import { getLang, t } from './i18n'
 import { useStore, type DevTab, type Tab } from './store'
 
 const TABS: [Tab, string][] = [['desk', 'Escritorio'], ['breakdown', 'Breakdown'], ['dev', 'Desarrollo'], ['production', 'Producción'], ['settings', 'Ajustes']]
@@ -20,9 +21,10 @@ const DEV: [DevTab, string][] = [['characters', 'Personajes'], ['beats', 'Beat T
 
 // Menú desplegable de la barra superior (estilo suite Adobe).
 function AppMenu() {
-  const { openVault, openPrefs, setTab, openLinker, openSearch, vault } = useStore()
+  const { openVault, openPrefs, setTab, openLinker, openSearch, setLanguage, vault } = useStore()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const lang = getLang()
   useEffect(() => {
     if (!open) return
     const close = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
@@ -34,16 +36,20 @@ function AppMenu() {
   )
   return (
     <div className="appmenu" ref={ref}>
-      <button className="ghost" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>☰ Menú</button>
+      <button className="ghost" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>{t('☰ Menú')}</button>
       {open && (
         <div className="menu" role="menu">
-          {item('Preferencias…', openPrefs)}
-          {vault && item('Buscar y reemplazar…', openSearch)}
-          {item('Abrir vault…', () => void openVault())}
-          {vault && item('Vincular carpetas…', openLinker)}
-          {item('Ajustes del proyecto', () => setTab('settings'))}
+          {item(t('Preferencias…'), openPrefs)}
+          {vault && item(t('Buscar y reemplazar…'), openSearch)}
+          {item(t('Abrir vault…'), () => void openVault())}
+          {vault && item(t('Vincular carpetas…'), openLinker)}
+          {item(t('Ajustes del proyecto'), () => setTab('settings'))}
           <div className="menu-sep" />
-          {item('Recargar', () => location.reload())}
+          <div className="menu-label">{t('Idioma')}</div>
+          <button className={`menu-item ${lang === 'en' ? 'sel' : ''}`} onClick={() => setLanguage('en')}>{lang === 'en' ? '✓ ' : ' '}{t('Inglés')}</button>
+          <button className={`menu-item ${lang === 'es' ? 'sel' : ''}`} onClick={() => setLanguage('es')}>{lang === 'es' ? '✓ ' : ' '}{t('Español')}</button>
+          <div className="menu-sep" />
+          {item(t('Recargar'), () => location.reload())}
         </div>
       )}
     </div>
@@ -60,21 +66,21 @@ export function App() {
       <header>
         <strong>Writter</strong>
         <nav>
-          {TABS.filter(([t]) => t === 'settings' || s.prefs.tabs.includes(t)).map(([t, l]) => (
-            <button key={t} className={s.tab === t ? 'on' : 'ghost'} disabled={!s.vault && t !== 'desk'} onClick={() => s.setTab(t)}>{l}</button>
+          {TABS.filter(([t]) => t === 'settings' || s.prefs.tabs.includes(t)).map(([tb, l]) => (
+            <button key={tb} className={s.tab === tb ? 'on' : 'ghost'} disabled={!s.vault && tb !== 'desk'} onClick={() => s.setTab(tb)}>{t(l)}</button>
           ))}
         </nav>
         {s.tab === 'dev' && (
           <nav className="sub">
-            {DEV.map(([t, l]) => (
-              <button key={t} className={s.devTab === t ? 'on' : 'ghost'} onClick={() => s.setDevTab(t)}>{l}</button>
+            {DEV.map(([tb, l]) => (
+              <button key={tb} className={s.devTab === tb ? 'on' : 'ghost'} onClick={() => s.setDevTab(tb)}>{t(l)}</button>
             ))}
           </nav>
         )}
         <span className="grow" />
-        <span className="muted crumb">{s.vault ? s.vault.root.split(/[\\/]/).pop() : 'Sin proyecto'}</span>
-        {s.graph && <span className="pill" title={s.graph.reason}>índice {s.graph.stale ? 'reindexando' : 'al día'}</span>}
-        <button className="ghost" onClick={() => void s.openVault()}>Abrir vault</button>
+        <span className="muted crumb">{s.vault ? s.vault.root.split(/[\\/]/).pop() : t('Sin proyecto')}</span>
+        {s.graph && <span className="pill" title={s.graph.reason}>{t('índice')} {s.graph.stale ? t('reindexando') : t('al día')}</span>}
+        <button className="ghost" onClick={() => void s.openVault()}>{t('Abrir vault')}</button>
         <AppMenu />
       </header>
       {s.tab === 'desk' && <Desk />}
@@ -91,10 +97,10 @@ export function App() {
       <SearchReplace />
       <Rename />
       <footer>
-        <span>{s.status || '—'}</span>
+        <span>{s.status ? t(s.status) : '—'}</span>
         <span className="grow" />
-        {scene && <span className="muted">Escena {scene.index + 1}: {scene.wordCount} pal · ≈{estimateTokens(sceneText)} tok · pág {s.pagination.lineToPage[scene.startLine] ?? 1}</span>}
-        {s.path && <span>Guion: {s.projection.wordCount} pal · ≈{estimateTokens(s.text)} tok · {s.pagination.pages} pág.</span>}
+        {scene && <span className="muted">{t('Escena')} {scene.index + 1}: {scene.wordCount} {t('pal')} · ≈{estimateTokens(sceneText)} {t('tok')} · {t('pág')} {s.pagination.lineToPage[scene.startLine] ?? 1}</span>}
+        {s.path && <span>{t('Guion')}: {s.projection.wordCount} {t('pal')} · ≈{estimateTokens(s.text)} {t('tok')} · {s.pagination.pages} {t('pág.')}</span>}
         <span>BYOK: {provider} {s.keyStatus?.present || provider === 'ollama' ? '●' : '○'}</span>
       </footer>
     </>

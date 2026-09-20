@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { readFrontmatter, writeFrontmatter } from '../../core/frontmatter'
+import { t } from '../i18n'
 import { useStore } from '../store'
 import { BlurInput, EpisodeSelect, useAsset, useDoc, useProjection } from '../ui'
 
@@ -13,7 +14,7 @@ const uid = () => Math.random().toString(36).slice(2, 8)
 
 function Thumb({ rel, onPick }: { rel: string; onPick: () => void }) {
   const url = useAsset(rel)
-  return <div className="thumb" onClick={onPick} title="Adjuntar storyboard">{url ? <img src={url} alt="" /> : <span className="muted tiny">+ img</span>}</div>
+  return <div className="thumb" onClick={onPick} title={t('Adjuntar storyboard')}>{url ? <img src={url} alt="" /> : <span className="muted tiny">+ img</span>}</div>
 }
 
 export function Production() {
@@ -39,7 +40,7 @@ export function Production() {
     <main className="split">
       <aside>
         <EpisodeSelect value={script} onChange={setEp} />
-        <h2>Escenas</h2>
+        <h2>{t('Escenas')}</h2>
         <ul>
           {proj.scenes.map((s) => (
             <li key={s.index} className={s.index === scene ? 'active' : ''} onClick={() => setScene(s.index)}>
@@ -50,29 +51,29 @@ export function Production() {
       </aside>
       <section className="scroll">
         <div className="toolbar">
-          <strong>Shot list · {proj.scenes[scene]?.heading ?? '—'}</strong>
+          <strong>{t('Shot list')} · {proj.scenes[scene]?.heading ?? '—'}</strong>
           <span className="grow" />
-          <button disabled={!shotsDoc || !proj.scenes.length} onClick={() => save([...shots, { id: uid(), scene, size: SIZES[0]!, angle: ANGLES[0]!, movement: MOVES[0]!, lens: '35mm', description: '', status: STATUS[0]!, image: '' }])}>+ Toma</button>
+          <button disabled={!shotsDoc || !proj.scenes.length} onClick={() => save([...shots, { id: uid(), scene, size: SIZES[0]!, angle: ANGLES[0]!, movement: MOVES[0]!, lens: '35mm', description: '', status: STATUS[0]!, image: '' }])}>+ {t('Toma')}</button>
         </div>
         <table className="table">
-          <thead><tr><th>#</th><th>Storyboard</th><th>Tamaño</th><th>Ángulo</th><th>Movimiento</th><th>Lente</th><th>Descripción</th><th>Estado</th><th /></tr></thead>
+          <thead><tr><th>#</th><th>Storyboard</th><th>{t('Tamaño')}</th><th>{t('Ángulo')}</th><th>{t('Movimiento')}</th><th>{t('Lente')}</th><th>{t('Descripción')}</th><th>{t('Estado')}</th><th /></tr></thead>
           <tbody>
             {list.map((s, i) => (
               <tr key={s.id}>
                 <td>{scene + 1}.{i + 1}</td>
                 <td><Thumb rel={s.image} onPick={() => void window.api.assetPick().then((rel) => rel && upd(s.id, { image: rel }))} /></td>
-                <td><select value={s.size} onChange={(e) => upd(s.id, { size: e.target.value })}>{SIZES.map((o) => <option key={o}>{o}</option>)}</select></td>
-                <td><select value={s.angle} onChange={(e) => upd(s.id, { angle: e.target.value })}>{ANGLES.map((o) => <option key={o}>{o}</option>)}</select></td>
-                <td><select value={s.movement} onChange={(e) => upd(s.id, { movement: e.target.value })}>{MOVES.map((o) => <option key={o}>{o}</option>)}</select></td>
+                <td><select value={s.size} onChange={(e) => upd(s.id, { size: e.target.value })}>{SIZES.map((o) => <option key={o} value={o}>{t(o)}</option>)}</select></td>
+                <td><select value={s.angle} onChange={(e) => upd(s.id, { angle: e.target.value })}>{ANGLES.map((o) => <option key={o} value={o}>{t(o)}</option>)}</select></td>
+                <td><select value={s.movement} onChange={(e) => upd(s.id, { movement: e.target.value })}>{MOVES.map((o) => <option key={o} value={o}>{t(o)}</option>)}</select></td>
                 <td><BlurInput value={s.lens} onCommit={(v) => upd(s.id, { lens: v })} /></td>
                 <td><BlurInput textarea rows={2} value={s.description} onCommit={(v) => upd(s.id, { description: v })} /></td>
-                <td><select value={s.status} onChange={(e) => upd(s.id, { status: e.target.value })}>{STATUS.map((o) => <option key={o}>{o}</option>)}</select></td>
+                <td><select value={s.status} onChange={(e) => upd(s.id, { status: e.target.value })}>{STATUS.map((o) => <option key={o} value={o}>{t(o)}</option>)}</select></td>
                 <td><button className="mini ghost" onClick={() => save(shots.filter((x) => x.id !== s.id))}>×</button></td>
               </tr>
             ))}
           </tbody>
         </table>
-        {list.length === 0 && <p className="muted">Sin tomas en esta escena.</p>}
+        {list.length === 0 && <p className="muted">{t('Sin tomas en esta escena.')}</p>}
       </section>
     </main>
   )

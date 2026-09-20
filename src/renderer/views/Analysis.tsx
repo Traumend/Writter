@@ -3,6 +3,7 @@ import { doctor } from '../../core/doctor'
 import { parseFountain } from '../../core/parser/fountain'
 import { project } from '../../core/projection'
 import type { Analysis as A } from '../../core/types/ipc'
+import { t } from '../i18n'
 import { cleanErr, useStore } from '../store'
 import { EpisodeSelect, useDoc } from '../ui'
 
@@ -28,7 +29,7 @@ function Chart({ a, onPick }: { a: A; onPick: (i: number) => void }) {
     <div className="chart">
       <div className="legend">
         {SERIES.map(([k, l, c]) => (
-          <label key={k} className="check"><input type="checkbox" checked={on.has(k)} onChange={() => setOn((s) => { const m = new Set(s); m.has(k) ? m.delete(k) : m.add(k); return m })} /><span className="sw" style={{ background: c }} /> {l}</label>
+          <label key={k} className="check"><input type="checkbox" checked={on.has(k)} onChange={() => setOn((s) => { const m = new Set(s); m.has(k) ? m.delete(k) : m.add(k); return m })} /><span className="sw" style={{ background: c }} /> {t(l)}</label>
         ))}
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} onMouseLeave={() => setHover(null)} onMouseMove={(e) => {
@@ -52,7 +53,7 @@ function Chart({ a, onPick }: { a: A; onPick: (i: number) => void }) {
       {hs && (
         <div className="tooltip">
           <strong>E{hs.index + 1}</strong> · {hs.emotion}
-          {SERIES.map(([k, l, c]) => <div key={k}><span className="sw" style={{ background: c }} /> {l}: <b>{hs[k]}/10</b></div>)}
+          {SERIES.map(([k, l, c]) => <div key={k}><span className="sw" style={{ background: c }} /> {t(l)}: <b>{hs[k]}/10</b></div>)}
           <div className="muted">{hs.summary}</div>
         </div>
       )}
@@ -122,7 +123,7 @@ export function Analysis() {
     <main className="page scroll">
       <div className="toolbar">
         <EpisodeSelect value={script} onChange={setEp} />
-        <button className={tab === 'ai' ? 'on' : 'ghost'} onClick={() => setTab('ai')}>Análisis IA</button>
+        <button className={tab === 'ai' ? 'on' : 'ghost'} onClick={() => setTab('ai')}>{t('Análisis IA')}</button>
         <button className={tab === 'doctor' ? 'on' : 'ghost'} onClick={() => setTab('doctor')}>Script Doctor ({dr.findings.length})</button>
         <span className="grow" />
         {tab === 'ai' && list.length > 0 && (
@@ -130,29 +131,29 @@ export function Analysis() {
             {list.map((l) => <option key={l.id} value={l.id}>{new Date(l.ts).toLocaleString()}</option>)}
           </select>
         )}
-        {tab === 'ai' && <button disabled={!doc || busy} onClick={() => void run()}>{busy ? 'Analizando…' : 'Analizar con IA'}</button>}
+        {tab === 'ai' && <button disabled={!doc || busy} onClick={() => void run()}>{busy ? t('Analizando…') : t('Analizar con IA')}</button>}
       </div>
       {err && <p className="err">{err}</p>}
 
-      {tab === 'ai' && !cur && <p className="muted center">Sin análisis para este episodio. Pulsa "Analizar con IA" (usa tu clave BYOK; el resultado se guarda en .narrative/analysis).</p>}
+      {tab === 'ai' && !cur && <p className="muted center">{t('Sin análisis para este episodio. Pulsa "Analizar con IA" (usa tu clave BYOK; el resultado se guarda en .narrative/analysis).')}</p>}
       {tab === 'ai' && cur && (
         <>
           <div className="grid2">
             <div className="block panelbox">
-              <p><b>Estructura:</b> {cur.structure}</p>
-              <p><b>Trama:</b> {cur.plot}</p>
-              <p><b>Tema:</b> {cur.theme}</p>
-              <p><b>Tono:</b> {cur.tone}</p>
+              <p><b>{t('Estructura')}:</b> {cur.structure}</p>
+              <p><b>{t('Trama')}:</b> {cur.plot}</p>
+              <p><b>{t('Tema')}:</b> {cur.theme}</p>
+              <p><b>{t('Tono')}:</b> {cur.tone}</p>
               <p className="muted tiny">{cur.model} · {new Date(cur.ts).toLocaleString()}</p>
             </div>
             <div className="block panelbox">
-              <h2>Notas</h2>
+              <h2>{t('Notas')}</h2>
               <ul className="bullets">{cur.notes.map((n, i) => <li key={i}>{n}</li>)}</ul>
             </div>
           </div>
-          <h2>Métricas por escena</h2>
+          <h2>{t('Métricas por escena')}</h2>
           <Chart a={cur} onPick={setPick} />
-          <h2>Paleta de emociones</h2>
+          <h2>{t('Paleta de emociones')}</h2>
           <div className="palette">
             {cur.scenes.map((s) => (
               <div key={s.index} className="emo" style={{ background: emoColor(s.emotion) }} title={`E${s.index + 1}: ${s.emotion}`} onClick={() => setPick(s.index)}><span>E{s.index + 1}</span><b>{s.emotion}</b></div>
@@ -166,9 +167,9 @@ export function Analysis() {
             </div>
           )}
           <details>
-            <summary className="muted">Tabla de datos</summary>
+            <summary className="muted">{t('Tabla de datos')}</summary>
             <table className="table">
-              <thead><tr><th>Escena</th><th>Emoción</th>{SERIES.map(([k, l]) => <th key={k}>{l}</th>)}<th>Resumen</th></tr></thead>
+              <thead><tr><th>{t('Escena')}</th><th>{t('Emoción')}</th>{SERIES.map(([k, l]) => <th key={k}>{t(l)}</th>)}<th>{t('Resumen')}</th></tr></thead>
               <tbody>{cur.scenes.map((s) => <tr key={s.index}><td>E{s.index + 1}</td><td>{s.emotion}</td>{SERIES.map(([k]) => <td key={k}>{s[k]}</td>)}<td>{s.summary}</td></tr>)}</tbody>
             </table>
           </details>
@@ -178,22 +179,22 @@ export function Analysis() {
       {tab === 'doctor' && (
         <div className="grid2">
           <div className="block panelbox">
-            <div className="row"><h2>Diagnóstico con IA</h2><span className="grow" />
-              <input style={{ width: 220 }} placeholder="Enfoque (ritmo, diálogo…)" value={docFocus} onChange={(e) => setDocFocus(e.target.value)} />
-              <button disabled={!doc || docBusy} onClick={() => void runDoctorAi()}>{docBusy ? 'Analizando…' : 'Analizar con IA'}</button>
+            <div className="row"><h2>{t('Diagnóstico con IA')}</h2><span className="grow" />
+              <input style={{ width: 220 }} placeholder={t('Enfoque (ritmo, diálogo…)')} value={docFocus} onChange={(e) => setDocFocus(e.target.value)} />
+              <button disabled={!doc || docBusy} onClick={() => void runDoctorAi()}>{docBusy ? t('Analizando…') : t('Analizar con IA')}</button>
             </div>
             {docErr && <p className="err">{docErr}</p>}
-            {docReport ? <div className="report">{docReport.split('\n').map((l, i) => <p key={i}>{l}</p>)}</div> : <p className="muted">Pulsa "Analizar con IA" para un informe crítico del guion (usa tu clave BYOK).</p>}
+            {docReport ? <div className="report">{docReport.split('\n').map((l, i) => <p key={i}>{l}</p>)}</div> : <p className="muted">{t('Pulsa "Analizar con IA" para un informe crítico del guion (usa tu clave BYOK).')}</p>}
           </div>
           <div className="block panelbox">
-            <h2>Hallazgos (heurísticas locales, sin IA)</h2>
-            {dr.findings.length === 0 && <p className="muted">Nada que señalar.</p>}
+            <h2>{t('Hallazgos (heurísticas locales, sin IA)')}</h2>
+            {dr.findings.length === 0 && <p className="muted">{t('Nada que señalar.')}</p>}
             <ul className="bullets">{dr.findings.map((f, i) => <li key={i} className={f.level === 'warn' ? 'warn' : ''}>{f.scene !== undefined ? <b>E{f.scene + 1} · </b> : null}{f.message}</li>)}</ul>
           </div>
           <div className="block panelbox">
-            <h2>Diálogo vs acción por escena</h2>
+            <h2>{t('Diálogo vs acción por escena')}</h2>
             {dr.stats.map((s) => (
-              <div key={s.index} className="bar" title={`${s.heading}: ${s.dialogue} diálogo / ${s.action} acción`}>
+              <div key={s.index} className="bar" title={`${s.heading}: ${s.dialogue} ${t('diálogo')} / ${s.action} ${t('acción')}`}>
                 <span className="tiny muted">E{s.index + 1}</span>
                 <div className="barbox">
                   <div style={{ width: `${(s.dialogue / maxW) * 100}%`, background: '#4f8cff' }} />
@@ -202,7 +203,7 @@ export function Analysis() {
                 <span className="tiny muted">{s.words}</span>
               </div>
             ))}
-            <div className="legend tiny"><span className="sw" style={{ background: '#4f8cff' }} /> diálogo <span className="sw" style={{ background: '#c47d1a' }} /> acción</div>
+            <div className="legend tiny"><span className="sw" style={{ background: '#4f8cff' }} /> {t('diálogo')} <span className="sw" style={{ background: '#c47d1a' }} /> {t('acción')}</div>
           </div>
         </div>
       )}

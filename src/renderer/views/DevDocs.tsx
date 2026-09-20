@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { readFrontmatter } from '../../core/frontmatter'
+import { t } from '../i18n'
 import { cleanErr, useStore } from '../store'
 import { BlurInput, EpisodeSelect } from '../ui'
 
@@ -31,9 +32,9 @@ function DocBlock({ kind, label, scriptName, scriptText }: { kind: string; label
   }
   return (
     <div className="panelbox">
-      <h2>{label} <button className="mini ghost" disabled={busy || !scriptText} onClick={() => void generate()}>{busy ? '…' : '✦ Generar con IA'}</button></h2>
+      <h2>{label} <button className="mini ghost" disabled={busy || !scriptText} onClick={() => void generate()}>{busy ? '…' : `✦ ${t('Generar con IA')}`}</button></h2>
       {err && <p className="err">{err}</p>}
-      <div><BlurInput textarea rows={kind === 'treatment' ? 12 : kind === 'sinopsis' ? 6 : 3} value={body} placeholder={`${label} (se guarda en ${path})`} onCommit={(v) => void write(v)} /></div>
+      <div><BlurInput textarea rows={kind === 'treatment' ? 12 : kind === 'sinopsis' ? 6 : 3} value={body} placeholder={`${label} (${t('se guarda en')} ${path})`} onCommit={(v) => void write(v)} /></div>
     </div>
   )
 }
@@ -49,9 +50,9 @@ export function DevDocs() {
     <main className="page scroll">
       <div className="toolbar">
         <EpisodeSelect value={script} onChange={setEp} />
-        <span className="muted tiny">Loglines, sinopsis y treatment generados por IA, guardados en knowledge/ y versionados.</span>
+        <span className="muted tiny">{t('Loglines, sinopsis y treatment generados por IA, guardados en knowledge/ y versionados.')}</span>
       </div>
-      {!script ? <p className="muted center">Crea o abre un guion.</p> : KINDS.map(([k, l]) => (
+      {!script ? <p className="muted center">{t('Crea o abre un guion.')}</p> : KINDS.map(([k, l]) => (
         <DocBlock key={k} kind={k} label={l} scriptName={scriptName} scriptText={scriptText} />
       ))}
     </main>

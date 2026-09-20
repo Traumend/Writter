@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { breakdown, extractMissing, toCsv, type EntityCard } from '../../core/breakdown'
 import { writeFrontmatter } from '../../core/frontmatter'
 import type { FileKind } from '../../core/types/ipc'
+import { t } from '../i18n'
 import { useStore } from '../store'
 import { BlurInput, useAsset } from '../ui'
 import { TEMPLATE } from './Desk'
@@ -18,23 +19,23 @@ function Card({ c }: { c: EntityCard }) {
   return (
     <div className="card">
       <div className="row">
-        <div className="avatar" onClick={() => void window.api.assetPick().then((rel) => rel && patch({ image: rel }))} title="Cambiar foto">
+        <div className="avatar" onClick={() => void window.api.assetPick().then((rel) => rel && patch({ image: rel }))} title={t('Cambiar foto')}>
           {img ? <img src={img} alt="" /> : <span>{c.name.slice(0, 1)}</span>}
         </div>
         <div className="grow">
           <div className="tiny muted">{c.kind}</div>
           <strong className="link" onClick={() => { void openFile(c.path); setTab('desk') }}>{c.name}</strong>
-          {c.kind === 'character' && <BlurInput value={c.actor} placeholder="Actor no asignado" onCommit={(v) => patch({ actor: v })} />}
+          {c.kind === 'character' && <BlurInput value={c.actor} placeholder={t('Actor no asignado')} onCommit={(v) => patch({ actor: v })} />}
         </div>
       </div>
       {c.kind === 'character' && (
         <select value={c.group} onChange={(e) => patch({ group: e.target.value })}>
-          {GROUPS.map((g) => <option key={g} value={g}>{GROUP_LABEL[g]}</option>)}
+          {GROUPS.map((g) => <option key={g} value={g}>{t(GROUP_LABEL[g] ?? g)}</option>)}
         </select>
       )}
-      <BlurInput textarea rows={2} value={c.description} placeholder="Descripción" onCommit={(v) => patch({ description: v })} />
-      <BlurInput value={c.aliases.join(', ')} placeholder="Alias separados por comas" onCommit={(v) => patch({ aliases: v.split(',').map((x) => x.trim()).filter(Boolean) })} />
-      <div className="tiny muted">{c.appearances.length} escenas{c.kind === 'character' ? ` · ${c.words} palabras de diálogo` : ''}</div>
+      <BlurInput textarea rows={2} value={c.description} placeholder={t('Descripción')} onCommit={(v) => patch({ description: v })} />
+      <BlurInput value={c.aliases.join(', ')} placeholder={t('Alias separados por comas')} onCommit={(v) => patch({ aliases: v.split(',').map((x) => x.trim()).filter(Boolean) })} />
+      <div className="tiny muted">{c.appearances.length} {t('escenas')}{c.kind === 'character' ? ` · ${c.words} ${t('palabras de diálogo')}` : ''}</div>
       <div className="chips">
         {c.appearances.map((a, i) => (
           <span key={i} className="chip" title={`${a.script}: ${a.heading}`} onClick={() => {
@@ -73,25 +74,25 @@ export function Breakdown() {
     <main className="page">
       <div className="toolbar">
         {(['character', 'location', 'prop'] as FileKind[]).map((k) => (
-          <button key={k} className={kind === k ? 'on' : 'ghost'} onClick={() => setKind(k)}>{{ character: 'Personajes', location: 'Locaciones', prop: 'Ítems' }[k as 'character']} ({cards.filter((c) => c.kind === k).length})</button>
+          <button key={k} className={kind === k ? 'on' : 'ghost'} onClick={() => setKind(k)}>{t({ character: 'Personajes', location: 'Locaciones', prop: 'Ítems' }[k as 'character'])} ({cards.filter((c) => c.kind === k).length})</button>
         ))}
         {kind === 'character' && (
           <select value={group} onChange={(e) => setGroup(e.target.value)}>
-            <option value="all">Todos los grupos</option>
-            {GROUPS.map((g) => <option key={g} value={g}>{GROUP_LABEL[g]}</option>)}
+            <option value="all">{t('Todos los grupos')}</option>
+            {GROUPS.map((g) => <option key={g} value={g}>{t(GROUP_LABEL[g] ?? g)}</option>)}
           </select>
         )}
-        <input placeholder="Buscar…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input placeholder={t('Buscar…')} value={q} onChange={(e) => setQ(e.target.value)} />
         <span className="grow" />
-        <input placeholder="Nuevo…" value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
+        <input placeholder={t('Nuevo…')} value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
         <button className="ghost" disabled={!missing.characters.length && !missing.locations.length} onClick={() => void extract()} title={[...missing.characters, ...missing.locations].join(', ')}>
-          Extraer del guión ({missing.characters.length + missing.locations.length})
+          {t('Extraer del guión')} ({missing.characters.length + missing.locations.length})
         </button>
         <button className="ghost" onClick={() => void window.api.exportText(toCsv(cards), 'breakdown.csv')}>CSV</button>
       </div>
       <div className="cards">
         {list.map((c) => <Card key={c.path} c={c} />)}
-        {list.length === 0 && <p className="muted">Sin fichas. Usa "Extraer del guión" o crea una.</p>}
+        {list.length === 0 && <p className="muted">{t('Sin fichas. Usa "Extraer del guión" o crea una.')}</p>}
       </div>
     </main>
   )

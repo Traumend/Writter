@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { AdoptRole } from '../../core/types/ipc'
+import { t } from '../i18n'
 import { useStore } from '../store'
 
 // Vinculador de carpetas del Vault (role-first): la raíz arriba y, por cada rol, su subcarpeta
@@ -29,16 +30,16 @@ function RoleRow({ role, label, desc, root, value, onChange }: { role: AdoptRole
     <div className="linkrow">
       <div className="linkrow-head">
         <div className="grow">
-          <strong>{label}</strong>
-          <span className="muted tiny"> · {desc}</span>
+          <strong>{t(label)}</strong>
+          <span className="muted tiny"> · {t(desc)}</span>
         </div>
-        {exists === true && <span className="badge ok">✓ existe</span>}
-        {exists === false && <span className="badge no">no existe</span>}
+        {exists === true && <span className="badge ok">✓ {t('existe')}</span>}
+        {exists === false && <span className="badge no">{t('no existe')}</span>}
       </div>
       <div className="row">
-        <input value={value} placeholder="subcarpeta…" onChange={(e) => onChange(e.target.value)} aria-label={`Carpeta de ${label}`} />
-        <button className="ghost" onClick={() => void browse()}>Examinar…</button>
-        {exists === false && <button onClick={() => void create()}>Crear</button>}
+        <input value={value} placeholder={t('subcarpeta…')} onChange={(e) => onChange(e.target.value)} aria-label={`${t('Carpeta de')} ${t(label)}`} />
+        <button className="ghost" onClick={() => void browse()}>{t('Examinar…')}</button>
+        {exists === false && <button onClick={() => void create()}>{t('Crear')}</button>}
       </div>
       <div className="linkpath tiny muted">{join(root, value)}</div>
     </div>
@@ -54,11 +55,11 @@ export function Adoption() {
   return (
     <div className="modal-backdrop" onClick={cancelLink}>
       <div className="modal linker" onClick={(e) => e.stopPropagation()}>
-        <div className="row"><h1>Vincular carpetas del Vault</h1><span className="grow" /><button className="ghost mini" onClick={cancelLink}>Cerrar</button></div>
-        <p className="muted">Indica dónde vive cada cosa. Si una carpeta no existe, créala con un botón. No se mueve ni se modifica contenido.</p>
+        <div className="row"><h1>{t('Vincular carpetas del Vault')}</h1><span className="grow" /><button className="ghost mini" onClick={cancelLink}>{t('Cerrar')}</button></div>
+        <p className="muted">{t('Indica dónde vive cada cosa. Si una carpeta no existe, créala con un botón. No se mueve ni se modifica contenido.')}</p>
 
         <div className="linkrow root">
-          <div className="linkrow-head"><strong>Vault principal (raíz)</strong><span className="grow" /><button className="ghost mini" onClick={() => void repickRoot()}>Cambiar…</button></div>
+          <div className="linkrow-head"><strong>{t('Vault principal (raíz)')}</strong><span className="grow" /><button className="ghost mini" onClick={() => void repickRoot()}>{t('Cambiar…')}</button></div>
           <div className="linkpath mono">{linker.root}</div>
         </div>
 
@@ -69,8 +70,8 @@ export function Adoption() {
         </div>
 
         <div className="row" style={{ justifyContent: 'flex-end', marginTop: 14 }}>
-          <button className="ghost" onClick={cancelLink}>Cancelar</button>
-          <button onClick={() => void linkVault(roles)}>Vincular y abrir</button>
+          <button className="ghost" onClick={cancelLink}>{t('Cancelar')}</button>
+          <button onClick={() => void linkVault(roles)}>{t('Vincular y abrir')}</button>
         </div>
       </div>
     </div>

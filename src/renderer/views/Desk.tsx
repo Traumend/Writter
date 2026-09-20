@@ -6,6 +6,7 @@ import { readFrontmatter } from '../../core/frontmatter'
 import { estimateTokens } from '../../core/safeguards'
 import { type FileKind, type Scope } from '../../core/types/ipc'
 import { Editor } from '../editor/Editor'
+import { t } from '../i18n'
 import { DEFAULT_SECTIONS, useStore } from '../store'
 import { Icon, useAsset } from '../ui'
 
@@ -33,11 +34,11 @@ function NewFile({ kind, onDone }: { kind: Exclude<FileKind, 'other'>; onDone: (
   }
   return (
     <div className="newfile">
-      <input autoFocus placeholder="Nombre · Enter" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => (e.key === 'Enter' ? go() : e.key === 'Escape' && onDone())} />
+      <input autoFocus placeholder={t('Nombre · Enter')} value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => (e.key === 'Enter' ? go() : e.key === 'Escape' && onDone())} />
       {kind === 'script' && (
         <div className="row">
-          <input type="number" min={1} value={season} onChange={(e) => setSeason(e.target.value)} title="Temporada" />
-          <input type="number" min={1} value={episode} onChange={(e) => setEpisode(e.target.value)} title="Episodio" />
+          <input type="number" min={1} value={season} onChange={(e) => setSeason(e.target.value)} title={t('Temporada')} />
+          <input type="number" min={1} value={episode} onChange={(e) => setEpisode(e.target.value)} title={t('Episodio')} />
         </div>
       )}
     </div>
@@ -63,7 +64,7 @@ function LibrarySection({ id, label, onAdd, children }: { id: string; label: str
   }
   return (
     <div className={`block lib ${over ? 'dragover' : ''}`} onDragOver={(e) => { e.preventDefault(); setOver(true) }} onDragLeave={() => setOver(false)} onDrop={drop}>
-      <h2 draggable onDragStart={() => (dragId = id)} onDragEnd={() => (dragId = null)} title="Arrastra para reordenar · clic para plegar">
+      <h2 draggable onDragStart={() => (dragId = id)} onDragEnd={() => (dragId = null)} title={t('Arrastra para reordenar · clic para plegar')}>
         <span className="drag" aria-hidden>⠿</span>
         <span className="grow link" onClick={toggle}>{collapsed ? '▸' : '▾'} {label}</span>
         <button className="mini" onClick={(e) => { e.stopPropagation(); onAdd() }}>+</button>
@@ -90,14 +91,13 @@ function LeftPanel() {
   const [newGroup, setNewGroup] = useState<string | null>(null)
   const [showTrash, setShowTrash] = useState(false)
   const lines = useMemo(() => useStore.getState().text.split('\n'), [projection])
-  if (!vault) return <p className="muted">Abre una carpeta como vault.</p>
+  if (!vault) return <p className="muted">{t('Abre una carpeta como vault.')}</p>
   const scene = projection.scenes.find((s) => cursorLine >= s.startLine && cursorLine < s.endLine)
   const resolved = new Set(files.map((f) => f.name.toLowerCase()))
-  const seasons = new Map<string, typeof files>()
+  const seasons = new Map<string, typeof files>() // clave = número de temporada ('' = sin temporada)
   for (const f of files.filter((x) => x.kind === 'script')) {
     const d = docs.find((x) => x.path === f.path)
-    const s = d ? String(readFrontmatter(d.content).data['season'] ?? '') : ''
-    const key = s ? `Temporada ${s}` : 'Sin temporada'
+    const key = d ? String(readFrontmatter(d.content).data['season'] ?? '') : ''
     seasons.set(key, [...(seasons.get(key) ?? []), f])
   }
   const ql = q.toLowerCase()
@@ -117,8 +117,8 @@ function LeftPanel() {
         <>
           {adding === 'script' && <NewFile kind="script" onDone={() => setAdding(null)} />}
           {[...seasons.entries()].sort().map(([season, list]) => (
-            <div key={season}>
-              <div className="muted tiny">{season}</div>
+            <div key={season || 'none'}>
+              <div className="muted tiny">{season ? `${t('Temporada')} ${season}` : t('Sin temporada')}</div>
               <ul>{list.map((f) => <li key={f.path} className={f.path === path ? 'active' : ''} onClick={() => void openFile(f.path)}>{f.name}</li>)}</ul>
             </div>
           ))}
@@ -140,17 +140,17 @@ function LeftPanel() {
       {path && projection.scenes.length > 0 && (
         <div className="block">
           <h2>
-            Escenas · {projection.scenes.length}
+            {t('Escenas')} · {projection.scenes.length}
             <span className="grow" />
-            <button className={multi ? 'mini on' : 'mini ghost'} title="Selección múltiple" onClick={() => { setMulti((m) => !m); setSel(new Set()) }}>Multi</button>
-            {sceneTrash.length > 0 && <button className="mini ghost" title="Papelera de escenas" onClick={() => setShowTrash((t) => !t)}><Icon name="trash" size={13} /> {sceneTrash.length}</button>}
+            <button className={multi ? 'mini on' : 'mini ghost'} title={t('Selección múltiple')} onClick={() => { setMulti((m) => !m); setSel(new Set()) }}>{t('Multi')}</button>
+            {sceneTrash.length > 0 && <button className="mini ghost" title={t('Papelera de escenas')} onClick={() => setShowTrash((v) => !v)}><Icon name="trash" size={13} /> {sceneTrash.length}</button>}
           </h2>
-          <input placeholder="Buscar escena…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input placeholder={t('Buscar escena…')} value={q} onChange={(e) => setQ(e.target.value)} />
           <div className="row tiny">
-            <label className="check tiny grow"><input type="checkbox" checked={inContent} onChange={(e) => setInContent(e.target.checked)} /> también en contenido</label>
+            <label className="check tiny grow"><input type="checkbox" checked={inContent} onChange={(e) => setInContent(e.target.checked)} /> {t('también en contenido')}</label>
             {groups.length > 0 && (
-              <select value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)} title="Filtrar por grupo">
-                <option value="">Todos los grupos</option>
+              <select value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)} title={t('Filtrar por grupo')}>
+                <option value="">{t('Todos los grupos')}</option>
                 {groups.map((g) => <option key={g} value={g}>{g}</option>)}
               </select>
             )}
@@ -158,11 +158,11 @@ function LeftPanel() {
 
           {showTrash && sceneTrash.length > 0 && (
             <div className="trashbox">
-              <div className="muted tiny">Papelera (sesión) · recuperación permanente en Versiones</div>
-              {sceneTrash.map((t, i) => (
+              <div className="muted tiny">{t('Papelera (sesión) · recuperación permanente en Versiones')}</div>
+              {sceneTrash.map((tr, i) => (
                 <div key={i} className="row tiny">
-                  <span className="grow ell">{t.heading || '(sin encabezado)'}</span>
-                  <button className="mini" onClick={() => restoreScene(i)}>Restaurar</button>
+                  <span className="grow ell">{tr.heading || t('(sin encabezado)')}</span>
+                  <button className="mini" onClick={() => restoreScene(i)}>{t('Restaurar')}</button>
                 </div>
               ))}
             </div>
@@ -170,9 +170,9 @@ function LeftPanel() {
 
           {multi && (
             <div className="row tiny bulkbar">
-              <span className="grow">{sel.size} seleccionadas</span>
-              <button className="mini" disabled={!sel.size} onClick={() => setSel(new Set(scenes.map((s) => s.index)))}>Todas</button>
-              <button className="mini del" disabled={!sel.size} onClick={runDelete}>Eliminar</button>
+              <span className="grow">{sel.size} {t('seleccionadas')}</span>
+              <button className="mini" disabled={!sel.size} onClick={() => setSel(new Set(scenes.map((s) => s.index)))}>{t('Todas')}</button>
+              <button className="mini del" disabled={!sel.size} onClick={runDelete}>{t('Eliminar')}</button>
             </div>
           )}
 
@@ -182,7 +182,7 @@ function LeftPanel() {
               return (
                 <div key={s.index}>
                   {!groupFilter && newGroupHere && s.group && <li className="grouphead muted tiny">{s.group}</li>}
-                  <li className={s === scene ? 'active' : ''} onClick={() => (multi ? toggleSel(s.index) : setCursor(s.startLine, null))} title={`${s.wordCount} palabras · ≈${estimateTokens(lines.slice(s.startLine, s.endLine).join('\n'))} tokens · pág. ${pagination.lineToPage[s.startLine] ?? 1}\n${s.characters.join(', ')}`}>
+                  <li className={s === scene ? 'active' : ''} onClick={() => (multi ? toggleSel(s.index) : setCursor(s.startLine, null))} title={`${s.wordCount} ${t('palabras')} · ≈${estimateTokens(lines.slice(s.startLine, s.endLine).join('\n'))} ${t('tokens')} · ${t('pág.')} ${pagination.lineToPage[s.startLine] ?? 1}\n${s.characters.join(', ')}`}>
                     {multi && <input type="checkbox" checked={sel.has(s.index)} onChange={() => toggleSel(s.index)} onClick={(e) => e.stopPropagation()} />}
                     <span className="muted">{s.index + 1}.</span> <span className="grow ell">{s.heading}</span>
                     {!multi && <>
@@ -196,22 +196,22 @@ function LeftPanel() {
           </ul>
 
           {newGroup === null ? (
-            <button className="mini ghost" onClick={() => setNewGroup('')}>+ grupo (sección) en la escena actual</button>
+            <button className="mini ghost" onClick={() => setNewGroup('')}>{t('+ grupo (sección) en la escena actual')}</button>
           ) : (
-            <input autoFocus placeholder="Nombre del grupo · Enter" value={newGroup} onChange={(e) => setNewGroup(e.target.value)}
+            <input autoFocus placeholder={t('Nombre del grupo · Enter')} value={newGroup} onChange={(e) => setNewGroup(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && newGroup.trim()) { addGroup(newGroup); setNewGroup(null) } else if (e.key === 'Escape') setNewGroup(null) }} onBlur={() => setNewGroup(null)} />
           )}
         </div>
       )}
       {scene && (
         <div className="block">
-          <h2>En escena</h2>
+          <h2>{t('En escena')}</h2>
           <ul>
             {scene.characters.map((c) => <li key={c}>{c}</li>)}
             {scene.links.map((l) => (
               <li key={l} className={resolved.has(l.toLowerCase()) ? '' : 'muted'}>
                 [[{l}]]
-                {!resolved.has(l.toLowerCase()) && <button className="mini" onClick={() => void createFile(`${roleDir('character')}/${l}.md`, TEMPLATE.character(l), false)}>+ ficha</button>}
+                {!resolved.has(l.toLowerCase()) && <button className="mini" onClick={() => void createFile(`${roleDir('character')}/${l}.md`, TEMPLATE.character(l), false)}>{t('+ ficha')}</button>}
               </li>
             ))}
           </ul>
@@ -219,7 +219,7 @@ function LeftPanel() {
       )}
       {/* Biblioteca: secciones reordenables y plegables (arrastra la cabecera). */}
       {orderedSections(prefs.sectionOrder).map((id) => (
-        <LibrarySection key={id} id={id} label={KIND_LABEL[id as FileKind]} onAdd={() => setAdding(id as Exclude<FileKind, 'other'>)}>
+        <LibrarySection key={id} id={id} label={t(KIND_LABEL[id as FileKind])} onAdd={() => setAdding(id as Exclude<FileKind, 'other'>)}>
           {body(id)}
         </LibrarySection>
       ))}
@@ -247,17 +247,17 @@ function ScopeBar() {
   return (
     <div className="scopebar">
       {SCOPES.map(([s, l]) => (
-        <button key={s} className={s === scope ? 'on' : 'ghost'} disabled={s === 'range' && !selection} onClick={() => setScope(s)}>{l}</button>
+        <button key={s} className={s === scope ? 'on' : 'ghost'} disabled={s === 'range' && !selection} onClick={() => setScope(s)}>{t(l)}</button>
       ))}
       <span className="grow" />
-      <button className={prefs.focus ? 'on mini' : 'ghost mini'} onClick={() => setPref('focus', !prefs.focus)} title="Modo enfoque: atenúa lo demás">Enfoque</button>
-      <button className={prefs.page ? 'on mini' : 'ghost mini'} onClick={() => setPref('page', !prefs.page)} title="Modo página: aspecto de hoja de guion">Página</button>
-      <button className={showTags ? 'on mini' : 'ghost mini'} onClick={toggleTags} title="Etiquetas de elemento">ABC</button>
+      <button className={prefs.focus ? 'on mini' : 'ghost mini'} onClick={() => setPref('focus', !prefs.focus)} title={t('Modo enfoque: atenúa lo demás')}>{t('Enfoque')}</button>
+      <button className={prefs.page ? 'on mini' : 'ghost mini'} onClick={() => setPref('page', !prefs.page)} title={t('Modo página: aspecto de hoja de guion')}>{t('Página')}</button>
+      <button className={showTags ? 'on mini' : 'ghost mini'} onClick={toggleTags} title={t('Etiquetas de elemento')}>ABC</button>
       <span className="sep" />
       <button className="ghost mini" onClick={() => { setTab('dev'); setDevTab('beats') }} title="Beat Timeline">Beats</button>
-      <button className="ghost mini" onClick={() => { setTab('dev'); setDevTab('map') }} title="Mapa neural">Mapa</button>
-      <button className="ghost mini" onClick={() => { setTab('dev'); setDevTab('analysis') }} title="Análisis">Análisis</button>
-      <span className="muted">≈ {Math.ceil(est / 4)} tokens</span>
+      <button className="ghost mini" onClick={() => { setTab('dev'); setDevTab('map') }} title={t('Mapa neural')}>{t('Mapa')}</button>
+      <button className="ghost mini" onClick={() => { setTab('dev'); setDevTab('analysis') }} title={t('Análisis')}>{t('Análisis')}</button>
+      <span className="muted">≈ {Math.ceil(est / 4)} {t('tokens')}</span>
     </div>
   )
 }
@@ -273,38 +273,39 @@ function RightPanel() {
   const coverImg = useAsset(cfg?.cover.image ?? '')
   const locked = s.frontmatter['locked'] === true
   const name = s.path ? s.path.split('/').pop()!.replace(/\.md$/, '') : 'guion'
+  const TAB_LABEL = { ai: t('Script Assistant'), versions: t('Versiones'), export: t('Exportar') }
 
   return (
     <>
       <div className="tabs">
-        {(['ai', 'versions', 'export'] as const).map((t) => (
-          <button key={t} className={tab === t ? 'on' : 'ghost'} onClick={() => setTab(t)}>{{ ai: 'Script Assistant', versions: 'Versiones', export: 'Exportar' }[t]}</button>
+        {(['ai', 'versions', 'export'] as const).map((tb) => (
+          <button key={tb} className={tab === tb ? 'on' : 'ghost'} onClick={() => setTab(tb)}>{TAB_LABEL[tb]}</button>
         ))}
       </div>
 
       {tab === 'ai' && (
         <>
           <div className="block">
-            <h2>Instrucción · scope: {SCOPES.find(([k]) => k === s.scope)?.[1]}</h2>
-            <textarea rows={4} placeholder='Ej. "Haz el diálogo de Rick más evasivo sin revelar la clave"' value={instruction} onChange={(e) => setInstruction(e.target.value)} />
+            <h2>{t('Instrucción')} · {t('scope')}: {t(SCOPES.find(([k]) => k === s.scope)?.[1] ?? '')}</h2>
+            <textarea rows={4} placeholder={t('Ej. "Haz el diálogo de Rick más evasivo sin revelar la clave"')} value={instruction} onChange={(e) => setInstruction(e.target.value)} />
             {locked && (
-              <label className="check"><input type="checkbox" checked={allowLocked} onChange={(e) => setAllowLocked(e.target.checked)} /> Autorizo editar este archivo <code>locked</code></label>
+              <label className="check"><input type="checkbox" checked={allowLocked} onChange={(e) => setAllowLocked(e.target.checked)} /> {t('Autorizo editar este archivo')} <code>locked</code></label>
             )}
-            <button disabled={!s.path || s.aiBusy || !instruction.trim()} onClick={() => void s.runAi(instruction, allowLocked)}>{s.aiBusy ? 'Pensando…' : 'Proponer diff'}</button>
+            <button disabled={!s.path || s.aiBusy || !instruction.trim()} onClick={() => void s.runAi(instruction, allowLocked)}>{s.aiBusy ? t('Pensando…') : t('Proponer diff')}</button>
             {s.aiError && <p className="err">{s.aiError}</p>}
-            {!s.keyStatus?.present && cfg?.byok.provider !== 'ollama' && <p className="muted tiny">Sin clave BYOK: configúrala en Ajustes.</p>}
+            {!s.keyStatus?.present && cfg?.byok.provider !== 'ollama' && <p className="muted tiny">{t('Sin clave BYOK: configúrala en Ajustes.')}</p>}
           </div>
           {s.proposal && (
             <div className="block">
-              <h2>Propuesta · líneas {s.proposal.from + 1}-{s.proposal.to} · {s.proposal.tokensIn}→{s.proposal.tokensOut} tokens · {s.proposal.model}</h2>
+              <h2>{t('Propuesta')} · {t('líneas')} {s.proposal.from + 1}-{s.proposal.to} · {s.proposal.tokensIn}→{s.proposal.tokensOut} {t('tokens')} · {s.proposal.model}</h2>
               <pre className="diff">
                 {diffLines(s.proposal.target + '\n', s.proposal.replacement + '\n').map((p, i) => <span key={i} className={p.added ? 'add' : p.removed ? 'del' : ''}>{p.value}</span>)}
               </pre>
               {s.proposal.rationale && <p className="muted">{s.proposal.rationale}</p>}
-              {s.proposal.docHash !== s.diskHash && <p className="err">Obsoleta: el documento cambió desde la petición.</p>}
+              {s.proposal.docHash !== s.diskHash && <p className="err">{t('Obsoleta: el documento cambió desde la petición.')}</p>}
               <div className="row">
-                <button disabled={s.proposal.docHash !== s.diskHash} onClick={() => void s.acceptProposal()}>Aceptar</button>
-                <button className="ghost" onClick={s.rejectProposal}>Rechazar</button>
+                <button disabled={s.proposal.docHash !== s.diskHash} onClick={() => void s.acceptProposal()}>{t('Aceptar')}</button>
+                <button className="ghost" onClick={s.rejectProposal}>{t('Rechazar')}</button>
               </div>
             </div>
           )}
@@ -313,25 +314,25 @@ function RightPanel() {
 
       {tab === 'versions' && (
         <div className="block">
-          <h2>Historial · {name}</h2>
+          <h2>{t('Historial')} · {name}</h2>
           <div className="row">
-            <input placeholder="Nombre del snapshot" value={label} onChange={(e) => setLabel(e.target.value)} />
-            <button className="mini" disabled={!s.path || !label.trim()} onClick={() => { void s.snapshot(label.trim()); setLabel('') }}>Snapshot</button>
+            <input placeholder={t('Nombre del snapshot')} value={label} onChange={(e) => setLabel(e.target.value)} />
+            <button className="mini" disabled={!s.path || !label.trim()} onClick={() => { void s.snapshot(label.trim()); setLabel('') }}>{t('Snapshot')}</button>
           </div>
-          {s.versions.length === 0 && <p className="muted">Sin versiones aún. Cada guardado que cambia el archivo crea un punto restaurable.</p>}
+          {s.versions.length === 0 && <p className="muted">{t('Sin versiones aún. Cada guardado que cambia el archivo crea un punto restaurable.')}</p>}
           <ul>
             {s.versions.map((v) => (
               <li key={v.id} className="row">
                 <span className="ell">{new Date(v.ts).toLocaleString()} · {v.label ?? v.origin} · {v.bytes} B</span>
                 <span className="grow" />
-                <button className="mini ghost" onClick={() => void window.api.versionRead(s.path!, v.id).then((content) => setCompare({ id: v.id, content }))}>Comparar</button>
-                <button className="mini" onClick={() => void s.restoreVersion(v.id)}>Restaurar</button>
+                <button className="mini ghost" onClick={() => void window.api.versionRead(s.path!, v.id).then((content) => setCompare({ id: v.id, content }))}>{t('Comparar')}</button>
+                <button className="mini" onClick={() => void s.restoreVersion(v.id)}>{t('Restaurar')}</button>
               </li>
             ))}
           </ul>
           {compare && (
             <>
-              <h2>Versión → actual <button className="mini ghost" onClick={() => setCompare(null)}>cerrar</button></h2>
+              <h2>{t('Versión → actual')} <button className="mini ghost" onClick={() => setCompare(null)}>{t('cerrar')}</button></h2>
               <pre className="diff">
                 {diffLines(compare.content, s.text).filter((p) => p.added || p.removed).map((p, i) => <span key={i} className={p.added ? 'add' : 'del'}>{p.value}</span>)}
               </pre>
@@ -342,7 +343,7 @@ function RightPanel() {
 
       {tab === 'export' && (
         <div className="block">
-          <h2>Exportar {name}</h2>
+          <h2>{t('Exportar')} {name}</h2>
           <div className="col">
             <button disabled={!s.path} onClick={() => {
               const vars = { title: cfg?.cover.title || name, episode: name, author: cfg?.cover.author }
@@ -351,14 +352,14 @@ function RightPanel() {
                 `${name}.pdf`,
                 { paper: cfg?.pdf.paper ?? 'Letter', headerTemplate: pdfVars(cfg?.pdf.header ?? '', vars), footerTemplate: pdfVars(cfg?.pdf.footer ?? '', vars) }
               )
-            }}>PDF (formato industria{cfg?.cover.title ? ' + portada' : ''})</button>
+            }}>{t('PDF (formato industria')}{cfg?.cover.title ? t(' + portada') : ''})</button>
             <div className="row">
               <button disabled={!s.path} className="ghost" onClick={() => void window.api.exportBytes(toB64(mdToDocx(s.text)), `${name}.docx`)}>DOCX</button>
               <button disabled={!s.path} className="ghost" onClick={() => void window.api.exportText(mdToFdx(s.text), `${name}.fdx`)}>FDX</button>
               <button disabled={!s.path} className="ghost" onClick={() => void window.api.exportText(mdToFountain(s.text), `${name}.fountain`)}>Fountain</button>
               <button disabled={!s.path} className="ghost" onClick={() => void window.api.exportText(mdToTxt(s.text), `${name}.txt`)}>TXT</button>
             </div>
-            <button className="ghost" onClick={() => void window.api.importScript().then((f) => f && s.refreshFiles().then(() => s.openFile(f.path)))}>Importar .fountain / .fdx</button>
+            <button className="ghost" onClick={() => void window.api.importScript().then((f) => f && s.refreshFiles().then(() => s.openFile(f.path)))}>{t('Importar .fountain / .fdx')}</button>
           </div>
         </div>
       )}
@@ -403,13 +404,13 @@ export function Desk() {
   return (
     <main className="desk" ref={mainRef} style={{ gridTemplateColumns: cols(prefs.deskLeft, prefs.deskRight) }}>
       <aside><LeftPanel /></aside>
-      <div className="resizer" onPointerDown={resizer('left')} title="Arrastra para redimensionar" />
+      <div className="resizer" onPointerDown={resizer('left')} title={t('Arrastra para redimensionar')} />
       <section>
         {s.conflict && (
           <div className="banner">
-            El archivo cambió en disco mientras lo editabas.
-            <button className="mini" onClick={() => void s.reloadFromDisk()}>Recargar del disco</button>
-            <button className="mini ghost" onClick={() => void s.save(true)}>Conservar lo mío</button>
+            {t('El archivo cambió en disco mientras lo editabas.')}
+            <button className="mini" onClick={() => void s.reloadFromDisk()}>{t('Recargar del disco')}</button>
+            <button className="mini ghost" onClick={() => void s.save(true)}>{t('Conservar lo mío')}</button>
           </div>
         )}
         {s.path ? (
@@ -418,10 +419,10 @@ export function Desk() {
             <Editor />
           </>
         ) : (
-          <p className="muted center">Selecciona o crea un archivo. Ctrl+clic en un [[enlace]] abre la ficha.</p>
+          <p className="muted center">{t('Selecciona o crea un archivo. Ctrl+clic en un [[enlace]] abre la ficha.')}</p>
         )}
       </section>
-      <div className="resizer" onPointerDown={resizer('right')} title="Arrastra para redimensionar" />
+      <div className="resizer" onPointerDown={resizer('right')} title={t('Arrastra para redimensionar')} />
       <aside className="right"><RightPanel /></aside>
     </main>
   )

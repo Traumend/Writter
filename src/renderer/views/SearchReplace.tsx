@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { searchReplace, type SRResult } from '../../core/searchreplace'
 import type { TokenType } from '../../core/parser/fountain'
+import { t } from '../i18n'
 import { useStore } from '../store'
 
 // Buscar y reemplazar global sobre los guiones del vault (Nivel 1).
@@ -30,7 +31,7 @@ export function SearchReplace() {
     try {
       setResults(searchReplace(docs, scriptPaths, opts()))
     } catch (e) {
-      setErr(`Regex inválida: ${String(e).replace(/^Error:\s*/, '')}`)
+      setErr(`${t('Regex inválida')}: ${String(e).replace(/^Error:\s*/, '')}`)
       setResults(null)
     }
   }
@@ -53,31 +54,31 @@ export function SearchReplace() {
   return (
     <div className="modal-backdrop" onClick={closeSearch}>
       <div className="modal search" onClick={(e) => e.stopPropagation()}>
-        <div className="row"><h1>Buscar y reemplazar</h1><span className="grow" /><button className="ghost mini" onClick={closeSearch}>Cerrar</button></div>
+        <div className="row"><h1>{t('Buscar y reemplazar')}</h1><span className="grow" /><button className="ghost mini" onClick={closeSearch}>{t('Cerrar')}</button></div>
         <div className="grid2">
-          <label className="field"><span>Buscar</span><input autoFocus value={q} onChange={(e) => { setQ(e.target.value); setResults(null) }} onKeyDown={(e) => e.key === 'Enter' && preview()} /></label>
-          <label className="field"><span>Reemplazar por (vacío = eliminar)</span><input value={repl} onChange={(e) => setRepl(e.target.value)} /></label>
+          <label className="field"><span>{t('Buscar')}</span><input autoFocus value={q} onChange={(e) => { setQ(e.target.value); setResults(null) }} onKeyDown={(e) => e.key === 'Enter' && preview()} /></label>
+          <label className="field"><span>{t('Reemplazar por (vacío = eliminar)')}</span><input value={repl} onChange={(e) => setRepl(e.target.value)} /></label>
         </div>
         <div className="row" style={{ flexWrap: 'wrap', gap: 14 }}>
-          <label className="check"><input type="checkbox" checked={caseSensitive} onChange={(e) => setCase(e.target.checked)} /> Distinguir mayúsculas</label>
-          <label className="check"><input type="checkbox" checked={wholeWord} onChange={(e) => setWhole(e.target.checked)} /> Palabra completa</label>
+          <label className="check"><input type="checkbox" checked={caseSensitive} onChange={(e) => setCase(e.target.checked)} /> {t('Distinguir mayúsculas')}</label>
+          <label className="check"><input type="checkbox" checked={wholeWord} onChange={(e) => setWhole(e.target.checked)} /> {t('Palabra completa')}</label>
           <label className="check"><input type="checkbox" checked={regex} onChange={(e) => setRegex(e.target.checked)} /> Regex</label>
           <span className="grow" />
-          <label className="check"><input type="checkbox" checked={scopeAll} onChange={(e) => { setScopeAll(e.target.checked); setResults(null) }} /> Todos los guiones</label>
+          <label className="check"><input type="checkbox" checked={scopeAll} onChange={(e) => { setScopeAll(e.target.checked); setResults(null) }} /> {t('Todos los guiones')}</label>
         </div>
         <div className="row" style={{ flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
-          <span className="muted tiny">Bloques:</span>
-          {BLOCKS.map(([t, l]) => (
-            <button key={t} className={blocks.has(t) ? 'on mini' : 'ghost mini'} onClick={() => { setBlocks((s) => { const n = new Set(s); n.has(t) ? n.delete(t) : n.add(t); return n }); setResults(null) }}>{l}</button>
+          <span className="muted tiny">{t('Bloques:')}</span>
+          {BLOCKS.map(([bt, l]) => (
+            <button key={bt} className={blocks.has(bt) ? 'on mini' : 'ghost mini'} onClick={() => { setBlocks((s) => { const n = new Set(s); n.has(bt) ? n.delete(bt) : n.add(bt); return n }); setResults(null) }}>{t(l)}</button>
           ))}
-          <span className="muted tiny">{blocks.size ? '' : '(todos)'}</span>
+          <span className="muted tiny">{blocks.size ? '' : t('(todos)')}</span>
         </div>
         {err && <p className="err">{err}</p>}
         {results && (
           <div className="scroll" style={{ maxHeight: '34vh', marginTop: 10 }}>
-            {results.length === 0 ? <p className="muted">Sin coincidencias.</p> : (
+            {results.length === 0 ? <p className="muted">{t('Sin coincidencias.')}</p> : (
               <>
-                <p className="muted tiny">{total} coincidencia(s) en {results.length} archivo(s).</p>
+                <p className="muted tiny">{total} {t('coincidencia(s) en')} {results.length} {t('archivo(s).')}</p>
                 {results.map((r) => (
                   <div className="linkrow" key={r.path}>
                     <div className="row"><strong className="tiny">{r.path.split('/').pop()}</strong><span className="grow" /><span className="badge no">{r.count}</span></div>
@@ -89,8 +90,8 @@ export function SearchReplace() {
           </div>
         )}
         <div className="row" style={{ justifyContent: 'flex-end', marginTop: 14 }}>
-          <button className="ghost" onClick={preview} disabled={!q}>Previsualizar</button>
-          <button onClick={() => void apply()} disabled={busy || !results?.length}>Aplicar {total ? `(${total})` : ''}</button>
+          <button className="ghost" onClick={preview} disabled={!q}>{t('Previsualizar')}</button>
+          <button onClick={() => void apply()} disabled={busy || !results?.length}>{t('Aplicar')} {total ? `(${total})` : ''}</button>
         </div>
       </div>
     </div>
