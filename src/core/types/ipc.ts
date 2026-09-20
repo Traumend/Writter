@@ -1,11 +1,13 @@
 // Contrato IPC (plan §3.2). Tipos compartidos main <-> renderer, sin dependencias de Node.
 export type AdoptRole = 'script' | 'character' | 'location' | 'prop' | 'outline' | 'knowledge' | 'assets'
 
+export type Provider = 'anthropic' | 'ollama' | 'openai' | 'openrouter' | 'gemini' | 'deepseek' | 'grok' | 'custom'
+
 export type ProjectConfig = {
   format: { default: 'md' | 'fountain'; live_format: boolean }
   tags: { entity_link: string; note: string }
   graphify: { enabled: boolean; semantic_pass: 'off' | 'opt-in' | 'on'; backend: string }
-  byok: { provider: 'anthropic' | 'ollama'; model?: string }
+  byok: { provider: Provider; model?: string; baseUrl?: string }
   prompts: { assistant: string; analysis: string }
   cover: { title: string; author: string; contact: string; draft: string; image: string }
   pdf: { paper: 'Letter' | 'A4' }
@@ -60,6 +62,8 @@ export type Analysis = {
   scenes: SceneAnalysis[]
 }
 
+export type UsageStats = { calls: number; fails: number; tokensIn: number; tokensOut: number; byModel: { model: string; calls: number; tokensIn: number; tokensOut: number }[] }
+
 export type GraphStatus = { available: boolean; reason?: string; nodes?: number; edges?: number; stale?: boolean }
 export type GraphNode = { id: string; kind: FileKind | 'scene'; label: string }
 export type GraphEdge = { source: string; target: string; kind: 'references' | 'appears' }
@@ -95,7 +99,10 @@ export type Api = {
   assetRead(rel: string): Promise<string>
   exportPdf(html: string, suggestedName: string, paper: 'Letter' | 'A4'): Promise<string | null>
   exportText(content: string, suggestedName: string): Promise<string | null>
+  exportBytes(base64: string, suggestedName: string): Promise<string | null>
   importScript(): Promise<FileEntry | null>
+  usageGet(): Promise<UsageStats>
+  usageReset(): Promise<void>
 }
 
 export const DEFAULT_PROMPTS = {

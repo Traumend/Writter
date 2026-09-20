@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { basename, extname, join, resolve } from 'node:path'
 import { fdxToMd, fountainToMd } from '../core/convert'
@@ -92,6 +92,14 @@ ipcMain.handle('export.text', async (_e, content: string, suggested: string) => 
   writeFileSync(r.filePath, content)
   return r.filePath
 })
+ipcMain.handle('export.bytes', async (_e, base64: string, suggested: string) => {
+  const r = await dialog.showSaveDialog({ defaultPath: suggested })
+  if (!r.filePath) return null
+  writeFileSync(r.filePath, Buffer.from(base64, 'base64'))
+  return r.filePath
+})
+ipcMain.handle('usage.get', () => V.usageStats())
+ipcMain.handle('usage.reset', () => V.usageReset())
 ipcMain.handle('import.script', async (): Promise<FileEntry | null> => {
   const r = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: 'Guión', extensions: ['fountain', 'fdx', 'txt'] }] })
   const src = r.filePaths[0]
@@ -111,6 +119,21 @@ function createWindow() {
     height: 950,
     backgroundColor: '#1a1c20',
     webPreferences: { preload: join(__dirname, '../preload/index.js'), contextIsolation: true, nodeIntegration: false }
+  })
+  // Corrector ortográfico nativo (ES + EN) con menú contextual de sugerencias.
+  try {
+    win.webContents.session.setSpellCheckerLanguages(['es-ES', 'en-US'])
+  } catch {
+    /* algunos SO limitan idiomas; el corrector sigue con el default */
+  }
+  win.webContents.on('context-menu', (_e, params) => {
+    if (!params.misspelledWord) return
+    const menu = Menu.buildFromTemplate([
+      ...params.dictionarySuggestions.map((s) => ({ label: s, click: () => win?.webContents.replaceMisspelling(s) })),
+      ...(params.dictionarySuggestions.length ? [{ type: 'separator' as const }] : []),
+      { label: 'Añadir al diccionario', click: () => win?.webContents.session.addWordToSpellCheckerDictionary(params.misspelledWord) }
+    ])
+    menu.popup()
   })
   const devUrl = process.env['ELECTRON_RENDERER_URL']
   if (devUrl) void win.loadURL(devUrl)

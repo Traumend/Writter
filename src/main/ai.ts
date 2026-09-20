@@ -1,10 +1,30 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { checkSafeguards, estimateTokens } from '../core/safeguards'
-import type { AiProposal, AiRequest, AiText, Analysis, ProjectConfig } from '../core/types/ipc'
+import type { AiProposal, AiRequest, AiText, Analysis, ProjectConfig, Provider } from '../core/types/ipc'
 import { getKey } from './keys'
+import { logUsage } from './vault'
 
-// Motor de IA (M3/C/D). Solo main: aquí viven las claves y la red (I3). Nunca escribe al vault por su cuenta (I2).
+// Motor de IA. Solo main: aquí viven las claves y la red (I3). Nunca escribe al vault por su cuenta (I2).
 type Raw = { text: string; tokensIn: number; tokensOut: number; model: string }
+
+// Endpoints compatibles con la API de OpenAI (chat/completions). Gemini y los demás caben aquí con su baseUrl.
+const OPENAI_COMPAT: Partial<Record<Provider, string>> = {
+  openai: 'https://api.openai.com/v1',
+  openrouter: 'https://openrouter.ai/api/v1',
+  deepseek: 'https://api.deepseek.com/v1',
+  grok: 'https://api.x.ai/v1',
+  gemini: 'https://generativelanguage.googleapis.com/v1beta/openai'
+}
+const DEFAULT_MODEL: Record<Provider, string> = {
+  anthropic: 'claude-opus-5',
+  ollama: 'llama3.1',
+  openai: 'gpt-4o',
+  openrouter: 'meta-llama/llama-3.1-70b-instruct:free',
+  gemini: 'gemini-2.0-flash',
+  deepseek: 'deepseek-chat',
+  grok: 'grok-2-latest',
+  custom: 'default'
+}
 
 async function callAnthropic(system: string, prompt: string, model: string): Promise<Raw> {
   const apiKey = getKey('anthropic')
@@ -18,7 +38,7 @@ async function callAnthropic(system: string, prompt: string, model: string): Pro
   return { text, tokensIn: msg.usage.input_tokens, tokensOut: msg.usage.output_tokens, model: msg.model }
 }
 
-// Ollama local: API HTTP propia, sin SDK oficial (I8: gratis y offline).
+// Ollama local (I8: gratis y offline).
 async function callOllama(system: string, prompt: string, model: string): Promise<Raw> {
   const r = await fetch('http://127.0.0.1:11434/api/generate', { method: 'POST', body: JSON.stringify({ model, system, prompt, stream: false }) })
   if (!r.ok) throw new Error(`Ollama respondió ${r.status}`)
@@ -26,12 +46,37 @@ async function callOllama(system: string, prompt: string, model: string): Promis
   return { text: j.response, tokensIn: j.prompt_eval_count ?? estimateTokens(prompt), tokensOut: j.eval_count ?? estimateTokens(j.response), model }
 }
 
-function call(cfg: ProjectConfig, system: string, prompt: string): Promise<Raw> {
-  const { provider } = cfg.byok
-  const model = cfg.byok.model ?? (provider === 'anthropic' ? 'claude-opus-5' : 'llama3.1')
-  if (provider === 'ollama') return callOllama(system, prompt, model)
-  if (provider === 'anthropic') return callAnthropic(system, prompt, model)
-  throw new Error(`Proveedor no soportado: ${provider}`) // ponytail: openai/gemini cuando alguien los pida
+// Cualquier proveedor compatible con OpenAI (OpenAI, OpenRouter, Gemini, DeepSeek, Grok, Custom).
+async function callOpenAICompat(provider: Provider, cfg: ProjectConfig, system: string, prompt: string, model: string): Promise<Raw> {
+  const base = (provider === 'custom' ? cfg.byok.baseUrl : OPENAI_COMPAT[provider])?.replace(/\/$/, '')
+  if (!base) throw new Error(`Sin URL base para ${provider}`)
+  const apiKey = getKey(provider)
+  if (!apiKey && provider !== 'custom') throw new Error(`Sin clave BYOK para ${provider}`)
+  const r = await fetch(`${base}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) },
+    body: JSON.stringify({ model, max_tokens: 32000, messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }] })
+  })
+  if (!r.ok) throw new Error(`${provider} respondió ${r.status}: ${(await r.text()).slice(0, 200)}`)
+  const j = (await r.json()) as { choices?: { message?: { content?: string } }[]; usage?: { prompt_tokens?: number; completion_tokens?: number } }
+  const text = j.choices?.[0]?.message?.content ?? ''
+  if (!text) throw new Error(`${provider} no devolvió texto`)
+  return { text, tokensIn: j.usage?.prompt_tokens ?? estimateTokens(prompt), tokensOut: j.usage?.completion_tokens ?? estimateTokens(text), model }
+}
+
+async function call(cfg: ProjectConfig, system: string, prompt: string): Promise<Raw> {
+  const provider = cfg.byok.provider
+  const model = cfg.byok.model || DEFAULT_MODEL[provider] || 'default'
+  try {
+    const r = provider === 'anthropic' ? await callAnthropic(system, prompt, model)
+      : provider === 'ollama' ? await callOllama(system, prompt, model)
+      : await callOpenAICompat(provider, cfg, system, prompt, model)
+    logUsage({ provider, model: r.model, tokensIn: r.tokensIn, tokensOut: r.tokensOut, ok: true })
+    return r
+  } catch (e) {
+    logUsage({ provider, model, tokensIn: 0, tokensOut: 0, ok: false })
+    throw e
+  }
 }
 
 export async function runAi(req: AiRequest, cfg: ProjectConfig): Promise<AiProposal> {
@@ -45,13 +90,11 @@ export async function runAi(req: AiRequest, cfg: ProjectConfig): Promise<AiPropo
   return { replacement, rationale: rat.trim(), tokensIn: r.tokensIn, tokensOut: r.tokensOut, model: r.model, docHash: req.docHash }
 }
 
-// Texto libre para un campo (C): el renderer lo muestra como propuesta y el usuario acepta.
 export async function aiText(instruction: string, context: string, cfg: ProjectConfig): Promise<AiText> {
   const system = 'Eres un desarrollador de personajes y guiones. Responde solo con el texto pedido, sin preámbulos ni formato Markdown.'
   return call(cfg, system, `CONTEXTO:\n${context}\n\nPETICIÓN:\n${instruction}`)
 }
 
-// Análisis del guión (D): JSON por escena. Se guarda como derivado; nunca toca el .md.
 export async function analyze(text: string, cfg: ProjectConfig): Promise<Omit<Analysis, 'id' | 'ts'>> {
   const r = await call(cfg, cfg.prompts.analysis, text)
   const m = /\{[\s\S]*\}/.exec(r.text)

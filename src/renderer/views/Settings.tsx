@@ -1,14 +1,22 @@
 import { useEffect, useState } from 'react'
 import { validateTags } from '../../core/tags'
-import { DEFAULT_PROMPTS, type ProjectConfig } from '../../core/types/ipc'
+import { DEFAULT_PROMPTS, type ProjectConfig, type Provider, type UsageStats } from '../../core/types/ipc'
 import { useStore } from '../store'
 import { Field, useAsset } from '../ui'
+
+const PROVIDERS: [Provider, string][] = [
+  ['anthropic', 'Anthropic (Claude)'], ['openai', 'OpenAI (GPT)'], ['openrouter', 'OpenRouter (modelos gratis)'],
+  ['gemini', 'Google (Gemini)'], ['deepseek', 'DeepSeek'], ['grok', 'Grok (xAI)'], ['ollama', 'Ollama (local)'], ['custom', 'Custom (compatible OpenAI)']
+]
+const NEEDS_KEY = (p: Provider) => p !== 'ollama'
 
 export function Settings() {
   const { vault, keyStatus, saveKey, saveConfig } = useStore()
   const [c, setC] = useState<ProjectConfig | null>(vault?.config ?? null)
   const [key, setKey] = useState('')
+  const [usage, setUsage] = useState<UsageStats | null>(null)
   useEffect(() => setC(vault?.config ?? null), [vault])
+  useEffect(() => { void window.api.usageGet().then(setUsage) }, [vault])
   const cover = useAsset(c?.cover.image ?? '')
   if (!c) return <main className="page"><p className="muted">Abre un vault.</p></main>
   const issues = validateTags(c.tags)
@@ -21,18 +29,33 @@ export function Settings() {
         <div className="panelbox">
           <h2>IA y API (BYOK)</h2>
           <Field label="Proveedor">
-            <select value={c.byok.provider} onChange={(e) => set('byok', { provider: e.target.value as ProjectConfig['byok']['provider'] })}>
-              <option value="anthropic">Anthropic</option>
-              <option value="ollama">Ollama (local)</option>
+            <select value={c.byok.provider} onChange={(e) => set('byok', { provider: e.target.value as Provider })}>
+              {PROVIDERS.map(([p, l]) => <option key={p} value={p}>{l}</option>)}
             </select>
           </Field>
-          <Field label="Modelo"><input value={c.byok.model ?? ''} placeholder={c.byok.provider === 'anthropic' ? 'claude-opus-5' : 'llama3.1'} onChange={(e) => set('byok', { model: e.target.value || undefined })} /></Field>
-          {c.byok.provider !== 'ollama' && (
+          {c.byok.provider === 'custom' && (
+            <Field label="URL base (compatible OpenAI)"><input value={c.byok.baseUrl ?? ''} placeholder="http://localhost:1234/v1" onChange={(e) => set('byok', { baseUrl: e.target.value || undefined })} /></Field>
+          )}
+          <Field label="Modelo"><input value={c.byok.model ?? ''} placeholder="por defecto del proveedor" onChange={(e) => set('byok', { model: e.target.value || undefined })} /></Field>
+          {NEEDS_KEY(c.byok.provider) && (
             <Field label={`Clave · ${keyStatus?.present ? 'guardada en el keychain del SO' : 'sin clave'}`}>
               <input type="password" placeholder="Pegar clave y Enter" value={key} onChange={(e) => setKey(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { void saveKey(key); setKey('') } }} />
             </Field>
           )}
-          <p className="muted tiny">La clave nunca se guarda en el vault ni viaja al renderer.</p>
+          <p className="muted tiny">La clave se guarda en el keychain del SO por proveedor; nunca en el vault ni en el renderer. {c.byok.provider === 'openrouter' && 'OpenRouter da modelos gratis (usa uno que termine en :free).'}</p>
+        </div>
+        <div className="panelbox">
+          <h2>Uso de IA <button className="mini ghost" onClick={() => void window.api.usageReset().then(() => window.api.usageGet().then(setUsage))}>Reiniciar</button></h2>
+          {!usage || usage.calls === 0 ? <p className="muted">Sin llamadas registradas todavía.</p> : (
+            <>
+              <div className="row tiny"><span>{usage.calls} llamadas</span><span className="grow" /><span>{usage.fails} fallos</span></div>
+              <div className="row tiny"><span>≈ {usage.tokensIn.toLocaleString()} tokens enviados</span><span className="grow" /><span>≈ {usage.tokensOut.toLocaleString()} recibidos</span></div>
+              <table className="table"><thead><tr><th>Modelo</th><th>Llamadas</th><th>Tokens</th></tr></thead>
+                <tbody>{usage.byModel.slice(0, 8).map((m) => <tr key={m.model}><td>{m.model}</td><td>{m.calls}</td><td>{(m.tokensIn + m.tokensOut).toLocaleString()}</td></tr>)}</tbody>
+              </table>
+              <p className="muted tiny">Local, en .narrative/usage.log. Nunca incluye la clave.</p>
+            </>
+          )}
         </div>
         <div className="panelbox">
           <h2>Mapa de tags</h2>

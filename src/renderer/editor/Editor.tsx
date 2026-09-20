@@ -30,6 +30,7 @@ export function Editor() {
           history(),
           keymap.of([...defaultKeymap, ...historyKeymap, { key: 'Mod-s', run: () => (void useStore.getState().save(), true) }]),
           EditorView.lineWrapping,
+          EditorView.contentAttributes.of({ spellcheck: 'true', autocapitalize: 'off' }),
           fountainExtension(d.note, d.link),
           landingField,
           EditorView.updateListener.of((u) => {

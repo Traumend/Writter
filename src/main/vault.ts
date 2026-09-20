@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, watch, writeFileSync, type FSWatcher } from 'node:fs'
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, watch, writeFileSync, type FSWatcher } from 'node:fs'
 import { basename, extname, join, relative, resolve } from 'node:path'
 import { parse, stringify } from 'yaml'
 import { guessRole, roleOf } from '../core/adopt'
@@ -259,6 +259,41 @@ export function readAsset(rel: string): string {
 }
 
 // --- Análisis IA (D): derivado, en .narrative/analysis/<script>/<ts>.json
+// --- Medidor de uso de IA (JSONL en .narrative/usage.log, agregado local; nunca guarda la clave).
+const usageFile = () => join(vaultRoot(), '.narrative/usage.log')
+type UsageRow = { ts: number; provider: string; model: string; tokensIn: number; tokensOut: number; ok: boolean }
+export function logUsage(r: Omit<UsageRow, 'ts'>) {
+  if (!root) return
+  try {
+    appendFileSync(usageFile(), JSON.stringify({ ts: Date.now(), ...r }) + '\n')
+  } catch {
+    /* el medidor nunca debe romper una acción de IA */
+  }
+}
+export function usageStats() {
+  const empty = { calls: 0, fails: 0, tokensIn: 0, tokensOut: 0, byModel: [] as { model: string; calls: number; tokensIn: number; tokensOut: number }[] }
+  if (!existsSync(usageFile())) return empty
+  const per = new Map<string, { model: string; calls: number; tokensIn: number; tokensOut: number }>()
+  for (const line of readFileSync(usageFile(), 'utf8').split('\n')) {
+    if (!line.trim()) continue
+    let r: UsageRow
+    try { r = JSON.parse(line) } catch { continue }
+    empty.calls++
+    if (!r.ok) empty.fails++
+    empty.tokensIn += r.tokensIn || 0
+    empty.tokensOut += r.tokensOut || 0
+    const key = `${r.provider}/${r.model}`
+    const m = per.get(key) ?? { model: key, calls: 0, tokensIn: 0, tokensOut: 0 }
+    m.calls++; m.tokensIn += r.tokensIn || 0; m.tokensOut += r.tokensOut || 0
+    per.set(key, m)
+  }
+  empty.byModel = [...per.values()].sort((a, b) => b.calls - a.calls)
+  return empty
+}
+export function usageReset() {
+  if (root && existsSync(usageFile())) writeFileSync(usageFile(), '')
+}
+
 const analysisDir = (rel: string) => join(vaultRoot(), '.narrative/analysis', rel.replace(/[\\/]/g, '__'))
 export function saveAnalysis(rel: string, data: object): string {
   const dir = analysisDir(rel)

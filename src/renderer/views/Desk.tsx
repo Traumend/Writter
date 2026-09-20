@@ -1,6 +1,7 @@
 import { diffLines } from 'diff'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { mdToFountain, mdToHtml } from '../../core/convert'
+import { mdToFdx, mdToFountain, mdToHtml, mdToTxt } from '../../core/convert'
+import { mdToDocx } from '../../core/docx'
 import { readFrontmatter } from '../../core/frontmatter'
 import { estimateTokens } from '../../core/safeguards'
 import { type FileKind, type Scope } from '../../core/types/ipc'
@@ -164,6 +165,13 @@ function LeftPanel() {
   )
 }
 
+// Uint8Array -> base64 por trozos (evita desbordar el stack con archivos grandes).
+const toB64 = (u8: Uint8Array) => {
+  let s = ''
+  for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode(...u8.subarray(i, i + 0x8000))
+  return btoa(s)
+}
+
 const SCOPES: [Scope, string][] = [['cursor', 'Cursor'], ['node', 'Nodo'], ['scene', 'Escena'], ['range', 'Rango'], ['outline', 'Escaleta'], ['full', 'Guión completo']]
 
 function ScopeBar() {
@@ -269,7 +277,12 @@ function RightPanel() {
           <h2>Exportar {name}</h2>
           <div className="col">
             <button disabled={!s.path} onClick={() => void window.api.exportPdf(mdToHtml(s.text, name, cfg ? { ...cfg.cover, imageDataUrl: coverImg } : undefined), `${name}.pdf`, cfg?.pdf.paper ?? 'Letter')}>PDF (formato industria{cfg?.cover.title ? ' + portada' : ''})</button>
-            <button disabled={!s.path} className="ghost" onClick={() => void window.api.exportText(mdToFountain(s.text), `${name}.fountain`)}>.fountain</button>
+            <div className="row">
+              <button disabled={!s.path} className="ghost" onClick={() => void window.api.exportBytes(toB64(mdToDocx(s.text)), `${name}.docx`)}>DOCX</button>
+              <button disabled={!s.path} className="ghost" onClick={() => void window.api.exportText(mdToFdx(s.text), `${name}.fdx`)}>FDX</button>
+              <button disabled={!s.path} className="ghost" onClick={() => void window.api.exportText(mdToFountain(s.text), `${name}.fountain`)}>Fountain</button>
+              <button disabled={!s.path} className="ghost" onClick={() => void window.api.exportText(mdToTxt(s.text), `${name}.txt`)}>TXT</button>
+            </div>
             <button className="ghost" onClick={() => void window.api.importScript().then((f) => f && s.refreshFiles().then(() => s.openFile(f.path)))}>Importar .fountain / .fdx</button>
           </div>
         </div>

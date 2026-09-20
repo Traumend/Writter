@@ -1,6 +1,14 @@
 import { useState } from 'react'
 import { ACCENTS, useStore, type AccentName, type Scale } from '../store'
 
+const TAB_LABEL: Record<string, string> = { desk: 'Escritorio', breakdown: 'Breakdown', dev: 'Desarrollo', production: 'Producción' }
+const ROLE_PRESETS: [string, string[]][] = [
+  ['Completo', ['desk', 'breakdown', 'dev', 'production']],
+  ['Escritor', ['desk', 'breakdown', 'dev']],
+  ['Director', ['desk', 'breakdown', 'dev', 'production']],
+  ['Productor', ['breakdown', 'production']]
+]
+
 // Preferencias de interfaz (estilo suite Adobe): categorías a la izquierda, ajustes a la derecha.
 // Solo tocan la apariencia local; la configuración del proyecto vive en la pestaña Ajustes.
 const ACCENT_LABEL: Record<AccentName, string> = { naranja: 'Naranja', ambar: 'Ámbar', azul: 'Azul', verde: 'Verde', rosa: 'Rosa' }
@@ -8,7 +16,12 @@ const SCALES: [Scale, string][] = [['compact', 'Compacta'], ['normal', 'Normal']
 const CATS = ['Interfaz', 'Editor'] as const
 
 export function Preferences() {
-  const { prefsOpen, closePrefs, prefs, setPref, showTags, toggleTags, resetLayout } = useStore()
+  const { prefsOpen, closePrefs, prefs, setPref, showTags, toggleTags, resetLayout, tab, setTab } = useStore()
+  const setTabs = (tabs: string[]) => {
+    setPref('tabs', tabs)
+    if (tab !== 'settings' && !tabs.includes(tab)) setTab('desk')
+  }
+  const toggleTab = (t: string) => setTabs(prefs.tabs.includes(t) ? prefs.tabs.filter((x) => x !== t) : [...prefs.tabs, t])
   const [cat, setCat] = useState<(typeof CATS)[number]>('Interfaz')
   if (!prefsOpen) return null
   return (
@@ -35,6 +48,19 @@ export function Preferences() {
                   ))}
                 </div>
                 <p className="muted tiny">Ajusta el tamaño de todo el texto e interfaz. Se guarda en este equipo.</p>
+                <h2>Vista por rol (pestañas)</h2>
+                <div className="segmented">
+                  {ROLE_PRESETS.map(([label, tabs]) => (
+                    <button key={label} className={prefs.tabs.join() === tabs.join() ? 'on' : 'ghost'} onClick={() => setTabs(tabs)}>{label}</button>
+                  ))}
+                </div>
+                <div className="row" style={{ flexWrap: 'wrap', gap: 10, marginTop: 8 }}>
+                  {Object.entries(TAB_LABEL).map(([t, l]) => (
+                    <label key={t} className="check"><input type="checkbox" checked={prefs.tabs.includes(t)} onChange={() => toggleTab(t)} /> {l}</label>
+                  ))}
+                </div>
+                <p className="muted tiny">Muestra solo las pestañas que necesitas. Ajustes siempre está visible.</p>
+
                 <h2>Disposición</h2>
                 <button className="ghost" onClick={resetLayout}>Restablecer paneles</button>
                 <p className="muted tiny">En el Escritorio puedes arrastrar los bordes entre paneles para redimensionarlos, y arrastrar las cabeceras de la biblioteca (Episodios, Personajes…) para reordenarlas o plegarlas. Esto las devuelve a su lugar.</p>

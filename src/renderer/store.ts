@@ -21,7 +21,8 @@ export type Scale = 'compact' | 'normal' | 'large'
 export const DEFAULT_SECTIONS = ['script', 'character', 'location', 'prop', 'outline', 'knowledge']
 // deskLeft/deskRight: ancho de los paneles laterales del Escritorio (arrastrables).
 // sectionOrder/collapsed: orden y plegado de las secciones de biblioteca (arrastrables).
-export type Prefs = { accent: AccentName; scale: Scale; deskLeft: number; deskRight: number; sectionOrder: string[]; collapsed: string[] }
+export type Prefs = { accent: AccentName; scale: Scale; deskLeft: number; deskRight: number; sectionOrder: string[]; collapsed: string[]; tabs: string[] }
+export const ALL_TABS = ['desk', 'breakdown', 'dev', 'production', 'settings']
 export const ACCENTS: Record<AccentName, [string, string, string]> = {
   naranja: ['#ff5a1f', '#e64d13', '#1a1000'],
   ambar: ['#f5a623', '#e0930f', '#1a1200'],
@@ -30,7 +31,7 @@ export const ACCENTS: Record<AccentName, [string, string, string]> = {
   rosa: ['#ff5a8a', '#e64878', '#1a0410']
 }
 const SCALE_PX: Record<Scale, string> = { compact: '12.5px', normal: '13.5px', large: '15px' }
-const DEFAULT_PREFS: Prefs = { accent: 'naranja', scale: 'normal', deskLeft: 268, deskRight: 350, sectionOrder: DEFAULT_SECTIONS, collapsed: [] }
+const DEFAULT_PREFS: Prefs = { accent: 'naranja', scale: 'normal', deskLeft: 268, deskRight: 350, sectionOrder: DEFAULT_SECTIONS, collapsed: [], tabs: ALL_TABS }
 export const DEFAULT_LAYOUT = { deskLeft: 268, deskRight: 350, sectionOrder: DEFAULT_SECTIONS, collapsed: [] as string[] }
 
 function loadPrefs(): Prefs {
@@ -80,6 +81,7 @@ type State = {
   linker: Linker | null
   prefs: Prefs
   prefsOpen: boolean
+  searchOpen: boolean
 }
 
 type Actions = {
@@ -117,6 +119,8 @@ type Actions = {
   resetLayout(): void
   openPrefs(): void
   closePrefs(): void
+  openSearch(): void
+  closeSearch(): void
 }
 
 const EMPTY: Projection = { scenes: [], characters: [], links: [], wordCount: 0 }
@@ -177,6 +181,7 @@ export const useStore = create<State & Actions>((set, get) => ({
   linker: null,
   prefs: loadPrefs(),
   prefsOpen: false,
+  searchOpen: false,
 
   setPref(k, v) {
     const prefs = { ...get().prefs, [k]: v }
@@ -191,6 +196,8 @@ export const useStore = create<State & Actions>((set, get) => ({
   },
   openPrefs: () => set({ prefsOpen: true }),
   closePrefs: () => set({ prefsOpen: false }),
+  openSearch: () => set({ searchOpen: true }),
+  closeSearch: () => set({ searchOpen: false }),
 
   setTab: (tab) => set({ tab }),
   setDevTab: (devTab) => set({ devTab }),

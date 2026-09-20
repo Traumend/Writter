@@ -5,14 +5,14 @@ import { parseFountain } from '../../core/parser/fountain'
 import { useStore } from '../store'
 import { AiSuggest, BlurInput, Field, useAsset } from '../ui'
 
-const TRAITS: [string, string, string, string][] = [
-  ['initiative', 'Iniciativa', 'Reactivo', 'Proactivo'],
-  ['empathy', 'Empatía', 'Distante', 'Cercano'],
-  ['moral_ambiguity', 'Ambigüedad moral', 'Claro', 'Ambiguo'],
-  ['inner_conflict', 'Conflicto interno', 'Sereno', 'Roto por dentro'],
-  ['volatility', 'Volatilidad', 'Estable', 'Explosivo'],
-  ['transformation', 'Transformación', 'Sin cambio', 'Transformado'],
-  ['mystery', 'Misterio', 'Transparente', 'Enigma']
+const TRAITS: [string, string, string, string, string][] = [
+  ['initiative', 'Iniciativa', 'Reactivo', 'Proactivo', '#ff5a1f'],
+  ['empathy', 'Empatía', 'Distante', 'Cercano', '#3ddc97'],
+  ['moral_ambiguity', 'Ambigüedad moral', 'Claro', 'Ambiguo', '#c47d1a'],
+  ['inner_conflict', 'Conflicto interno', 'Sereno', 'Roto por dentro', '#e8437f'],
+  ['volatility', 'Volatilidad', 'Estable', 'Explosivo', '#f5c542'],
+  ['transformation', 'Transformación', 'Sin cambio', 'Transformado', '#4f8cff'],
+  ['mystery', 'Misterio', 'Transparente', 'Enigma', '#b388ff']
 ]
 const SEL: [string, string, string[]][] = [
   ['role', 'Rol narrativo', ['Protagonista', 'Antagonista', 'Antihéroe', 'Mentor', 'Aliado', 'Interés romántico', 'Comic relief', 'Secundario']],
@@ -130,10 +130,10 @@ export function Characters() {
       {card && doc && (
         <aside className="right scroll">
           <h2>Perfil creativo</h2>
-          {TRAITS.map(([k, l, lo, hi]) => (
+          {TRAITS.map(([k, l, lo, hi, color]) => (
             <div className="slider" key={k}>
-              <div className="row"><span>{l}</span><span className="grow" /><strong>{traits[k] ?? 50}</strong></div>
-              <input type="range" min={0} max={100} value={traits[k] ?? 50} onChange={(e) => patch({ traits: { ...traits, [k]: Number(e.target.value) } })} />
+              <div className="row"><span>{l}</span><span className="grow" /><strong style={{ color }}>{traits[k] ?? 50}</strong></div>
+              <input type="range" min={0} max={100} value={traits[k] ?? 50} style={{ accentColor: color }} onChange={(e) => patch({ traits: { ...traits, [k]: Number(e.target.value) } })} />
               <div className="row tiny muted"><span>{lo}</span><span className="grow" /><span>{hi}</span></div>
             </div>
           ))}

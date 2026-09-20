@@ -38,6 +38,23 @@ export function mdToFountain(md: string): string {
   return tokens.filter((t) => t.type !== 'frontmatter' && t.type !== 'note').map((t) => t.text).join('\n').replace(/^\n+/, '')
 }
 
+// .md -> .txt: texto plano legible (sin frontmatter ni notas). Igual que fountain, pensado para lectura simple.
+export function mdToTxt(md: string): string {
+  const { tokens } = parseFountain(md)
+  return tokens.filter((t) => t.type !== 'frontmatter' && t.type !== 'note').map((t) => t.text.replace(/^[.@!>]/, '').replace(/<$/, '')).join('\n').replace(/^\n+/, '')
+}
+
+// .md -> .fdx (Final Draft XML de salida). Estructura preservada (AC-3), tipografía fina no.
+const FDX_TYPE: Partial<Record<Token['type'], string>> = { heading: 'Scene Heading', action: 'Action', character: 'Character', parenthetical: 'Parenthetical', dialogue: 'Dialogue', transition: 'Transition', centered: 'Action' }
+export function mdToFdx(md: string): string {
+  const { tokens } = parseFountain(md)
+  const paras = tokens
+    .filter((t) => FDX_TYPE[t.type])
+    .map((t) => `    <Paragraph Type="${FDX_TYPE[t.type]}"><Text>${esc(t.text.trim().replace(/^[.@!>]/, '').replace(/<$/, ''))}</Text></Paragraph>`)
+    .join('\n')
+  return `<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<FinalDraft DocumentType="Script" Template="No" Version="1">\n  <Content>\n${paras}\n  </Content>\n</FinalDraft>\n`
+}
+
 // .fountain -> .md: añade frontmatter mínimo.
 export function fountainToMd(f: string, title: string): string {
   return `---\ntype: script\ntitle: "${title.replace(/"/g, '\\"')}"\nstatus: draft\nlocked: false\n---\n\n${f.replace(/^\s*title:.*\n(\s+.*\n)*/i, '')}`

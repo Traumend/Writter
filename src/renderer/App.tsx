@@ -3,6 +3,7 @@ import { Adoption } from './views/Adoption'
 import { Analysis } from './views/Analysis'
 import { BeatTimeline } from './views/BeatTimeline'
 import { Preferences } from './views/Preferences'
+import { SearchReplace } from './views/SearchReplace'
 import { Breakdown } from './views/Breakdown'
 import { Characters } from './views/Characters'
 import { Desk } from './views/Desk'
@@ -16,7 +17,7 @@ const DEV: [DevTab, string][] = [['characters', 'Personajes'], ['beats', 'Beat T
 
 // Menú desplegable de la barra superior (estilo suite Adobe).
 function AppMenu() {
-  const { openVault, openPrefs, setTab, openLinker, vault } = useStore()
+  const { openVault, openPrefs, setTab, openLinker, openSearch, vault } = useStore()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -34,6 +35,7 @@ function AppMenu() {
       {open && (
         <div className="menu" role="menu">
           {item('Preferencias…', openPrefs)}
+          {vault && item('Buscar y reemplazar…', openSearch)}
           {item('Abrir vault…', () => void openVault())}
           {vault && item('Vincular carpetas…', openLinker)}
           {item('Ajustes del proyecto', () => setTab('settings'))}
@@ -53,7 +55,7 @@ export function App() {
       <header>
         <strong>Writter</strong>
         <nav>
-          {TABS.map(([t, l]) => (
+          {TABS.filter(([t]) => t === 'settings' || s.prefs.tabs.includes(t)).map(([t, l]) => (
             <button key={t} className={s.tab === t ? 'on' : 'ghost'} disabled={!s.vault && t !== 'desk'} onClick={() => s.setTab(t)}>{l}</button>
           ))}
         </nav>
@@ -80,6 +82,7 @@ export function App() {
       {s.tab === 'settings' && <Settings />}
       <Adoption />
       <Preferences />
+      <SearchReplace />
       <footer>
         <span>{s.status || '—'}</span>
         <span className="grow" />

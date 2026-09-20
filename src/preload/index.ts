@@ -36,7 +36,10 @@ const api: Api = {
   assetRead: (rel) => ipcRenderer.invoke('asset.read', rel),
   exportPdf: (html, name, paper) => ipcRenderer.invoke('export.pdf', html, name, paper),
   exportText: (content, name) => ipcRenderer.invoke('export.text', content, name),
-  importScript: () => ipcRenderer.invoke('import.script')
+  exportBytes: (base64, name) => ipcRenderer.invoke('export.bytes', base64, name),
+  importScript: () => ipcRenderer.invoke('import.script'),
+  usageGet: () => ipcRenderer.invoke('usage.get'),
+  usageReset: () => ipcRenderer.invoke('usage.reset')
 }
 
 contextBridge.exposeInMainWorld('api', api)

@@ -244,3 +244,6 @@ textarea { min-height: 2.6em; } /* red de seguridad: ningún textarea colapsa a 
 .badge { font-size: 10.5px; padding: 2px 9px; border-radius: 10px; white-space: nowrap; }
 .badge.ok { background: #16351f; color: #86e29a; }
 .badge.no { background: #3a1e0a; color: var(--warn); }
+/* buscar y reemplazar */
+.search { width: min(720px, 94vw); }
+.search .grid2 { margin-bottom: 6px; }
