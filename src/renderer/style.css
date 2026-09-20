@@ -252,3 +252,5 @@ textarea { min-height: 2.6em; } /* red de seguridad: ningún textarea colapsa a 
 .report p { margin: 0 0 4px; white-space: pre-wrap; }
 .report p:empty { height: 6px; }
 .relcard.auto { display: flex; align-items: center; gap: 8px; }
+.relcard .del { background: transparent; color: var(--err); box-shadow: none; font-size: 18px; line-height: 1; padding: 0 8px; flex: none; }
+.relcard .del:hover { filter: none; background: rgba(255,122,107,.14); }

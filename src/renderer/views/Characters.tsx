@@ -167,9 +167,9 @@ export function Characters() {
                 <select className="grow" value={r.target} onChange={(e) => patch({ relationships: rels.map((x, j) => (j === i ? { ...x, target: e.target.value } : x)) })}>
                   {cards.filter((c) => c.path !== card.path).map((c) => <option key={c.path} value={c.name}>{c.name}</option>)}
                 </select>
-                <BlurInput value={r.kind} placeholder="tipo (familia, rival…)" onCommit={(v) => patch({ relationships: rels.map((x, j) => (j === i ? { ...x, kind: v } : x)) })} />
-                <button className="mini ghost" title="Eliminar relación" onClick={() => patch({ relationships: rels.filter((_, j) => j !== i) })}>×</button>
+                <button className="del" title="Eliminar relación" onClick={() => patch({ relationships: rels.filter((_, j) => j !== i) })}>×</button>
               </div>
+              <BlurInput value={r.kind} placeholder="tipo (familia, rival…)" onCommit={(v) => patch({ relationships: rels.map((x, j) => (j === i ? { ...x, kind: v } : x)) })} />
               <BlurInput textarea rows={2} value={r.note} placeholder="Nota" onCommit={(v) => patch({ relationships: rels.map((x, j) => (j === i ? { ...x, note: v } : x)) })} />
             </div>
           ))}
