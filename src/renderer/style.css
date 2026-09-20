@@ -251,3 +251,4 @@ textarea { min-height: 2.6em; } /* red de seguridad: ningún textarea colapsa a 
 .report { max-height: 60vh; overflow: auto; }
 .report p { margin: 0 0 4px; white-space: pre-wrap; }
 .report p:empty { height: 6px; }
+.relcard.auto { display: flex; align-items: center; gap: 8px; }

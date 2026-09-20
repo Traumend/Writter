@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { breakdown } from '../../core/breakdown'
 import { readFrontmatter, writeFrontmatter } from '../../core/frontmatter'
-import { parseFountain } from '../../core/parser/fountain'
+import { extractLinks, parseFountain } from '../../core/parser/fountain'
 import { useStore } from '../store'
 import { AiSuggest, BlurInput, Field, useAsset } from '../ui'
 
@@ -36,6 +36,24 @@ export function Characters() {
   const { data, body } = doc ? readFrontmatter(doc.content) : { data: {}, body: '' }
   const traits = (data['traits'] as Record<string, number> | undefined) ?? {}
   const rels = (Array.isArray(data['relationships']) ? data['relationships'] : []) as Rel[]
+  // Relaciones automáticas: enlaces [[ ]] en la ficha que apuntan a otro personaje y no están ya como relación formal.
+  const auto = useMemo(() => {
+    if (!doc || !card) return []
+    const selfNames = new Set([card.name.toLowerCase(), ...card.aliases.map((a) => a.toLowerCase())])
+    const formal = new Set(rels.map((r) => r.target.toLowerCase()))
+    const seen = new Set<string>()
+    const out: string[] = []
+    for (const l of extractLinks(doc.content)) {
+      const hit = cards.find((c) => c.name.toLowerCase() === l.toLowerCase() || c.aliases.some((a) => a.toLowerCase() === l.toLowerCase()))
+      const nm = hit?.name
+      if (!nm) continue
+      const key = nm.toLowerCase()
+      if (selfNames.has(key) || formal.has(key) || seen.has(key)) continue
+      seen.add(key)
+      out.push(nm)
+    }
+    return out
+  }, [doc, card, cards, rels])
   const str = (k: string) => String(data[k] ?? '')
   const patch = (p: Record<string, unknown>) => doc && void writeOther(doc.path, writeFrontmatter(doc.content, p))
   const setBody = (b: string) => doc && void writeOther(doc.path, `${doc.content.slice(0, doc.content.length - body.length)}${b}`)
@@ -141,40 +159,54 @@ export function Characters() {
             </div>
           ))}
 
-          <h2>Relaciones · {rels.length}</h2>
-          <RelMap name={card.name} rels={rels} />
+          <h2>Relaciones · {rels.length + auto.length}</h2>
+          <RelMap name={card.name} rels={rels} auto={auto} onOpen={(n) => { const f = cards.find((x) => x.name.toLowerCase() === n.toLowerCase()); if (f) { setSel(f.path); void openFile(f.path) } }} />
           {rels.map((r, i) => (
             <div className="relcard" key={i}>
               <div className="row">
-                <select value={r.target} onChange={(e) => patch({ relationships: rels.map((x, j) => (j === i ? { ...x, target: e.target.value } : x)) })}>
+                <select className="grow" value={r.target} onChange={(e) => patch({ relationships: rels.map((x, j) => (j === i ? { ...x, target: e.target.value } : x)) })}>
                   {cards.filter((c) => c.path !== card.path).map((c) => <option key={c.path} value={c.name}>{c.name}</option>)}
                 </select>
                 <BlurInput value={r.kind} placeholder="tipo (familia, rival…)" onCommit={(v) => patch({ relationships: rels.map((x, j) => (j === i ? { ...x, kind: v } : x)) })} />
-                <button className="mini ghost" onClick={() => patch({ relationships: rels.filter((_, j) => j !== i) })}>×</button>
+                <button className="mini ghost" title="Eliminar relación" onClick={() => patch({ relationships: rels.filter((_, j) => j !== i) })}>×</button>
               </div>
               <BlurInput textarea rows={2} value={r.note} placeholder="Nota" onCommit={(v) => patch({ relationships: rels.map((x, j) => (j === i ? { ...x, note: v } : x)) })} />
             </div>
           ))}
           <button className="ghost" disabled={cards.length < 2} onClick={() => patch({ relationships: [...rels, { target: cards.find((c) => c.path !== card.path)?.name ?? '', kind: '', note: '' }] })}>+ Añadir relación</button>
+
+          {auto.length > 0 && (
+            <>
+              <h2>Detectadas en el texto · {auto.length}</h2>
+              <p className="muted tiny">Enlaces [[ ]] en la ficha. Formalízalas para darles tipo y nota, o edítalas quitando el enlace del texto.</p>
+              {auto.map((n) => (
+                <div className="relcard auto" key={n}>
+                  <span className="link grow ell" onClick={() => { const f = cards.find((x) => x.name.toLowerCase() === n.toLowerCase()); if (f) { setSel(f.path); void openFile(f.path) } }}>[[{n}]]</span>
+                  <button className="mini" title="Añadir como relación" onClick={() => patch({ relationships: [...rels, { target: n, kind: '', note: '' }] })}>＋ relación</button>
+                </div>
+              ))}
+            </>
+          )}
         </aside>
       )}
     </main>
   )
 }
 
-function RelMap({ name, rels }: { name: string; rels: Rel[] }) {
-  const W = 300, H = 220, cx = W / 2, cy = H / 2, R = 80
+function RelMap({ name, rels, auto, onOpen }: { name: string; rels: Rel[]; auto: string[]; onOpen: (n: string) => void }) {
+  const W = 300, H = 220, cx = W / 2, cy = H / 2, R = 82
+  const nodes = [...rels.map((r) => ({ target: r.target, kind: r.kind, auto: false })), ...auto.map((t) => ({ target: t, kind: '', auto: true }))]
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="graph">
-      {rels.map((r, i) => {
-        const a = (i / Math.max(1, rels.length)) * Math.PI * 2 - Math.PI / 2
+      {nodes.map((r, i) => {
+        const a = (i / Math.max(1, nodes.length)) * Math.PI * 2 - Math.PI / 2
         const x = cx + Math.cos(a) * R, y = cy + Math.sin(a) * R
         return (
-          <g key={i}>
-            <line x1={cx} y1={cy} x2={x} y2={y} stroke="#e8437f88" />
-            <circle cx={x} cy={y} r={16} fill="var(--line)" />
+          <g key={i} style={{ cursor: 'pointer' }} onClick={() => onOpen(r.target)}>
+            <line x1={cx} y1={cy} x2={x} y2={y} stroke={r.auto ? '#9aa1ad66' : '#e8437f88'} strokeDasharray={r.auto ? '3 3' : undefined} />
+            <circle cx={x} cy={y} r={15} fill="var(--line)" stroke={r.auto ? 'var(--dim)' : 'var(--accent)'} strokeWidth={r.auto ? 1 : 0} />
             <text x={x} y={y + 3} textAnchor="middle" fontSize="8" fill="var(--fg)">{r.target.slice(0, 8)}</text>
-            <text x={(cx + x) / 2} y={(cy + y) / 2 - 3} textAnchor="middle" fontSize="7" fill="var(--dim)">{r.kind}</text>
+            {r.kind && <text x={(cx + x) / 2} y={(cy + y) / 2 - 3} textAnchor="middle" fontSize="7" fill="var(--dim)">{r.kind}</text>}
           </g>
         )
       })}
