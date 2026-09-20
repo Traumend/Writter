@@ -140,6 +140,15 @@ ul.bullets li:hover { background: transparent; }
 .diff .del { background: #3a1a16; color: #ff9a8a; text-decoration: line-through; }
 .graph { width: 100%; height: auto; background: var(--sink); border-radius: var(--r); margin: 10px 0; box-shadow: var(--inset); }
 .map { flex: 1; width: 100%; min-height: 0; background: var(--sink); border-radius: var(--r); cursor: grab; touch-action: none; box-shadow: var(--inset); }
+/* Mapa neural: panel de controles a la izquierda + lienzo. */
+main.page.nmap { min-height: 0; }
+.nmap-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 232px 1fr; gap: 14px; }
+.nmap-controls { display: flex; flex-direction: column; gap: 6px; align-content: start; padding-right: 4px; }
+.nmap-controls h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); margin: 12px 0 2px; }
+.nmap-controls .mini { text-align: left; margin-left: 0; }
+.nmap-controls .field { margin: 2px 0; }
+.nmap-controls .field span { font-size: 11px; color: var(--dim); }
+.toolbar.wrap { flex-wrap: wrap; }
 
 /* tarjetas */
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; overflow: auto; padding-bottom: 14px; }
