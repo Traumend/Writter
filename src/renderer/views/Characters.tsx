@@ -280,7 +280,7 @@ export function Characters() {
           </h2>
           <RelMap name={card.name} color={color} rels={rels} auto={auto} onOpen={openChar} />
           {rels.map((r, i) => (
-            <div className="relcard" key={i} style={{ borderLeft: `3px solid ${kindColor(r.kind)}` }}>
+            <div className="relcard" key={i}>
               <div className="row">
                 <select className="grow" value={r.target} onChange={(e) => patch({ relationships: rels.map((x, j) => (j === i ? { ...x, target: e.target.value } : x)) })}>
                   {cards.filter((c) => c.path !== card.path).map((c) => <option key={c.path} value={c.name}>{c.name}</option>)}
