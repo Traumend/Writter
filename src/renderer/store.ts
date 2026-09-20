@@ -23,7 +23,7 @@ export type Scale = 'compact' | 'normal' | 'large'
 export const DEFAULT_SECTIONS = ['script', 'character', 'location', 'prop', 'outline', 'knowledge']
 // deskLeft/deskRight: ancho de los paneles laterales del Escritorio (arrastrables).
 // sectionOrder/collapsed: orden y plegado de las secciones de biblioteca (arrastrables).
-export type Prefs = { accent: AccentName; scale: Scale; deskLeft: number; deskRight: number; sectionOrder: string[]; collapsed: string[]; tabs: string[] }
+export type Prefs = { accent: AccentName; scale: Scale; deskLeft: number; deskRight: number; sectionOrder: string[]; collapsed: string[]; tabs: string[]; focus: boolean; page: boolean }
 export const ALL_TABS = ['desk', 'breakdown', 'dev', 'production', 'settings']
 export const ACCENTS: Record<AccentName, [string, string, string]> = {
   naranja: ['#ff5a1f', '#e64d13', '#1a1000'],
@@ -33,7 +33,7 @@ export const ACCENTS: Record<AccentName, [string, string, string]> = {
   rosa: ['#ff5a8a', '#e64878', '#1a0410']
 }
 const SCALE_PX: Record<Scale, string> = { compact: '12.5px', normal: '13.5px', large: '15px' }
-const DEFAULT_PREFS: Prefs = { accent: 'naranja', scale: 'normal', deskLeft: 268, deskRight: 350, sectionOrder: DEFAULT_SECTIONS, collapsed: [], tabs: ALL_TABS }
+const DEFAULT_PREFS: Prefs = { accent: 'naranja', scale: 'normal', deskLeft: 268, deskRight: 350, sectionOrder: DEFAULT_SECTIONS, collapsed: [], tabs: ALL_TABS, focus: false, page: false }
 export const DEFAULT_LAYOUT = { deskLeft: 268, deskRight: 350, sectionOrder: DEFAULT_SECTIONS, collapsed: [] as string[] }
 
 function loadPrefs(): Prefs {
@@ -80,6 +80,7 @@ type State = {
   versions: Version[]
   status: string
   showTags: boolean
+  sceneTrash: { heading: string; content: string }[] // papelera de escenas en sesión (recuperación permanente vía Versiones)
   linker: Linker | null
   prefs: Prefs
   prefsOpen: boolean
@@ -114,6 +115,9 @@ type Actions = {
   restoreVersion(id: string): Promise<void>
   snapshot(label: string): Promise<void>
   moveScene(from: number, to: number): void
+  addGroup(name: string): void
+  deleteScenes(indexes: number[]): void
+  restoreScene(i: number): void
   refreshGraph(build?: boolean): Promise<void>
   saveKey(key: string): Promise<void>
   saveConfig(c: ProjectConfig): Promise<void>
@@ -184,6 +188,7 @@ export const useStore = create<State & Actions>((set, get) => ({
   versions: [],
   status: '',
   showTags: true,
+  sceneTrash: [],
   linker: null,
   prefs: loadPrefs(),
   prefsOpen: false,
@@ -298,7 +303,7 @@ export const useStore = create<State & Actions>((set, get) => ({
     if (get().dirty) await get().save()
     const { content, hash } = await window.api.fileRead(path)
     const r = reproject(content, get().vault)
-    set((s) => ({ path, text: content, diskHash: hash, dirty: false, conflict: false, proposal: null, ...r, externalSeq: s.externalSeq + 1, versions: [], cursorLine: gotoLine ?? 0 }))
+    set((s) => ({ path, text: content, diskHash: hash, dirty: false, conflict: false, proposal: null, ...r, externalSeq: s.externalSeq + 1, versions: [], sceneTrash: [], cursorLine: gotoLine ?? 0 }))
     set({ versions: await window.api.versionList(path) })
   },
 
@@ -436,6 +441,41 @@ export const useStore = create<State & Actions>((set, get) => ({
     const s = get()
     const next = moveSceneText(s.text, s.projection.scenes, from, to)
     if (next !== s.text) get().setTextExternal(next)
+  },
+
+  // Inserta una sección Fountain (`# name`) antes de la escena bajo el cursor -> nuevo grupo (nativo del .md).
+  addGroup(name) {
+    const s = get()
+    const label = name.trim()
+    if (!label) return
+    const scene = s.projection.scenes.find((sc) => s.cursorLine >= sc.startLine && s.cursorLine < sc.endLine) ?? s.projection.scenes[0]
+    const lines = s.text.split('\n')
+    const at = scene ? scene.startLine : lines.length
+    lines.splice(at, 0, `# ${label}`, '')
+    get().setTextExternal(lines.join('\n'))
+  },
+
+  // Borra escenas (por índice) del texto y las guarda en la papelera de sesión. Recuperación permanente vía Versiones.
+  // ponytail: papelera en memoria (se pierde al recargar); el disco ya es recuperable con el historial de versiones.
+  deleteScenes(indexes) {
+    const s = get()
+    const lines = s.text.split('\n')
+    const picked = s.projection.scenes.filter((sc) => indexes.includes(sc.index)).sort((a, b) => b.startLine - a.startLine)
+    if (!picked.length) return
+    const trash = picked.map((sc) => ({ heading: sc.heading, content: lines.slice(sc.startLine, sc.endLine).join('\n').replace(/\n+$/, '') }))
+    for (const sc of picked) lines.splice(sc.startLine, sc.endLine - sc.startLine)
+    set((st) => ({ sceneTrash: [...trash.reverse(), ...st.sceneTrash] }))
+    get().setTextExternal(lines.join('\n'))
+  },
+
+  // Reinserta una escena de la papelera al final del documento.
+  restoreScene(i) {
+    const s = get()
+    const item = s.sceneTrash[i]
+    if (!item) return
+    const next = s.text.replace(/\n+$/, '') + '\n\n' + item.content + '\n'
+    set((st) => ({ sceneTrash: st.sceneTrash.filter((_, j) => j !== i) }))
+    get().setTextExternal(next)
   },
 
   async refreshGraph(build = false) {

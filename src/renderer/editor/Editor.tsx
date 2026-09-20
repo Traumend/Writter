@@ -15,6 +15,8 @@ export function Editor() {
   const files = useStore((s) => s.files)
   const docs = useStore((s) => s.docs)
   const showTags = useStore((s) => s.showTags)
+  const focus = useStore((s) => s.prefs.focus)
+  const page = useStore((s) => s.prefs.page)
   const cursorLine = useStore((s) => s.cursorLine)
   const names = useMemo(() => entityNames(files, docs), [files, docs])
 
@@ -99,5 +101,5 @@ export function Editor() {
     view.current?.dispatch({ effects: setLanding.of(proposal ? { from: proposal.from, to: proposal.to } : null) })
   }, [proposal])
 
-  return <div ref={host} className={`editor ${showTags ? '' : 'notags'}`} />
+  return <div ref={host} className={`editor ${showTags ? '' : 'notags'} ${focus ? 'focus' : ''} ${page ? 'page' : ''}`} />
 }

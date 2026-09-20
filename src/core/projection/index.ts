@@ -9,6 +9,7 @@ export type Scene = {
   characters: string[]
   links: string[]
   wordCount: number
+  group: string // sección Fountain (`# Acto`) que precede a la escena; '' = sin grupo
 }
 
 export type Projection = { scenes: Scene[]; characters: string[]; links: string[]; wordCount: number }
@@ -19,6 +20,7 @@ export function project(doc: ParsedDoc, linkOpen = '[[', linkClose = ']]'): Proj
   const allLinks = new Set<string>()
   let words = 0
   let cur: Scene | null = null
+  let section = '' // grupo actual (última sección `#` vista)
   const chars = new Set<string>()
   const links = new Set<string>()
 
@@ -34,9 +36,10 @@ export function project(doc: ParsedDoc, linkOpen = '[[', linkClose = ']]'): Proj
 
   for (const tk of doc.tokens) {
     if (tk.type === 'frontmatter' || tk.type === 'blank') continue
+    if (tk.type === 'section') section = tk.text.replace(/^#+\s*/, '').trim()
     if (tk.type === 'heading') {
       flush(tk.line)
-      cur = { index: scenes.length, heading: tk.text.trim().replace(/^\./, ''), startLine: tk.line, endLine: tk.line, characters: [], links: [], wordCount: 0 }
+      cur = { index: scenes.length, heading: tk.text.trim().replace(/^\./, ''), startLine: tk.line, endLine: tk.line, characters: [], links: [], wordCount: 0, group: section }
     }
     if (tk.type === 'character') {
       const n = characterName(tk.text)

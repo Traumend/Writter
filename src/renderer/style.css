@@ -52,6 +52,15 @@ main.split section { padding: 20px 28px; }
 .editor { flex: 1; min-height: 0; overflow: hidden; }
 .editor .cm-editor { height: 100%; }
 .editor.notags .cm-gutters { display: none; }
+/* Modo Enfoque: atenúa todo menos la línea activa (concentración de escritura). */
+.editor.focus .cm-line { opacity: .32; transition: opacity .15s; }
+.editor.focus .cm-content:hover .cm-line { opacity: .6; }
+.editor.focus .cm-activeLine { opacity: 1 !important; }
+/* Modo Página: la hoja de guion sobre un lienzo, con sombra y márgenes de papel. */
+.editor.page .cm-scroller { background: var(--bg); }
+.editor.page .cm-content { background: #f7f6f3; color: #16181c; box-shadow: 0 8px 40px rgba(0,0,0,.5); padding: 56px 40px; margin: 24px auto; border-radius: 2px; }
+.editor.page .cm-gutters { background: transparent; }
+.editor.page .cm-cursor { border-left-color: #16181c; }
 
 h1 { margin: 0 0 8px; font-size: 27px; letter-spacing: .01em; }
 h2 { font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: var(--dim); margin: 20px 0 10px; display: flex; align-items: center; gap: 8px; }
@@ -76,6 +85,8 @@ select { width: auto; margin-bottom: 0; cursor: pointer; }
 .toolbar input { width: 220px; }
 textarea { resize: vertical; }
 input[type=number] { width: 72px; }
+input[type=checkbox], input[type=radio] { width: auto; margin-bottom: 0; padding: 0; box-shadow: none; accent-color: var(--accent); }
+.scenes li input[type=checkbox] { margin-right: 6px; flex: none; }
 input[type=range] { padding: 0; margin: 6px 0; accent-color: var(--accent); box-shadow: none; background: transparent; }
 
 ul { list-style: none; padding: 0; margin: 0; }
@@ -88,6 +99,12 @@ ul.bullets li.warn { color: var(--warn); }
 ul.bullets li:hover { background: transparent; }
 .scenes .mv { opacity: 0; font-size: 10px; padding: 0 3px; }
 .scenes li:hover .mv { opacity: .7; }
+.scenes li.grouphead { text-transform: uppercase; letter-spacing: .06em; font-weight: 700; background: transparent; cursor: default; padding-top: 8px; box-shadow: none; }
+.scenes li.grouphead:hover { background: transparent; }
+.bulkbar { align-items: center; margin: 6px 0; }
+.bulkbar .del { color: var(--err); }
+.trashbox { background: var(--sink); box-shadow: var(--inset); border-radius: var(--r-sm); padding: 8px; margin: 6px 0; }
+.scopebar .sep { width: 1px; align-self: stretch; margin: 4px 6px; background: var(--line); }
 .ell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .muted { color: var(--dim); }
 .tiny { font-size: 11.5px; }

@@ -12,6 +12,7 @@ import { Desk } from './views/Desk'
 import { NeuralMap } from './views/NeuralMap'
 import { Production } from './views/Production'
 import { Settings } from './views/Settings'
+import { estimateTokens } from '../core/safeguards'
 import { useStore, type DevTab, type Tab } from './store'
 
 const TABS: [Tab, string][] = [['desk', 'Escritorio'], ['breakdown', 'Breakdown'], ['dev', 'Desarrollo'], ['production', 'Producción'], ['settings', 'Ajustes']]
@@ -52,6 +53,8 @@ function AppMenu() {
 export function App() {
   const s = useStore()
   const provider = s.vault?.config.byok.provider ?? 'anthropic'
+  const scene = s.path ? s.projection.scenes.find((sc) => s.cursorLine >= sc.startLine && s.cursorLine < sc.endLine) : undefined
+  const sceneText = scene ? s.text.split('\n').slice(scene.startLine, scene.endLine).join('\n') : ''
   return (
     <>
       <header>
@@ -90,7 +93,8 @@ export function App() {
       <footer>
         <span>{s.status || '—'}</span>
         <span className="grow" />
-        {s.path && <span>{s.projection.wordCount} palabras · ≈ {Math.ceil(s.text.length / 4)} tokens · {s.pagination.pages} pág.</span>}
+        {scene && <span className="muted">Escena {scene.index + 1}: {scene.wordCount} pal · ≈{estimateTokens(sceneText)} tok · pág {s.pagination.lineToPage[scene.startLine] ?? 1}</span>}
+        {s.path && <span>Guion: {s.projection.wordCount} pal · ≈{estimateTokens(s.text)} tok · {s.pagination.pages} pág.</span>}
         <span>BYOK: {provider} {s.keyStatus?.present || provider === 'ollama' ? '●' : '○'}</span>
       </footer>
     </>

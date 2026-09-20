@@ -7,7 +7,7 @@ import { estimateTokens } from '../../core/safeguards'
 import { type FileKind, type Scope } from '../../core/types/ipc'
 import { Editor } from '../editor/Editor'
 import { DEFAULT_SECTIONS, useStore } from '../store'
-import { useAsset } from '../ui'
+import { Icon, useAsset } from '../ui'
 
 const KIND_LABEL: Record<FileKind, string> = { script: 'Episodios', character: 'Personajes', location: 'Locaciones', prop: 'Props', outline: 'Escaleta', knowledge: 'Conocimiento', other: 'Otros' }
 export const TEMPLATE: Record<Exclude<FileKind, 'other'>, (name: string, extra?: Record<string, unknown>) => string> = {
@@ -80,10 +80,15 @@ function orderedSections(order: string[]): string[] {
 }
 
 function LeftPanel() {
-  const { vault, files, docs, path, projection, pagination, cursorLine, openFile, createFile, setCursor, moveScene, roleDir, prefs } = useStore()
+  const { vault, files, docs, path, projection, pagination, cursorLine, openFile, createFile, setCursor, moveScene, roleDir, prefs, addGroup, deleteScenes, restoreScene, sceneTrash } = useStore()
   const [adding, setAdding] = useState<Exclude<FileKind, 'other'> | null>(null)
   const [q, setQ] = useState('')
   const [inContent, setInContent] = useState(false)
+  const [groupFilter, setGroupFilter] = useState('')
+  const [multi, setMulti] = useState(false)
+  const [sel, setSel] = useState<Set<number>>(new Set())
+  const [newGroup, setNewGroup] = useState<string | null>(null)
+  const [showTrash, setShowTrash] = useState(false)
   const lines = useMemo(() => useStore.getState().text.split('\n'), [projection])
   if (!vault) return <p className="muted">Abre una carpeta como vault.</p>
   const scene = projection.scenes.find((s) => cursorLine >= s.startLine && cursorLine < s.endLine)
@@ -96,7 +101,14 @@ function LeftPanel() {
     seasons.set(key, [...(seasons.get(key) ?? []), f])
   }
   const ql = q.toLowerCase()
-  const scenes = projection.scenes.filter((s) => !ql || s.heading.toLowerCase().includes(ql) || (inContent && lines.slice(s.startLine, s.endLine).join('\n').toLowerCase().includes(ql)))
+  const groups = [...new Set(projection.scenes.map((s) => s.group).filter(Boolean))]
+  const scenes = projection.scenes.filter(
+    (s) =>
+      (!groupFilter || s.group === groupFilter) &&
+      (!ql || s.heading.toLowerCase().includes(ql) || (inContent && lines.slice(s.startLine, s.endLine).join('\n').toLowerCase().includes(ql)))
+  )
+  const toggleSel = (i: number) => setSel((prev) => { const n = new Set(prev); n.has(i) ? n.delete(i) : n.add(i); return n })
+  const runDelete = () => { deleteScenes([...sel]); setSel(new Set()) }
 
   // Cuerpo de cada sección de biblioteca por id.
   const body = (id: string) => {
@@ -127,18 +139,68 @@ function LeftPanel() {
       {/* Contextuales al documento abierto: fijas arriba. */}
       {path && projection.scenes.length > 0 && (
         <div className="block">
-          <h2>Escenas · {projection.scenes.length}</h2>
+          <h2>
+            Escenas · {projection.scenes.length}
+            <span className="grow" />
+            <button className={multi ? 'mini on' : 'mini ghost'} title="Selección múltiple" onClick={() => { setMulti((m) => !m); setSel(new Set()) }}>Multi</button>
+            {sceneTrash.length > 0 && <button className="mini ghost" title="Papelera de escenas" onClick={() => setShowTrash((t) => !t)}><Icon name="trash" size={13} /> {sceneTrash.length}</button>}
+          </h2>
           <input placeholder="Buscar escena…" value={q} onChange={(e) => setQ(e.target.value)} />
-          <label className="check tiny"><input type="checkbox" checked={inContent} onChange={(e) => setInContent(e.target.checked)} /> también en contenido</label>
+          <div className="row tiny">
+            <label className="check tiny grow"><input type="checkbox" checked={inContent} onChange={(e) => setInContent(e.target.checked)} /> también en contenido</label>
+            {groups.length > 0 && (
+              <select value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)} title="Filtrar por grupo">
+                <option value="">Todos los grupos</option>
+                {groups.map((g) => <option key={g} value={g}>{g}</option>)}
+              </select>
+            )}
+          </div>
+
+          {showTrash && sceneTrash.length > 0 && (
+            <div className="trashbox">
+              <div className="muted tiny">Papelera (sesión) · recuperación permanente en Versiones</div>
+              {sceneTrash.map((t, i) => (
+                <div key={i} className="row tiny">
+                  <span className="grow ell">{t.heading || '(sin encabezado)'}</span>
+                  <button className="mini" onClick={() => restoreScene(i)}>Restaurar</button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {multi && (
+            <div className="row tiny bulkbar">
+              <span className="grow">{sel.size} seleccionadas</span>
+              <button className="mini" disabled={!sel.size} onClick={() => setSel(new Set(scenes.map((s) => s.index)))}>Todas</button>
+              <button className="mini del" disabled={!sel.size} onClick={runDelete}>Eliminar</button>
+            </div>
+          )}
+
           <ul className="scenes">
-            {scenes.map((s) => (
-              <li key={s.index} className={s === scene ? 'active' : ''} onClick={() => setCursor(s.startLine, null)} title={`${s.wordCount} palabras · ≈${estimateTokens(lines.slice(s.startLine, s.endLine).join('\n'))} tokens · pág. ${pagination.lineToPage[s.startLine] ?? 1}\n${s.characters.join(', ')}`}>
-                <span className="muted">{s.index + 1}.</span> <span className="grow ell">{s.heading}</span>
-                <span className="mv" onClick={(e) => { e.stopPropagation(); moveScene(s.index, s.index - 1) }}>▲</span>
-                <span className="mv" onClick={(e) => { e.stopPropagation(); moveScene(s.index, s.index + 1) }}>▼</span>
-              </li>
-            ))}
+            {scenes.map((s, i) => {
+              const newGroupHere = s.group !== (scenes[i - 1]?.group ?? (i === 0 ? null : ''))
+              return (
+                <div key={s.index}>
+                  {!groupFilter && newGroupHere && s.group && <li className="grouphead muted tiny">{s.group}</li>}
+                  <li className={s === scene ? 'active' : ''} onClick={() => (multi ? toggleSel(s.index) : setCursor(s.startLine, null))} title={`${s.wordCount} palabras · ≈${estimateTokens(lines.slice(s.startLine, s.endLine).join('\n'))} tokens · pág. ${pagination.lineToPage[s.startLine] ?? 1}\n${s.characters.join(', ')}`}>
+                    {multi && <input type="checkbox" checked={sel.has(s.index)} onChange={() => toggleSel(s.index)} onClick={(e) => e.stopPropagation()} />}
+                    <span className="muted">{s.index + 1}.</span> <span className="grow ell">{s.heading}</span>
+                    {!multi && <>
+                      <span className="mv" onClick={(e) => { e.stopPropagation(); moveScene(s.index, s.index - 1) }}>▲</span>
+                      <span className="mv" onClick={(e) => { e.stopPropagation(); moveScene(s.index, s.index + 1) }}>▼</span>
+                    </>}
+                  </li>
+                </div>
+              )
+            })}
           </ul>
+
+          {newGroup === null ? (
+            <button className="mini ghost" onClick={() => setNewGroup('')}>+ grupo (sección) en la escena actual</button>
+          ) : (
+            <input autoFocus placeholder="Nombre del grupo · Enter" value={newGroup} onChange={(e) => setNewGroup(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && newGroup.trim()) { addGroup(newGroup); setNewGroup(null) } else if (e.key === 'Escape') setNewGroup(null) }} onBlur={() => setNewGroup(null)} />
+          )}
         </div>
       )}
       {scene && (
@@ -175,7 +237,7 @@ const toB64 = (u8: Uint8Array) => {
 const SCOPES: [Scope, string][] = [['cursor', 'Cursor'], ['node', 'Nodo'], ['scene', 'Escena'], ['range', 'Rango'], ['outline', 'Escaleta'], ['full', 'Guión completo']]
 
 function ScopeBar() {
-  const { scope, setScope, selection, text, cursorLine, projection, showTags, toggleTags } = useStore()
+  const { scope, setScope, selection, text, cursorLine, projection, showTags, toggleTags, prefs, setPref, setTab, setDevTab } = useStore()
   const lines = text.split('\n')
   const scene = projection.scenes.find((s) => cursorLine >= s.startLine && cursorLine < s.endLine)
   const est =
@@ -188,7 +250,13 @@ function ScopeBar() {
         <button key={s} className={s === scope ? 'on' : 'ghost'} disabled={s === 'range' && !selection} onClick={() => setScope(s)}>{l}</button>
       ))}
       <span className="grow" />
+      <button className={prefs.focus ? 'on mini' : 'ghost mini'} onClick={() => setPref('focus', !prefs.focus)} title="Modo enfoque: atenúa lo demás">Enfoque</button>
+      <button className={prefs.page ? 'on mini' : 'ghost mini'} onClick={() => setPref('page', !prefs.page)} title="Modo página: aspecto de hoja de guion">Página</button>
       <button className={showTags ? 'on mini' : 'ghost mini'} onClick={toggleTags} title="Etiquetas de elemento">ABC</button>
+      <span className="sep" />
+      <button className="ghost mini" onClick={() => { setTab('dev'); setDevTab('beats') }} title="Beat Timeline">Beats</button>
+      <button className="ghost mini" onClick={() => { setTab('dev'); setDevTab('map') }} title="Mapa neural">Mapa</button>
+      <button className="ghost mini" onClick={() => { setTab('dev'); setDevTab('analysis') }} title="Análisis">Análisis</button>
       <span className="muted">≈ {Math.ceil(est / 4)} tokens</span>
     </div>
   )
