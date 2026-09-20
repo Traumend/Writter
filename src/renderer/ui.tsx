@@ -29,6 +29,24 @@ export function useProjection(path: string | null): Projection {
 
 export const fm = (doc: Doc | undefined) => (doc ? readFrontmatter(doc.content).data : {})
 
+// Iconos SVG inline (no emoji). Heredan color (currentColor) y tamaño 1em.
+const PATHS: Record<string, string> = {
+  plus: 'M12 5v14M5 12h14',
+  close: 'M6 6l12 12M18 6L6 18',
+  trash: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13',
+  expand: 'M4 9V4h5M20 15v5h-5M15 4h5v5M9 20H4v-5',
+  question: 'M9 9a3 3 0 1 1 4 2.8c-.8.4-1 1-1 2M12 17h.01',
+  dice: 'M4 4h16v16H4zM8 8h.01M16 8h.01M8 16h.01M16 16h.01M12 12h.01',
+  actor: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM5 20a7 7 0 0 1 14 0'
+}
+export function Icon({ name, size = 16 }: { name: keyof typeof PATHS; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }} aria-hidden>
+      {PATHS[name]!.split('M').filter(Boolean).map((d, i) => <path key={i} d={'M' + d} />)}
+    </svg>
+  )
+}
+
 export function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="field">

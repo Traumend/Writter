@@ -35,7 +35,8 @@ export function readConfig(): ProjectConfig {
     prompts: { ...DEFAULT_CONFIG.prompts, ...c.prompts },
     cover: { ...DEFAULT_CONFIG.cover, ...c.cover },
     pdf: { ...DEFAULT_CONFIG.pdf, ...c.pdf },
-    roles: { ...DEFAULT_CONFIG.roles, ...c.roles }
+    roles: { ...DEFAULT_CONFIG.roles, ...c.roles },
+    characterSliders: Array.isArray(c.characterSliders) ? c.characterSliders : DEFAULT_CONFIG.characterSliders
   }
 }
 

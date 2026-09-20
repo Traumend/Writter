@@ -254,3 +254,14 @@ textarea { min-height: 2.6em; } /* red de seguridad: ningún textarea colapsa a 
 .relcard.auto { display: flex; align-items: center; gap: 8px; }
 .relcard .del { background: transparent; color: var(--err); box-shadow: none; font-size: 18px; line-height: 1; padding: 0 8px; flex: none; }
 .relcard .del:hover { filter: none; background: rgba(255,122,107,.14); }
+/* personajes: chips de alias, color, secciones flexibles */
+.cdot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.chip.alias { display: inline-flex; align-items: center; gap: 4px; background: var(--sink); color: var(--fg); box-shadow: var(--raise-sm); }
+.chip .x { background: transparent; box-shadow: none; padding: 0; color: var(--dim); display: inline-flex; }
+.chip .x:hover { color: var(--err); filter: none; }
+.aliasin { width: 90px; background: var(--sink); box-shadow: var(--inset); padding: 2px 8px; margin: 0; font-size: 11px; }
+.swatch.on { outline: 2px solid var(--fg); outline-offset: 1px; }
+.section-card { background: var(--panel); border-radius: var(--r-sm); padding: 10px; margin-bottom: 10px; box-shadow: var(--raise-sm); }
+.slider .del, .section-card .del, .relcard .del { background: transparent; color: var(--err); box-shadow: none; padding: 0 6px; flex: none; display: inline-flex; align-items: center; }
+.slider .del:hover, .section-card .del:hover, .relcard .del:hover { filter: none; background: rgba(255,122,107,.14); }
+button svg { display: inline-block; vertical-align: -2px; }

@@ -18,6 +18,7 @@ export type ProjectConfig = {
     footer: string
   }
   roles: Record<AdoptRole, string[]> // carpetas por rol (adopción, Pieza 1); Writter lee desde aquí
+  characterSliders: { id: string; label: string; lo: string; hi: string; color: string }[] // sliders personalizados del proyecto
 }
 
 export type FileKind = 'script' | 'character' | 'location' | 'prop' | 'outline' | 'knowledge' | 'other'
@@ -140,7 +141,8 @@ export const DEFAULT_CONFIG: ProjectConfig = {
     outline: ['outline'],
     knowledge: ['knowledge'],
     assets: ['assets']
-  }
+  },
+  characterSliders: []
 }
 
 export const KIND_DIR: Record<Exclude<FileKind, 'other'>, string> = {
