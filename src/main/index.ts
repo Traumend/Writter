@@ -30,6 +30,13 @@ ipcMain.handle('vault.adopt', (_e, root: string, roles: Record<AdoptRole, string
   markStale()
   return V.adopt(root, roles, notify)
 })
+// Vinculador de carpetas: comprobar/crear/elegir subcarpetas sobre una raíz aún no abierta.
+ipcMain.handle('folder.exists', (_e, root: string, rel: string) => V.folderExists(root, rel))
+ipcMain.handle('folder.make', (_e, root: string, rel: string) => V.folderMake(root, rel))
+ipcMain.handle('folder.pick', async (_e, root: string) => {
+  const r = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'], defaultPath: root })
+  return r.filePaths[0] ? V.relInside(root, r.filePaths[0]) : null
+})
 ipcMain.handle('vault.list', () => V.listFiles())
 ipcMain.handle('vault.readAll', () => V.readAll())
 ipcMain.handle('config.write', (_e, c: ProjectConfig) => V.writeConfig(c))

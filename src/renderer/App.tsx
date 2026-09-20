@@ -16,7 +16,7 @@ const DEV: [DevTab, string][] = [['characters', 'Personajes'], ['beats', 'Beat T
 
 // Menú desplegable de la barra superior (estilo suite Adobe).
 function AppMenu() {
-  const { openVault, openPrefs, setTab } = useStore()
+  const { openVault, openPrefs, setTab, openLinker, vault } = useStore()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -35,6 +35,7 @@ function AppMenu() {
         <div className="menu" role="menu">
           {item('Preferencias…', openPrefs)}
           {item('Abrir vault…', () => void openVault())}
+          {vault && item('Vincular carpetas…', openLinker)}
           {item('Ajustes del proyecto', () => setTab('settings'))}
           <div className="menu-sep" />
           {item('Recargar', () => location.reload())}

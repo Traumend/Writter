@@ -68,6 +68,9 @@ export type Graph = { nodes: GraphNode[]; edges: GraphEdge[] }
 export type Api = {
   vaultOpen(): Promise<OpenResult>
   vaultAdopt(root: string, roles: Record<AdoptRole, string[]>): Promise<VaultSummary>
+  folderExists(root: string, rel: string): Promise<boolean>
+  folderMake(root: string, rel: string): Promise<boolean>
+  folderPick(root: string): Promise<string | null> // devuelve ruta relativa a root, o null
   vaultList(): Promise<FileEntry[]>
   vaultReadAll(): Promise<Doc[]>
   configWrite(config: ProjectConfig): Promise<ProjectConfig>

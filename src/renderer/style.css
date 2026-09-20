@@ -233,3 +233,14 @@ ul.bullets li:hover { background: transparent; }
 ::-webkit-scrollbar-corner { background: transparent; }
 ::-webkit-resizer { background: transparent; } /* quita el cuadro blanco del grip; el redimensionado sigue activo */
 textarea { min-height: 2.6em; } /* red de seguridad: ningún textarea colapsa a media línea */
+/* vinculador de carpetas del vault */
+.linker { width: min(680px, 94vw); }
+.linkrow { background: var(--sink); border-radius: var(--r-sm); padding: 12px 14px; margin-bottom: 10px; box-shadow: var(--inset); }
+.linkrow.root { background: var(--panel); box-shadow: var(--raise-sm); }
+.linkrow-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.linkrow-head strong { font-size: 13.5px; }
+.linkpath { margin-top: 6px; word-break: break-all; }
+.linkpath.mono { font-family: "Courier New", monospace; color: var(--fg); font-size: 12px; }
+.badge { font-size: 10.5px; padding: 2px 9px; border-radius: 10px; white-space: nowrap; }
+.badge.ok { background: #16351f; color: #86e29a; }
+.badge.no { background: #3a1e0a; color: var(--warn); }

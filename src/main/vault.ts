@@ -154,13 +154,36 @@ export function openVault(dir: string, onChange: (e: VaultChange) => void): Vaul
   return { root, config, files: listFiles() }
 }
 
-// Adopta una carpeta existente con el mapa rol -> carpetas que confirmó el usuario. No mueve ni crea contenido.
+// Adopta una carpeta existente con el mapa rol -> carpetas que confirmó el usuario.
+// Crea las carpetas mapeadas si no existen (el usuario ya las eligió); no mueve contenido.
 export function adopt(dir: string, roles: Record<AdoptRole, string[]>, onChange: (e: VaultChange) => void): VaultSummary {
   root = resolve(dir)
   for (const d of ['.narrative/versions', '.narrative/analysis']) mkdirSync(join(root, d), { recursive: true })
+  for (const dirs of Object.values(roles)) for (const d of dirs) mkdirSync(inVault(d), { recursive: true })
   const config = writeConfig({ ...readConfig(), roles })
   startWatcher(onChange)
   return { root, config, files: listFiles() }
+}
+
+// --- Vinculador de carpetas (sobre una raíz arbitraria, antes de abrirla).
+export function folderExists(rootDir: string, rel: string): boolean {
+  if (!rel.trim()) return false
+  try {
+    return existsSync(resolveInside(resolve(rootDir), rel))
+  } catch {
+    return false
+  }
+}
+export function folderMake(rootDir: string, rel: string): boolean {
+  mkdirSync(resolveInside(resolve(rootDir), rel), { recursive: true })
+  return true
+}
+// Ruta de una carpeta elegida, relativa a la raíz (rechaza fuera de la raíz).
+export function relInside(rootDir: string, abs: string): string {
+  const base = resolve(rootDir)
+  const rel = relative(base, resolve(abs)).split('\\').join('/')
+  if (rel.startsWith('..')) throw new Error('La carpeta debe estar dentro del Vault')
+  return rel
 }
 
 export function readFile(rel: string) {

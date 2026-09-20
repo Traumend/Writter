@@ -5,6 +5,9 @@ import type { Api, VaultChange } from '../core/types/ipc'
 const api: Api = {
   vaultOpen: () => ipcRenderer.invoke('vault.open'),
   vaultAdopt: (root, roles) => ipcRenderer.invoke('vault.adopt', root, roles),
+  folderExists: (root, rel) => ipcRenderer.invoke('folder.exists', root, rel),
+  folderMake: (root, rel) => ipcRenderer.invoke('folder.make', root, rel),
+  folderPick: (root) => ipcRenderer.invoke('folder.pick', root),
   vaultList: () => ipcRenderer.invoke('vault.list'),
   vaultReadAll: () => ipcRenderer.invoke('vault.readAll'),
   configWrite: (c) => ipcRenderer.invoke('config.write', c),

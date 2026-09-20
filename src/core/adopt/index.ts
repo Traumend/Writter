@@ -49,6 +49,15 @@ export function foldersToRoles(folders: FolderGuess[]): Record<AdoptRole, string
   return roles
 }
 
+// Mapa rol -> UNA carpeta (para el vinculador role-first): primera detectada por rol, o el default.
+export function guessesToRoleMap(folders: FolderGuess[]): Record<AdoptRole, string> {
+  const map = {} as Record<AdoptRole, string>
+  for (const k of Object.keys(DEFAULT_CONFIG.roles) as AdoptRole[]) map[k] = ''
+  for (const f of folders) if (f.role !== 'ignore' && !map[f.role]) map[f.role] = f.path
+  for (const k of Object.keys(map) as AdoptRole[]) if (!map[k]) map[k] = DEFAULT_CONFIG.roles[k][0] ?? k
+  return map
+}
+
 // Rol de una ruta según el mapa configurado: gana el prefijo de carpeta más profundo (I1: lee desde donde el usuario indicó).
 export function roleOf(rel: string, roles: Record<AdoptRole, string[]>): AdoptRole | null {
   let best: AdoptRole | null = null

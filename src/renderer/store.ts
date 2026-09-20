@@ -4,8 +4,13 @@ import { paginate, type Pagination } from '../core/paginate'
 import { parseFountain } from '../core/parser/fountain'
 import { project, type Projection } from '../core/projection'
 import { moveScene as moveSceneText } from '../core/scenes'
+import { guessesToRoleMap } from '../core/adopt'
 import { roleDir as roleDirOf } from '../core/types/ipc'
 import type { AdoptionProposal, AdoptRole, AiProposal, Doc, FileEntry, FileKind, GraphStatus, KeyStatus, ProjectConfig, Scope, VaultSummary, Version } from '../core/types/ipc'
+
+// Vinculador de carpetas: raíz del Vault + una carpeta por rol (role-first, editable).
+export type Linker = { root: string; roles: Record<AdoptRole, string> }
+const ADOPT_ROLES: AdoptRole[] = ['script', 'character', 'location', 'prop', 'outline', 'knowledge', 'assets']
 
 export type Proposal = AiProposal & { from: number; to: number; target: string }
 export type Tab = 'desk' | 'breakdown' | 'dev' | 'production' | 'settings'
@@ -72,7 +77,7 @@ type State = {
   versions: Version[]
   status: string
   showTags: boolean
-  adoption: AdoptionProposal | null
+  linker: Linker | null
   prefs: Prefs
   prefsOpen: boolean
 }
@@ -82,8 +87,10 @@ type Actions = {
   setDevTab(t: DevTab): void
   openVault(): Promise<void>
   applySummary(v: VaultSummary): Promise<void>
-  adopt(roles: Record<AdoptRole, string[]>): Promise<void>
-  cancelAdopt(): void
+  openLinker(): void
+  repickRoot(): Promise<void>
+  linkVault(roles: Record<AdoptRole, string>): Promise<void>
+  cancelLink(): void
   roleDir(kind: Exclude<FileKind, 'other'>): string
   refreshFiles(): Promise<void>
   refreshDocs(): Promise<void>
@@ -167,7 +174,7 @@ export const useStore = create<State & Actions>((set, get) => ({
   versions: [],
   status: '',
   showTags: true,
-  adoption: null,
+  linker: null,
   prefs: loadPrefs(),
   prefsOpen: false,
 
@@ -191,18 +198,39 @@ export const useStore = create<State & Actions>((set, get) => ({
   async openVault() {
     const r = await window.api.vaultOpen()
     if (!r) return
-    if (r.kind === 'adopt') set({ adoption: r }) // carpeta con contenido sin proyecto -> asistente
+    if (r.kind === 'adopt') set({ linker: { root: r.root, roles: guessesToRoleMap(r.folders) } }) // carpeta ajena -> vinculador
     else await get().applySummary(r.summary)
   },
 
-  async adopt(roles) {
-    const a = get().adoption
-    if (!a) return
-    set({ adoption: null })
-    await get().applySummary(await window.api.vaultAdopt(a.root, roles))
+  // Vincular carpetas del vault ya abierto (remapear): prellena desde su config.
+  openLinker() {
+    const v = get().vault
+    if (!v) return
+    const roles = {} as Record<AdoptRole, string>
+    for (const k of ADOPT_ROLES) roles[k] = v.config.roles[k]?.[0] ?? k
+    set({ linker: { root: v.root, roles } })
   },
 
-  cancelAdopt: () => set({ adoption: null }),
+  async repickRoot() {
+    const r = await window.api.vaultOpen()
+    if (!r) return
+    if (r.kind === 'adopt') set({ linker: { root: r.root, roles: guessesToRoleMap(r.folders) } })
+    else {
+      set({ linker: null })
+      await get().applySummary(r.summary)
+    }
+  },
+
+  async linkVault(roles) {
+    const l = get().linker
+    if (!l) return
+    const arr = {} as Record<AdoptRole, string[]>
+    for (const k of ADOPT_ROLES) arr[k] = [roles[k] || k]
+    set({ linker: null })
+    await get().applySummary(await window.api.vaultAdopt(l.root, arr))
+  },
+
+  cancelLink: () => set({ linker: null }),
 
   roleDir: (kind) => {
     const v = get().vault
@@ -396,7 +424,10 @@ export const cleanErr = (e: unknown) => String(e).replace(/^Error: (Error invoki
 applyPrefs(useStore.getState().prefs) // aplica acento y tamaño al cargar
 
 window.addEventListener('vault.opened', (e) => void useStore.getState().applySummary((e as CustomEvent<VaultSummary>).detail))
-window.addEventListener('vault.adopt', (e) => useStore.setState({ adoption: (e as CustomEvent<AdoptionProposal>).detail }))
+window.addEventListener('vault.adopt', (e) => {
+  const p = (e as CustomEvent<AdoptionProposal>).detail
+  useStore.setState({ linker: { root: p.root, roles: guessesToRoleMap(p.folders) } })
+})
 
 // Cambios externos (Obsidian u otro editor): recargar si no hay cambios locales; si los hay, marcar conflicto (I10).
 window.api.onVaultChange((e) => {

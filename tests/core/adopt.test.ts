@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { foldersToRoles, guessByName, guessRole, roleOf } from '../../src/core/adopt'
+import { foldersToRoles, guessByName, guessesToRoleMap, guessRole, roleOf } from '../../src/core/adopt'
 import { DEFAULT_CONFIG, type FolderGuess } from '../../src/core/types/ipc'
 
 test('guessByName reconoce nombres en varios idiomas', () => {
@@ -30,6 +30,18 @@ test('foldersToRoles agrupa por rol, descarta ignore y conserva defaults', () =>
   expect(roles.script).toEqual(['Guiones'])
   expect(roles.character).toEqual(['Cast', 'Elenco viejo'])
   expect(roles.location).toEqual(DEFAULT_CONFIG.roles.location) // sin mapear -> default
+})
+
+test('guessesToRoleMap: una carpeta por rol, detectada o default', () => {
+  const folders = [
+    { path: 'Guiones', role: 'script' as const, mdCount: 2, imageCount: 0, hint: '' },
+    { path: 'Cast', role: 'character' as const, mdCount: 3, imageCount: 0, hint: '' }
+  ]
+  const map = guessesToRoleMap(folders)
+  expect(map.script).toBe('Guiones')
+  expect(map.character).toBe('Cast')
+  expect(map.location).toBe(DEFAULT_CONFIG.roles.location[0]) // sin detectar -> default
+  expect(map.assets).toBe(DEFAULT_CONFIG.roles.assets[0])
 })
 
 test('roleOf: gana el prefijo de carpeta más profundo', () => {
