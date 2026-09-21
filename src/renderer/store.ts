@@ -258,10 +258,12 @@ export const useStore = create<State & Actions>((set, get) => ({
     applyPrefs(prefs)
     set({ prefs })
   },
-  // Cambia el idioma y recarga para re-renderizar toda la interfaz en el nuevo idioma.
+  // Cambia el idioma y recarga para re-renderizar toda la interfaz en el nuevo idioma; el vault abierto se reabre tras la recarga.
   setLanguage(l) {
     const prefs = { ...get().prefs, lang: l }
     localStorage.setItem('writter.prefs', JSON.stringify(prefs))
+    const root = get().vault?.root
+    if (root) sessionStorage.setItem('writter.reopen', root)
     location.reload()
   },
   resetLayout() {
@@ -588,6 +590,11 @@ export const cleanErr = (e: unknown) => String(e).replace(/^Error: (Error invoki
 applyPrefs(useStore.getState().prefs) // aplica acento y tamaño al cargar
 
 window.addEventListener('vault.opened', (e) => void useStore.getState().applySummary((e as CustomEvent<VaultSummary>).detail))
+// Recarga del renderer (cambio de idioma): reabre el vault que estaba abierto.
+{
+  const reopen = sessionStorage.getItem('writter.reopen')
+  if (reopen) { sessionStorage.removeItem('writter.reopen'); void useStore.getState().openVaultPath(reopen) }
+}
 window.addEventListener('vault.adopt', (e) => {
   const p = (e as CustomEvent<AdoptionProposal>).detail
   useStore.setState({ linker: { root: p.root, roles: guessesToRoleMap(p.folders) } })

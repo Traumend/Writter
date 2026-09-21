@@ -193,7 +193,10 @@ function createWindow() {
         win?.show()
         win?.focus()
         const ev = process.env['WRITTER_EVAL']
-        if (ev) console.log('[eval]', await win?.webContents.executeJavaScript(readFileSync(ev, 'utf8')))
+        const r: unknown = ev ? await win?.webContents.executeJavaScript(readFileSync(ev, 'utf8')) : undefined
+        if (ev) console.log('[eval]', r)
+        // El eval devuelve '__reload__' si va a recargar la página: esperar la nueva carga antes de capturar.
+        if (r === '__reload__') await new Promise((res) => win?.webContents.once('did-finish-load', () => setTimeout(res, 2500)))
         console.log('[dom]', await win?.webContents.executeJavaScript('document.body.innerText'))
         const img = await win?.webContents.capturePage()
         if (img && !img.isEmpty()) writeFileSync(shot, img.toPNG())
