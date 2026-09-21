@@ -69,8 +69,8 @@ export function listFiles(): FileEntry[] {
       if (e.isDirectory()) walk(abs)
       else if (e.name.endsWith('.md')) {
         const rel = toRel(abs)
-        const role = roleOf(rel, roles) // null (fuera del mapa) o 'assets' -> se ignora en la lista de contenido
-        if (role && role !== 'assets') out.push({ path: rel, kind: role, name: basename(e.name, '.md') })
+        const role = roleOf(rel, roles) // null (fuera del mapa) -> se ignora; assets/*.md (shot lists) entran como 'other'
+        if (role) out.push({ path: rel, kind: role === 'assets' ? 'other' : role, name: basename(e.name, '.md') })
       }
     }
   }
