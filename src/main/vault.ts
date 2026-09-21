@@ -331,3 +331,7 @@ export function listAnalyses(rel: string): { id: string; ts: number }[] {
 export function readAnalysis(rel: string, id: string): unknown {
   return JSON.parse(readFileSync(resolveInside(analysisDir(rel), id), 'utf8'))
 }
+// Sobrescribe un análisis existente (ediciones del usuario a notas/estructura; autoguardado).
+export function overwriteAnalysis(rel: string, id: string, data: object): void {
+  writeFileSync(resolveInside(analysisDir(rel), id), JSON.stringify(data, null, 1))
+}

@@ -490,6 +490,18 @@ const EN: Record<string, string> = {
   'mención': 'mention',
   encabezado: 'heading',
 
+  // Analysis v2
+  'Potencial comercial': 'Commercial potential',
+  'doble-clic → ir a la escena': 'double-click → go to scene',
+  'Añadir nota · Enter': 'Add note · Enter',
+  'Versión': 'Version',
+  'Comparar con': 'Compare with',
+  'Comparar con…': 'Compare with…',
+  'Editable · se guarda automáticamente': 'Editable · saved automatically',
+  'Timeline — métricas del guion': 'Timeline — script metrics',
+  Escritura: 'Writing',
+  'Texto y formato': 'Text & format',
+
   // Characters
   'Más escenas': 'Most scenes',
   'A-Z': 'A-Z',

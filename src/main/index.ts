@@ -78,6 +78,7 @@ ipcMain.handle('ai.analyze', async (_e, rel: string, text: string): Promise<Anal
 })
 ipcMain.handle('analysis.list', (_e, rel: string) => V.listAnalyses(rel))
 ipcMain.handle('analysis.read', (_e, rel: string, id: string) => ({ ...(V.readAnalysis(rel, id) as Omit<Analysis, 'id'>), id }))
+ipcMain.handle('analysis.save', (_e, rel: string, id: string, data: Analysis) => V.overwriteAnalysis(rel, id, data))
 ipcMain.handle('graph.status', () => graphStatus())
 ipcMain.handle('graph.build', () => graphBuild())
 ipcMain.handle('graph.get', () => getGraph())

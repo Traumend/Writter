@@ -33,6 +33,7 @@ const api: Api = {
   aiAnalyze: (path, text) => ipcRenderer.invoke('ai.analyze', path, text),
   analysisList: (path) => ipcRenderer.invoke('analysis.list', path),
   analysisRead: (path, id) => ipcRenderer.invoke('analysis.read', path, id),
+  analysisSave: (path, id, data) => ipcRenderer.invoke('analysis.save', path, id, data),
   graphStatus: () => ipcRenderer.invoke('graph.status'),
   graphBuild: () => ipcRenderer.invoke('graph.build'),
   graphGet: () => ipcRenderer.invoke('graph.get'),

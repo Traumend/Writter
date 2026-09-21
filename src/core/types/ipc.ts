@@ -56,7 +56,7 @@ export type AiRequest = {
 export type AiProposal = { replacement: string; rationale: string; tokensIn: number; tokensOut: number; model: string; docHash: string }
 export type AiText = { text: string; tokensIn: number; tokensOut: number; model: string }
 
-export type SceneAnalysis = { index: number; summary: string; emotion: string; intensity: number; tension: number; attention: number; notes: string[] }
+export type SceneAnalysis = { index: number; summary: string; emotion: string; intensity: number; tension: number; attention: number; commercial: number; notes: string[] }
 export type Analysis = {
   id: string
   ts: number
@@ -66,6 +66,8 @@ export type Analysis = {
   theme: string
   tone: string
   notes: string[]
+  writing: string[] // notas de escritura por escena ("Scene 6: …")
+  format: string[] // notas de texto y formato
   scenes: SceneAnalysis[]
 }
 
@@ -103,6 +105,7 @@ export type Api = {
   aiAnalyze(path: string, text: string): Promise<Analysis>
   analysisList(path: string): Promise<{ id: string; ts: number }[]>
   analysisRead(path: string, id: string): Promise<Analysis>
+  analysisSave(path: string, id: string, data: Analysis): Promise<void>
   graphStatus(): Promise<GraphStatus>
   graphBuild(): Promise<GraphStatus>
   graphGet(): Promise<Graph>
@@ -122,8 +125,10 @@ Devuelve SOLO el texto que reemplaza al fragmento objetivo, en formato Fountain,
 Si no hay que cambiar nada, devuelve el fragmento tal cual. Tras el texto, en una última línea separada, escribe "---RATIONALE---" seguido de una frase breve.`,
   analysis: `Eres un analista de guiones. Analiza el guión y responde ÚNICAMENTE con JSON válido con esta forma:
 {"structure": string, "plot": string, "theme": string, "tone": string, "notes": string[],
- "scenes": [{"index": number, "summary": string, "emotion": string, "intensity": 0-10, "tension": 0-10, "attention": 0-10, "notes": string[]}]}
-"emotion" es una palabra (p. ej. Neutral, Diversión, Tensión, Miedo, Calma). Incluye todas las escenas en orden, index desde 0.`
+ "writing": string[], "format": string[],
+ "scenes": [{"index": number, "summary": string, "emotion": string, "intensity": 0-10, "tension": 0-10, "attention": 0-10, "commercial": 0-10, "notes": string[]}]}
+"emotion" es una palabra (p. ej. Neutral, Diversión, Tensión, Miedo, Calma). "commercial" es el potencial comercial de la escena.
+"writing" son notas de escritura por escena (formato "Scene N: …") y "format" notas de texto y formato. Incluye todas las escenas en orden, index desde 0.`
 }
 
 export const DEFAULT_CONFIG: ProjectConfig = {
