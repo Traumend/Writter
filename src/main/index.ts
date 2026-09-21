@@ -177,6 +177,8 @@ function createWindow() {
   // Ganchos de desarrollo: WRITTER_VAULT abre un vault al arrancar; WRITTER_EVAL ejecuta JS en el renderer; WRITTER_SHOT captura y sale.
   win.webContents.on('console-message', (_e, level, msg) => level >= 2 && console.log('[renderer]', msg))
   win.webContents.once('did-finish-load', () => {
+    const ws = /^(\d+)x(\d+)$/.exec(process.env['WRITTER_WIN'] ?? '') // tamaño de ventana para pruebas de anchura
+    if (ws) win?.setSize(Number(ws[1]), Number(ws[2]))
     const v = process.env['WRITTER_VAULT']
     if (v) {
       // Igual que el diálogo: proyecto existente -> abrir; carpeta ajena con contenido -> proponer adopción.
@@ -193,14 +195,18 @@ function createWindow() {
         win?.show()
         win?.focus()
         const ev = process.env['WRITTER_EVAL']
-        const r: unknown = ev ? await win?.webContents.executeJavaScript(readFileSync(ev, 'utf8')) : undefined
-        if (ev) console.log('[eval]', r)
-        // El eval devuelve '__reload__' si va a recargar la página: esperar la nueva carga antes de capturar.
-        if (r === '__reload__') await new Promise((res) => win?.webContents.once('did-finish-load', () => setTimeout(res, 2500)))
-        console.log('[dom]', await win?.webContents.executeJavaScript('document.body.innerText'))
-        const img = await win?.webContents.capturePage()
-        if (img && !img.isEmpty()) writeFileSync(shot, img.toPNG())
-        else console.log('[shot] captura vacía')
+        // El eval se repite mientras devuelva '__more__' (una captura por paso: shot.png, shot-1.png, …);
+        // '__reload__' indica que va a recargar la página: esperar la nueva carga antes de capturar.
+        for (let n = 0; ; n++) {
+          const r: unknown = ev ? await win?.webContents.executeJavaScript(readFileSync(ev, 'utf8')) : undefined
+          if (ev) console.log('[eval]', r)
+          if (r === '__reload__') await new Promise((res) => win?.webContents.once('did-finish-load', () => setTimeout(res, 2500)))
+          if (n === 0) console.log('[dom]', await win?.webContents.executeJavaScript('document.body.innerText'))
+          const img = await win?.webContents.capturePage()
+          if (img && !img.isEmpty()) writeFileSync(n ? shot.replace(/\.png$/i, `-${n}.png`) : shot, img.toPNG())
+          else console.log('[shot] captura vacía')
+          if (r !== '__more__') break
+        }
         app.quit()
       }, 3500)
     }
