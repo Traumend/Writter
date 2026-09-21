@@ -37,7 +37,7 @@ export function useOpenScene() {
 export function CharChips({ all, value, onChange }: { all: string[]; value: string[]; onChange: (v: string[]) => void }) {
   return (
     <div className="chips">
-      {all.map((n) => <button key={n} className={value.includes(n) ? 'mini on' : 'mini ghost'} onClick={() => onChange(value.includes(n) ? value.filter((x) => x !== n) : [...value, n])}>{n}</button>)}
+      {all.map((n) => <button key={n} title={n} className={value.includes(n) ? 'mini on' : 'mini ghost'} onClick={() => onChange(value.includes(n) ? value.filter((x) => x !== n) : [...value, n])}><span className="ell">{n}</span></button>)}
     </div>
   )
 }

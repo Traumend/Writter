@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { SCENE_STATUS, TRACK_COLORS, uid, type SceneStatus } from '../../../core/planning'
 import { t } from '../../i18n'
-import { BlurInput } from '../../ui'
+import { Icon, BlurInput } from '../../ui'
 import { useCards, usePlanning, useSceneMetaWriter, useScripts } from './data'
 import { useOpenScene } from './shared'
 
@@ -31,7 +31,7 @@ export function Planner() {
         <span className="muted tiny">{script.scenes.length} {t('escenas')} · {planning.tracks.length} tracks</span>
         <span className="grow" />
         <input placeholder={t('Nuevo track · Enter')} value={newTrack} onChange={(e) => setNewTrack(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addTrack()} style={{ width: 200 }} />
-        <button className="mini" onClick={addTrack}>+ Track</button>
+        <button className="mini" onClick={addTrack}><Icon name="plus" size={12} />Track</button>
       </div>
 
       {/* Matriz de presencia track × escena: detecta subtramas abandonadas de un vistazo. */}
@@ -46,7 +46,7 @@ export function Planner() {
                   const on = meta(s.heading).track === tr.id
                   return <td key={i} className="cell" onClick={() => void writeMeta(script, s.heading, { track: on ? '' : tr.id })}><span className="pip" style={{ background: on ? tr.color : 'var(--line)' }} /></td>
                 })}
-                <td><button className="mini ghost" onClick={() => delTrack(tr.id)}>×</button></td>
+                <td><button className="mini ghost" title={t('Quitar')} onClick={() => delTrack(tr.id)}><Icon name="close" size={12} /></button></td>
               </tr>
             ))}
             {planning.tracks.length === 0 && <tr><td colSpan={script.scenes.length + 2} className="muted tiny">{t('Sin tracks. Crea uno (Trama principal, Romance, Antagonista…) y marca en qué escenas aparece.')}</td></tr>}

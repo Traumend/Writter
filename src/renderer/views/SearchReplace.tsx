@@ -54,7 +54,7 @@ export function SearchReplace() {
   return (
     <div className="modal-backdrop" onClick={closeSearch}>
       <div className="modal search" onClick={(e) => e.stopPropagation()}>
-        <div className="row"><h1>{t('Buscar y reemplazar')}</h1><span className="grow" /><button className="ghost mini" onClick={closeSearch}>{t('Cerrar')}</button></div>
+        <div className="row"><h1>{t('Buscar y reemplazar')}</h1><span className="grow" /><button className="mini ghost" onClick={closeSearch}>{t('Cerrar')}</button></div>
         <div className="grid2">
           <label className="field"><span>{t('Buscar')}</span><input autoFocus value={q} onChange={(e) => { setQ(e.target.value); setResults(null) }} onKeyDown={(e) => e.key === 'Enter' && preview()} /></label>
           <label className="field"><span>{t('Reemplazar por (vacío = eliminar)')}</span><input value={repl} onChange={(e) => setRepl(e.target.value)} /></label>
@@ -69,7 +69,7 @@ export function SearchReplace() {
         <div className="row" style={{ flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
           <span className="muted tiny">{t('Bloques:')}</span>
           {BLOCKS.map(([bt, l]) => (
-            <button key={bt} className={blocks.has(bt) ? 'on mini' : 'ghost mini'} onClick={() => { setBlocks((s) => { const n = new Set(s); n.has(bt) ? n.delete(bt) : n.add(bt); return n }); setResults(null) }}>{t(l)}</button>
+            <button key={bt} className={blocks.has(bt) ? 'on mini' : 'mini ghost'} onClick={() => { setBlocks((s) => { const n = new Set(s); n.has(bt) ? n.delete(bt) : n.add(bt); return n }); setResults(null) }}>{t(l)}</button>
           ))}
           <span className="muted tiny">{blocks.size ? '' : t('(todos)')}</span>
         </div>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { breakdown } from '../../core/breakdown'
 import { readFrontmatter, writeFrontmatter } from '../../core/frontmatter'
 import { sceneMinutes } from '../../core/paginate'
@@ -6,7 +6,7 @@ import { parseFountain } from '../../core/parser/fountain'
 import { project } from '../../core/projection'
 import { t } from '../i18n'
 import { useStore } from '../store'
-import { BlurInput, useDoc } from '../ui'
+import { Icon, BlurInput, useDoc } from '../ui'
 import { TEMPLATE } from './Desk'
 
 type Act = { title: string; summary: string; from: number; to: number }
@@ -52,17 +52,21 @@ export function BeatTimeline() {
   const [linking, setLinking] = useState<string | null>(null)
   const [versions, setVersions] = useState<{ id: string; ts: number; label?: string; origin: string }[]>([])
   const wall = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (outlinePath && !files.some((f) => f.path === outlinePath)) void createFile(outlinePath, TEMPLATE.outline(outlinePath), false)
   }, [outlinePath, files, createFile])
   useEffect(() => { setSelScene(null); if (script) void window.api.versionList(script).then(setVersions) }, [script])
+  // "Ajustar": el guion entero ocupa el ancho visible (también al cambiar de episodio).
+  const fit = useCallback((totalMin: number) => { const w = scrollRef.current?.clientWidth ?? 0; if (w && totalMin > 0) setZoom(Math.min(200, Math.max(0.2, (w - 84 - 24) / (16 * totalMin)))) }, [])
 
   const doc = useMemo(() => parseFountain(scriptDoc?.content ?? ''), [scriptDoc?.content])
   const proj = useMemo(() => project(doc), [doc])
   const mins = useMemo(() => sceneMinutes(doc.tokens, proj.scenes), [doc, proj])
   const starts = useMemo(() => { const a: number[] = []; let s = 0; for (const m of mins) { a.push(s); s += m } a.push(s); return a }, [mins])
   const total = starts[starts.length - 1] ?? 1
+  useEffect(() => { fit(total) }, [script, total, fit])
   const PXM = 16 * zoom
   const GUT = 84 // canalón izquierdo para las etiquetas de carril
   const x = (m: number) => GUT + m * PXM
@@ -133,13 +137,13 @@ export function BeatTimeline() {
           <option value="">{t('Aplicar plantilla…')}</option>
           {Object.keys(PRESETS).map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
-        <button className="ghost mini" onClick={() => save({ beats: [...beats, { id: uid(), title: t('Nuevo beat'), note: '', scene: sceneAtPlay >= 0 ? sceneAtPlay : (selScene ?? 0), kind: 'setup' }] })}>+ {t('Beat')}</button>
-        <button className="ghost mini" onClick={() => save({ notes: [...notes, { id: uid(), text: '', x: 20 + notes.length * 26, y: 20 + notes.length * 18, color: COLORS[notes.length % COLORS.length]!, kind: 'idea' }] })}>+ {t('Nota')}</button>
-        <button className="ghost mini" onClick={() => save({ acts: [...acts, { title: `${t('Acto')} ${acts.length + 1}`, summary: '', from: 0, to: Math.max(0, proj.scenes.length - 1) }] })}>+ {t('Acto')}</button>
+        <button className="mini ghost" onClick={() => save({ beats: [...beats, { id: uid(), title: t('Nuevo beat'), note: '', scene: sceneAtPlay >= 0 ? sceneAtPlay : (selScene ?? 0), kind: 'setup' }] })}><Icon name="plus" size={12} />{t('Beat')}</button>
+        <button className="mini ghost" onClick={() => save({ notes: [...notes, { id: uid(), text: '', x: 20 + notes.length * 26, y: 20 + notes.length * 18, color: COLORS[notes.length % COLORS.length]!, kind: 'idea' }] })}><Icon name="plus" size={12} />{t('Nota')}</button>
+        <button className="mini ghost" onClick={() => save({ acts: [...acts, { title: `${t('Acto')} ${acts.length + 1}`, summary: '', from: 0, to: Math.max(0, proj.scenes.length - 1) }] })}><Icon name="plus" size={12} />{t('Acto')}</button>
         <span className="sep" />
-        <button className="mini ghost" onClick={() => setZoom((z) => Math.max(0.3, z - 0.2))}>−</button>
-        <button className="mini ghost" onClick={() => setZoom((z) => Math.min(3, z + 0.2))}>+</button>
-        <button className="mini ghost" onClick={() => setZoom(1)}>{t('Ajustar')}</button>
+        <button className="mini ghost" title={t('Alejar')} onClick={() => setZoom((z) => Math.max(0.2, z / 1.25))}><Icon name="minus" size={12} /></button>
+        <button className="mini ghost" title={t('Acercar')} onClick={() => setZoom((z) => Math.min(200, z * 1.25))}><Icon name="plus" size={12} /></button>
+        <button className="mini ghost" onClick={() => fit(total)}>{t('Ajustar')}</button>
         <span className="grow" />
         <span className="muted tiny">{proj.scenes.length} {t('escenas')} · {beats.length} beats · {total.toFixed(1)}m · {t('escritas')} {written}/{proj.scenes.length}</span>
         <button className="mini ghost" onClick={exportMarkers}>{t('Exportar marcadores')}</button>
@@ -149,11 +153,11 @@ export function BeatTimeline() {
       <div className="toolbar wrap tiny">
         <span className="muted">{t('Filtros')}:</span>
         {cards.slice(0, 12).map((c) => (
-          <button key={c.path} className={entFilter.has(c.name) ? 'on mini' : 'ghost mini'} onClick={() => setEntFilter((s) => { const n = new Set(s); n.has(c.name) ? n.delete(c.name) : n.add(c.name); return n })}>{c.name} {c.appearances.length}</button>
+          <button key={c.path} className={entFilter.has(c.name) ? 'on mini' : 'mini ghost'} title={c.name} onClick={() => setEntFilter((s) => { const n = new Set(s); n.has(c.name) ? n.delete(c.name) : n.add(c.name); return n })}><span className="ell">{c.name}</span> {c.appearances.length}</button>
         ))}
       </div>
 
-      <div className="bt-scroll scroll">
+      <div className="bt-scroll scroll" ref={scrollRef}>
         <div className="bt-lanes" style={{ width }}>
           {/* Regla de tiempo + playhead */}
           <div className="bt-ruler" style={{ width }} onPointerDown={(e) => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); const set = (cx: number) => setPlay(Math.max(0, Math.min(total, (cx - r.left - GUT) / PXM))); set(e.clientX); const mv = (ev: PointerEvent) => set(ev.clientX); const up = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up) }; window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up) }}>
@@ -164,19 +168,19 @@ export function BeatTimeline() {
           <div className="bt-lane"><span className="lanelabel">{t('Actos')}</span>
             {acts.map((a, i) => (
               <div className="bt-block act" key={i} style={{ left: x(starts[a.from] ?? 0), width: Math.max(60, x(starts[Math.min(a.to + 1, starts.length - 1)] ?? total) - x(starts[a.from] ?? 0)) }}>
-                <div className="row"><BlurInput value={a.title} onCommit={(v) => save({ acts: acts.map((y, j) => (j === i ? { ...y, title: v } : y)) })} /><button className="mini ghost" onClick={() => save({ acts: acts.filter((_, j) => j !== i) })}>×</button></div>
+                <div className="row"><BlurInput value={a.title} onCommit={(v) => save({ acts: acts.map((y, j) => (j === i ? { ...y, title: v } : y)) })} /><button className="mini ghost" title={t('Quitar')} onClick={() => save({ acts: acts.filter((_, j) => j !== i) })}><Icon name="close" size={12} /></button></div>
                 <BlurInput textarea rows={2} value={a.summary} placeholder={t('Resumen del acto')} onCommit={(v) => save({ acts: acts.map((y, j) => (j === i ? { ...y, summary: v } : y)) })} />
               </div>
             ))}
           </div>
 
-          <div className="bt-lane"><span className="lanelabel">Beats</span>
+          <div className="bt-lane beats"><span className="lanelabel">Beats</span>
             {beats.map((b) => (
-              <div className="bt-beat" key={b.id} style={{ left: x((starts[b.scene] ?? 0) + (mins[b.scene] ?? 0) / 2), background: KINDS[b.kind] ?? KINDS['other'] }}>
+              <div className="bt-beat" key={b.id} style={{ left: Math.max(GUT + 95, x((starts[b.scene] ?? 0) + (mins[b.scene] ?? 0) / 2)), background: KINDS[b.kind] ?? KINDS['other'] }}>
                 <div className="row">
                   <select value={b.kind} onChange={(e) => save({ beats: beats.map((x) => (x.id === b.id ? { ...x, kind: e.target.value } : x)) })}>{Object.keys(KINDS).map((k) => <option key={k} value={k}>{t(KIND_LABEL[k] ?? k)}</option>)}</select>
                   <select value={b.scene} onChange={(e) => save({ beats: beats.map((x) => (x.id === b.id ? { ...x, scene: Number(e.target.value) } : x)) })}>{proj.scenes.map((s, i) => <option key={i} value={i}>#{i + 1}</option>)}</select>
-                  <button className="mini ghost" onClick={() => save({ beats: beats.filter((x) => x.id !== b.id) })}>×</button>
+                  <button className="mini ghost" title={t('Quitar')} onClick={() => save({ beats: beats.filter((x) => x.id !== b.id) })}><Icon name="close" size={12} /></button>
                 </div>
                 <BlurInput value={b.title} onCommit={(v) => save({ beats: beats.map((x) => (x.id === b.id ? { ...x, title: v } : x)) })} />
               </div>
@@ -203,8 +207,8 @@ export function BeatTimeline() {
               <div className="row">
                 {COLORS.map((c) => <span key={c} className="dot" style={{ background: c }} onClick={(e) => { e.stopPropagation(); save({ notes: notes.map((x) => (x.id === nt.id ? { ...x, color: c } : x)) }) }} />)}
                 <span className="grow" />
-                <button className="mini ghost" title={t('Conectar')} onClick={(e) => { e.stopPropagation(); setLinking(linking === nt.id ? null : nt.id) }}>∞</button>
-                <button className="mini ghost" onClick={(e) => { e.stopPropagation(); save({ notes: notes.filter((x) => x.id !== nt.id) }) }}>×</button>
+                <button className="mini ghost" title={t('Conectar')} onClick={(e) => { e.stopPropagation(); setLinking(linking === nt.id ? null : nt.id) }}><Icon name="link" size={12} /></button>
+                <button className="mini ghost" title={t('Quitar')} onClick={(e) => { e.stopPropagation(); save({ notes: notes.filter((x) => x.id !== nt.id) }) }}><Icon name="close" size={12} /></button>
               </div>
               <BlurInput textarea rows={3} value={nt.text} placeholder={t('Idea…')} onCommit={(v) => save({ notes: notes.map((x) => (x.id === nt.id ? { ...x, text: v } : x)) })} />
             </div>
@@ -229,7 +233,7 @@ export function BeatTimeline() {
       {/* Inspector de escena */}
       {selScene !== null && proj.scenes[selScene] && (
         <aside className="inspector bt-inspector">
-          <div className="row"><strong>#{selScene + 1} {proj.scenes[selScene]!.heading}</strong><span className="grow" /><button className="mini ghost" onClick={() => setSelScene(null)}>×</button></div>
+          <div className="row"><strong>#{selScene + 1} {proj.scenes[selScene]!.heading}</strong><span className="grow" /><button className="mini ghost" title={t('Quitar')} onClick={() => setSelScene(null)}><Icon name="close" size={12} /></button></div>
           {versions.length > 0 && (
             <select><option>{t('Versión actual')}</option>{versions.map((v) => <option key={v.id}>{new Date(v.ts).toLocaleDateString()} · {v.label ?? v.origin}</option>)}</select>
           )}

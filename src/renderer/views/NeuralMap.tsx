@@ -149,7 +149,7 @@ export function NeuralMap() {
   const relayout = () => { setView({ x: 0, y: 0, k: 1 }); setNodes((ns) => [...ns]) }
 
   const chk = (on: boolean, label: string, fn: () => void, count?: number, color?: string) => (
-    <button className={on ? 'on mini' : 'ghost mini'} style={color ? { borderColor: color } : undefined} onClick={fn}>{color ? '● ' : (on ? '☑ ' : '☐ ')}{label}{count !== undefined ? ` (${count})` : ''}</button>
+    <button className={on ? 'on mini' : 'mini ghost'} style={color ? { borderColor: color } : undefined} onClick={fn}>{color ? '● ' : (on ? '☑ ' : '☐ ')}{label}{count !== undefined ? ` (${count})` : ''}</button>
   )
   const edgeCount = (ty: EdgeType) => built.edges.filter((e) => e.type === ty).length
   const orphans = built.nodes.filter((n) => n.kind !== 'scene' && n.appear === 0).length
@@ -229,7 +229,7 @@ export function NeuralMap() {
                     ? <polygon points={`0,${-r} ${r},0 0,${r} ${-r},0`} fill={col} stroke={isArt ? '#fff' : (hit(n) ? '#fff' : 'none')} strokeWidth={isArt ? 3 : 2} />
                     : <circle r={r} fill={col} stroke={isArt ? '#fff' : (hit(n) ? '#fff' : 'none')} strokeWidth={isArt ? 3 : 2} />}
                   {isArt && <circle r={r + 4} fill="none" stroke="#ff5a1f" strokeWidth={1.5} />}
-                  <text x={r + 4} y={4} fontSize={n.kind === 'scene' ? 9 : 11} fill={n.kind === 'scene' ? 'var(--dim)' : 'var(--fg)'} transform={`rotate(${-rot})`}>{n.label}</text>
+                  <text x={r + 4} y={4} fontSize={n.kind === 'scene' ? 9 : 11} fill={n.kind === 'scene' ? 'var(--dim)' : 'var(--fg)'} transform={`rotate(${-rot})`}>{n.label.length > 28 ? n.label.slice(0, 27) + '…' : n.label}<title>{n.label}</title></text>
                 </g>
               )
             })}

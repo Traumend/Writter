@@ -6,7 +6,7 @@ const TAB_LABEL: Record<string, string> = { desk: 'Escritorio', breakdown: 'Brea
 const ROLE_PRESETS: [string, string[]][] = [
   ['Completo', ['desk', 'breakdown', 'dev', 'plan', 'production']],
   ['Escritor', ['desk', 'breakdown', 'dev', 'plan']],
-  ['Director', ['desk', 'breakdown', 'dev', 'plan', 'production']],
+  ['Director', ['desk', 'dev', 'plan', 'production']],
   ['Productor', ['breakdown', 'production']]
 ]
 
@@ -28,7 +28,7 @@ export function Preferences() {
   return (
     <div className="modal-backdrop" onClick={closePrefs}>
       <div className="modal prefs" onClick={(e) => e.stopPropagation()}>
-        <div className="row"><h1>{t('Preferencias')}</h1><span className="grow" /><button className="ghost mini" onClick={closePrefs}>{t('Cerrar')}</button></div>
+        <div className="row"><h1>{t('Preferencias')}</h1><span className="grow" /><button className="mini ghost" onClick={closePrefs}>{t('Cerrar')}</button></div>
         <div className="prefs-body">
           <ul className="prefs-cats">
             {CATS.map((c) => <li key={c} className={c === cat ? 'active' : ''} onClick={() => setCat(c)}>{t(c)}</li>)}
@@ -52,7 +52,7 @@ export function Preferences() {
                 <h2>{t('Vista por rol (pestañas)')}</h2>
                 <div className="segmented">
                   {ROLE_PRESETS.map(([label, tabs]) => (
-                    <button key={label} className={prefs.tabs.join() === tabs.join() ? 'on' : 'ghost'} onClick={() => setTabs(tabs)}>{t(label)}</button>
+                    <button key={label} className={prefs.tabs.filter((x) => x !== 'settings').sort().join() === [...tabs].sort().join() ? 'on' : 'ghost'} onClick={() => setTabs(tabs)}>{t(label)}</button>
                   ))}
                 </div>
                 <div className="row" style={{ flexWrap: 'wrap', gap: 10, marginTop: 8 }}>

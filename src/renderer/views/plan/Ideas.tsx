@@ -4,7 +4,7 @@ import { readFrontmatter } from '../../../core/frontmatter'
 import { MOT_DIMS, readMotivation, uid, type Idea } from '../../../core/planning'
 import { getLang, t } from '../../i18n'
 import { useStore } from '../../store'
-import { BlurInput } from '../../ui'
+import { Icon, BlurInput } from '../../ui'
 import { useCards, usePlanning, useScripts } from './data'
 import { CharChips } from './shared'
 
@@ -47,7 +47,7 @@ export function Ideas() {
           {planning.ideas.length === 0 && <p className="muted">{t('Bandeja vacía. Captura ideas sin forzar un orden; intégralas al guion cuando encajen.')}</p>}
           {planning.ideas.map((idea) => (
             <div className="panelbox" key={idea.id}>
-              <div className="row"><BlurInput value={idea.title} onCommit={(v) => upd(idea.id, { title: v })} /><button className="mini ghost" onClick={() => void save({ ideas: planning.ideas.filter((x) => x.id !== idea.id) })}>×</button></div>
+              <div className="row"><BlurInput value={idea.title} onCommit={(v) => upd(idea.id, { title: v })} /><button className="mini ghost" title={t('Quitar')} onClick={() => void save({ ideas: planning.ideas.filter((x) => x.id !== idea.id) })}><Icon name="close" size={12} /></button></div>
               <BlurInput textarea rows={2} value={idea.summary} placeholder={t('Sinopsis / premisa')} onCommit={(v) => upd(idea.id, { summary: v })} />
               <CharChips all={names} value={idea.characters} onChange={(v) => upd(idea.id, { characters: v })} />
               <div className="row tiny">
@@ -71,7 +71,7 @@ export function Ideas() {
             <div className="premise" key={i}>
               <div className="row tiny muted"><span>{t(MOT_DIMS.find(([k]) => k === p.dims[0])?.[1] ?? '')} × {t(MOT_DIMS.find(([k]) => k === p.dims[1])?.[1] ?? '')}</span><span className="grow" /><b>{p.score}</b></div>
               <p>{p.text}</p>
-              <button className="mini ghost" onClick={() => add(`${A!.name} / ${B!.name}`, p.text, [A!.name, B!.name])}>+ {t('Añadir como idea de escena')}</button>
+              <button className="mini ghost" onClick={() => add(`${A!.name} / ${B!.name}`, p.text, [A!.name, B!.name])}><Icon name="plus" size={12} />{t('Añadir como idea de escena')}</button>
             </div>
           ))}
         </div>

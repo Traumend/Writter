@@ -71,8 +71,8 @@ function AppMenu() {
           {vault && item(t('Importar proyecto (JSON)'), () => void importProjectJson())}
           <div className="menu-sep" />
           <div className="menu-label">{t('Idioma')}</div>
-          <button className={`menu-item ${lang === 'en' ? 'sel' : ''}`} onClick={() => setLanguage('en')}>{lang === 'en' ? '✓ ' : ' '}{t('Inglés')}</button>
-          <button className={`menu-item ${lang === 'es' ? 'sel' : ''}`} onClick={() => setLanguage('es')}>{lang === 'es' ? '✓ ' : ' '}{t('Español')}</button>
+          <button className={`menu-item ${lang === 'en' ? 'sel' : ''}`} onClick={() => setLanguage('en')}><span className="chk">{lang === 'en' && <Icon name="check" size={12} />}</span>{t('Inglés')}</button>
+          <button className={`menu-item ${lang === 'es' ? 'sel' : ''}`} onClick={() => setLanguage('es')}><span className="chk">{lang === 'es' && <Icon name="check" size={12} />}</span>{t('Español')}</button>
           <div className="menu-sep" />
           {item(t('Recargar'), () => location.reload())}
         </div>
@@ -87,8 +87,8 @@ function Pomodoro() {
   const label = pomo.mode === 'focus' ? t('Foco') : pomo.mode === 'short' ? t('Descanso') : t('Descanso largo')
   return (
     <span className={`pomo ${pomo.running ? 'on' : ''} ${pomo.mode}`} title={`${label} · ${t('clic: iniciar/pausar · doble clic: reiniciar')}`}>
-      <button className="ghost mini" onClick={pomoToggle} onDoubleClick={() => pomoReset()}><Icon name="timer" size={12} /> {mm}:{ss}</button>
-      {pomo.running && <button className="ghost mini" title={t('Saltar')} onClick={pomoSkip}>»</button>}
+      <button className="mini ghost" onClick={pomoToggle} onDoubleClick={() => pomoReset()}><Icon name="timer" size={12} />{mm}:{ss}</button>
+      {pomo.running && <button className="mini ghost" title={t('Saltar')} onClick={pomoSkip}>»</button>}
       {pomo.done > 0 && <span className="muted tiny">{'●'.repeat(Math.min(4, pomo.done % 4 || 4))}</span>}
     </span>
   )
@@ -102,9 +102,19 @@ export function App() {
   // Atajos globales: Ctrl+K paleta, Ctrl+Shift+N nota rápida.
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
-      if (!useStore.getState().vault) return
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); useStore.getState().setPaletteOpen(true) }
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'n') { e.preventDefault(); useStore.getState().setQuickNoteOpen(true) }
+      const st = useStore.getState()
+      if (e.key === 'Escape') { // cierra el modal abierto (Escape dentro de un input ya lo gestiona cada vista)
+        if (st.paletteOpen) st.setPaletteOpen(false)
+        else if (st.quickNoteOpen) st.setQuickNoteOpen(false)
+        else if (st.prefsOpen) st.closePrefs()
+        else if (st.searchOpen) st.closeSearch()
+        else if (st.rename) st.closeRename()
+        else if (st.linker && st.vault) st.cancelLink()
+        return
+      }
+      if (!st.vault || st.paletteOpen || st.quickNoteOpen || st.prefsOpen || st.searchOpen || st.rename || st.linker) return
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); st.setPaletteOpen(true) }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'n') { e.preventDefault(); st.setQuickNoteOpen(true) }
     }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)

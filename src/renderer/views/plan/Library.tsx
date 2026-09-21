@@ -38,7 +38,7 @@ export function Library() {
       </aside>
       <section className="scroll">
         <div className="toolbar"><input placeholder={t('Buscar en la biblioteca…')} value={q} onChange={(e) => setQ(e.target.value)} /><span className="muted tiny">{list.length}</span></div>
-        <div className="grid2">
+        <div className={sel ? 'grid2' : ''}>
           <div className="cards libcards">
             {list.map((e) => (
               <div key={e.id} className={`card ${sel?.id === e.id ? 'on' : ''}`} onClick={() => setSel(e)}>
@@ -57,7 +57,7 @@ export function Library() {
               <p><b>{sel.kind === 'psychology' ? t('Se manifiesta') : sel.kind === 'trope' ? t('Uso habitual') : t('Cuándo')}:</b> {sel.when}</p>
               <p><b>{t('Cuidado')}:</b> {sel.pitfalls}</p>
               {sel.related.length > 0 && <><h2>{t('Relacionadas')}</h2><div className="chips">{sel.related.map((id) => byId(id)).filter(Boolean).map((r) => <button key={r!.id} className="chip" onClick={() => { setKind(r!.kind); setCat(''); setSel(r!) }}>{r!.title}</button>)}</div></>}
-              <div className="row" style={{ marginTop: 10 }}><button className="ghost" onClick={() => toNote(sel)}>{t('Crear nota en el vault')}</button><button className="ghost mini" onClick={() => void navigator.clipboard.writeText(`${sel.title} — ${sel.summary}`)}>{t('Copiar referencia')}</button></div>
+              <div className="row" style={{ marginTop: 10 }}><button className="mini ghost" onClick={() => toNote(sel)}>{t('Crear nota en el vault')}</button><button className="mini ghost" onClick={() => void navigator.clipboard.writeText(`${sel.title} — ${sel.summary}`)}>{t('Copiar referencia')}</button></div>
             </div>
           )}
         </div>

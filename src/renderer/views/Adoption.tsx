@@ -55,11 +55,11 @@ export function Adoption() {
   return (
     <div className="modal-backdrop" onClick={cancelLink}>
       <div className="modal linker" onClick={(e) => e.stopPropagation()}>
-        <div className="row"><h1>{t('Vincular carpetas del Vault')}</h1><span className="grow" /><button className="ghost mini" onClick={cancelLink}>{t('Cerrar')}</button></div>
+        <div className="row"><h1>{t('Vincular carpetas del Vault')}</h1><span className="grow" /><button className="mini ghost" onClick={cancelLink}>{t('Cerrar')}</button></div>
         <p className="muted">{t('Indica dónde vive cada cosa. Si una carpeta no existe, créala con un botón. No se mueve ni se modifica contenido.')}</p>
 
         <div className="linkrow root">
-          <div className="linkrow-head"><strong>{t('Vault principal (raíz)')}</strong><span className="grow" /><button className="ghost mini" onClick={() => void repickRoot()}>{t('Cambiar…')}</button></div>
+          <div className="linkrow-head"><strong>{t('Vault principal (raíz)')}</strong><span className="grow" /><button className="mini ghost" onClick={() => void repickRoot()}>{t('Cambiar…')}</button></div>
           <div className="linkpath mono">{linker.root}</div>
         </div>
 

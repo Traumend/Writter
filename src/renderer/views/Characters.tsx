@@ -180,8 +180,8 @@ export function Characters() {
               </div>
             </div>
             <div className="col">
-              <button className="ghost mini" onClick={() => useStore.getState().openRename(card.path, card.name, [card.name, ...card.aliases])}>{t('Renombrar…')}</button>
-              <button className="ghost mini" onClick={() => { void openFile(card.path); setTab('desk') }}>{t('Abrir .md')}</button>
+              <button className="mini ghost" onClick={() => useStore.getState().openRename(card.path, card.name, [card.name, ...card.aliases])}>{t('Renombrar…')}</button>
+              <button className="mini ghost" onClick={() => { void openFile(card.path); setTab('desk') }}>{t('Abrir .md')}</button>
             </div>
           </div>
 
@@ -239,8 +239,8 @@ export function Characters() {
           </div>
 
           <h2>{t('Profundización')}
-            <button className="mini ghost" onClick={() => setSections([...sections, { title: t('Nueva sección'), body: '' }])}><Icon name="plus" size={12} /> {t('Añadir sección')}</button>
-            <button className="mini ghost" onClick={() => setShowGuide((s) => !s)}><Icon name="question" size={12} /> {t('Preguntas guía')}</button>
+            <button className="mini ghost" onClick={() => setSections([...sections, { title: t('Nueva sección'), body: '' }])}><Icon name="plus" size={12} />{t('Añadir sección')}</button>
+            <button className="mini ghost" onClick={() => setShowGuide((s) => !s)}><Icon name="question" size={12} />{t('Preguntas guía')}</button>
           </h2>
           {showGuide && (
             <div className="panelbox" style={{ marginBottom: 10 }}>
@@ -288,7 +288,7 @@ export function Characters() {
           ))}
           <div className="row">
             <input placeholder={t('Nueva métrica del proyecto…')} value={newSlider} onChange={(e) => setNewSlider(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addSlider()} />
-            <button className="mini" onClick={addSlider}><Icon name="plus" size={12} /></button>
+            <button className="mini" title={t('Añadir métrica')} onClick={addSlider}><Icon name="plus" size={12} /></button>
           </div>
 
           <h2>{t('Relaciones')} · {rels.length + auto.length}
@@ -308,7 +308,7 @@ export function Characters() {
               <BlurInput textarea rows={2} value={r.note} placeholder={t('Nota')} onCommit={(v) => patch({ relationships: rels.map((x, j) => (j === i ? { ...x, note: v } : x)) })} />
             </div>
           ))}
-          <button className="ghost" disabled={cards.length < 2} onClick={() => patch({ relationships: [...rels, { target: cards.find((c) => c.path !== card.path)?.name ?? '', kind: '', note: '' }] })}><Icon name="plus" size={12} /> {t('Añadir relación')}</button>
+          <button className="ghost" disabled={cards.length < 2} onClick={() => patch({ relationships: [...rels, { target: cards.find((c) => c.path !== card.path)?.name ?? '', kind: '', note: '' }] })}><Icon name="plus" size={12} />{t('Añadir relación')}</button>
 
           {auto.length > 0 && (
             <>
@@ -317,7 +317,7 @@ export function Characters() {
               {auto.map((n) => (
                 <div className="relcard auto" key={n}>
                   <span className="link grow ell" onClick={() => openChar(n)}>[[{n}]]</span>
-                  <button className="mini" title={t('Añadir como relación')} onClick={() => patch({ relationships: [...rels, { target: n, kind: '', note: '' }] })}><Icon name="plus" size={12} /> {t('relación')}</button>
+                  <button className="mini" title={t('Añadir como relación')} onClick={() => patch({ relationships: [...rels, { target: n, kind: '', note: '' }] })}><Icon name="plus" size={12} />{t('relación')}</button>
                 </div>
               ))}
             </>
@@ -327,7 +327,7 @@ export function Characters() {
       {mapBig && card && (
         <div className="modal-backdrop" onClick={() => setMapBig(false)}>
           <div className="modal" style={{ width: 'min(760px,94vw)' }} onClick={(e) => e.stopPropagation()}>
-            <div className="row"><h1>{t('Mapa de relaciones')} · {card.name}</h1><span className="grow" /><button className="ghost mini" onClick={() => setMapBig(false)}>{t('Cerrar')}</button></div>
+            <div className="row"><h1>{t('Mapa de relaciones')} · {card.name}</h1><span className="grow" /><button className="mini ghost" onClick={() => setMapBig(false)}>{t('Cerrar')}</button></div>
             <RelMap name={card.name} color={color} rels={rels} auto={auto} onOpen={(n) => { setMapBig(false); openChar(n) }} big />
           </div>
         </div>

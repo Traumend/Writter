@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { resolveRef, uid, type Plant } from '../../../core/planning'
 import { t } from '../../i18n'
-import { BlurInput } from '../../ui'
+import { Icon, BlurInput } from '../../ui'
 import { refLabel, useCards, usePlanning, useScripts } from './data'
 import { CharChips, SceneRefPicker, useOpenScene } from './shared'
 
@@ -34,7 +34,7 @@ export function Plants() {
     <main className="page scroll">
       <div className="toolbar wrap">
         <input placeholder={t('Nueva siembra (objeto, frase, gesto…) · Enter')} value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} style={{ width: 380 }} />
-        <button className="mini" onClick={add}>+ Plant</button>
+        <button className="mini" onClick={add}><Icon name="plus" size={12} />Plant</button>
         <span className="grow" />
         <span className="pill warn">{planning.plants.filter((p) => !p.payoffs.length).length} {t('sin pago')}</span>
         <span className="pill" style={{ color: '#e8437f' }}>{planning.plants.filter((p) => !p.plant).length} {t('sin siembra')}</span>
@@ -62,10 +62,10 @@ export function Plants() {
                       <button className="mini ghost" onClick={() => openScene(scripts, po)}>{refLabel(po, scripts)} ↗</button>
                     </div>
                   ))}
-                  <button className="mini ghost" onClick={() => upd(p.id, { payoffs: [...p.payoffs, { script: scripts[0]?.path ?? '', heading: scripts[0]?.scenes[0]?.heading ?? '' }] })}>+ payoff</button>
+                  <button className="mini ghost" onClick={() => upd(p.id, { payoffs: [...p.payoffs, { script: scripts[0]?.path ?? '', heading: scripts[0]?.scenes[0]?.heading ?? '' }] })}><Icon name="plus" size={12} />payoff</button>
                 </td>
                 <td><span className="pill" style={{ color }}>{label}</span></td>
-                <td><button className="mini ghost" onClick={() => void save({ plants: planning.plants.filter((x) => x.id !== p.id) })}>×</button></td>
+                <td><button className="mini ghost" title={t('Quitar')} onClick={() => void save({ plants: planning.plants.filter((x) => x.id !== p.id) })}><Icon name="close" size={12} /></button></td>
               </tr>
             )
           })}

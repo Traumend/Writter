@@ -56,7 +56,7 @@ export function Clinic() {
               <span className="grow" />
               <button className="mini ghost" onClick={() => setDismissed((s) => new Set([...s, i.title]))}>{t('Descartar')}</button>
             </div>
-            <div className="chips">{i.techniques.map((id) => byId(id)).filter(Boolean).map((e) => <button key={e!.id} className="chip" onClick={() => setLib(e!.id)}><Icon name="book" size={11} /> {e!.title}</button>)}</div>
+            <div className="chips">{i.techniques.map((id) => byId(id)).filter(Boolean).map((e) => <button key={e!.id} className="chip" onClick={() => setLib(e!.id)}><Icon name="book" size={11} />{e!.title}</button>)}</div>
           </div>
         ))}
       </div>
@@ -76,7 +76,7 @@ export function Clinic() {
       {entry && (
         <div className="modal-backdrop" onClick={() => setLib(null)}>
           <div className="modal" style={{ width: 'min(560px,92vw)' }} onClick={(e) => e.stopPropagation()}>
-            <div className="row"><h1>{entry.title}</h1><span className="grow" /><button className="ghost mini" onClick={() => setLib(null)}>{t('Cerrar')}</button></div>
+            <div className="row"><h1>{entry.title}</h1><span className="grow" /><button className="mini ghost" onClick={() => setLib(null)}>{t('Cerrar')}</button></div>
             <p className="muted tiny">{entry.category}</p>
             <p>{entry.summary}</p>
             <p><b>{t('Cuándo')}:</b> {entry.when}</p>

@@ -6,7 +6,7 @@ import { project } from '../../core/projection'
 import type { Analysis as A } from '../../core/types/ipc'
 import { t } from '../i18n'
 import { cleanErr, useStore } from '../store'
-import { EpisodeSelect, useDoc } from '../ui'
+import { Icon, EpisodeSelect, useDoc } from '../ui'
 
 type Metric = 'intensity' | 'tension' | 'attention' | 'commercial'
 const SERIES: [Metric, string, string][] = [
@@ -72,7 +72,7 @@ function EditList({ title, items, onChange }: { title: string; items: string[]; 
       <h2>{title}</h2>
       <ul className="bullets">
         {items.map((it, i) => (
-          <li key={i} className="row"><span className="grow">{it}</span><button className="mini ghost" onClick={() => onChange(items.filter((_, j) => j !== i))}>×</button></li>
+          <li key={i} className="row"><span className="grow">{it}</span><button className="mini ghost" title={t('Quitar')} onClick={() => onChange(items.filter((_, j) => j !== i))}><Icon name="close" size={12} /></button></li>
         ))}
       </ul>
       <input placeholder={t('Añadir nota · Enter')} value={add} onChange={(e) => setAdd(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && add.trim()) { onChange([...items, add.trim()]); setAdd('') } }} />

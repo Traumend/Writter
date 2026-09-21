@@ -46,7 +46,7 @@ export function Index() {
         <input placeholder={t('Buscar…')} value={q} onChange={(e) => setQ(e.target.value)} />
         <span className="grow" />
         <span className="muted tiny">{list.length} {t('filas')}</span>
-        <button className="ghost mini" onClick={csv}>CSV</button>
+        <button className="mini ghost" onClick={csv}>CSV</button>
       </div>
       <table className="table">
         <thead><tr>{cols.map((c, i) => <th key={c} className="link" onClick={() => { if (sortCol === i) setAsc(!asc); else { setSortCol(i); setAsc(true) } }}>{t(c)}{sortCol === i ? (asc ? ' ▲' : ' ▼') : ''}</th>)}</tr></thead>

@@ -4,7 +4,7 @@ import { readFrontmatter, writeFrontmatter } from '../../core/frontmatter'
 import type { FileKind } from '../../core/types/ipc'
 import { t } from '../i18n'
 import { useStore } from '../store'
-import { BlurInput, useAsset } from '../ui'
+import { Icon, BlurInput, useAsset } from '../ui'
 import { TEMPLATE } from './Desk'
 
 const GROUP_META: Record<string, { label: string; color: string }> = {
@@ -22,17 +22,18 @@ const VIA_LABEL: Record<Appearance['via'], string> = { cue: 'en escena', link: '
 
 let dragCard: string | null = null // ficha en arrastre (clasificar soltando en un grupo)
 
-function Menu({ onRename, onOpen, onDelete }: { onRename: () => void; onOpen: () => void; onDelete: () => void }) {
+type MenuItem = { label: string; run: () => void; danger?: boolean; disabled?: boolean } | 'sep'
+// Menú "…" (tarjeta o vista): acciones secundarias fuera de la barra.
+function Menu({ items }: { items: MenuItem[] }) {
   const [open, setOpen] = useState(false)
   return (
     <div className="cardmenu">
-      <button className="mini ghost" onClick={() => setOpen((o) => !o)}>⋯</button>
+      <button className="mini ghost" title={t('Más acciones')} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}><Icon name="more" size={12} /></button>
       {open && (
         <div className="menu" role="menu" onMouseLeave={() => setOpen(false)}>
-          <button className="menu-item" onClick={() => { setOpen(false); onOpen() }}>{t('Abrir .md')}</button>
-          <button className="menu-item" onClick={() => { setOpen(false); onRename() }}>{t('Renombrar…')}</button>
-          <div className="menu-sep" />
-          <button className="menu-item danger" onClick={() => { setOpen(false); onDelete() }}>{t('Eliminar')}</button>
+          {items.map((it, i) => it === 'sep' ? <div key={i} className="menu-sep" /> : (
+            <button key={i} className={`menu-item ${it.danger ? 'danger' : ''}`} disabled={it.disabled} onClick={() => { setOpen(false); it.run() }}>{it.label}</button>
+          ))}
         </div>
       )}
     </div>
@@ -59,7 +60,7 @@ function Card({ c, groups, epOf }: { c: EntityCard; groups: string[]; epOf: (s: 
           <div className="tiny muted">{c.kind}</div>
           <strong className="link" onClick={() => { void openFile(c.path); setTab('desk') }}>{c.name}</strong>
         </div>
-        <Menu onRename={() => openRename(c.path, c.name, [c.name, ...c.aliases])} onOpen={() => { void openFile(c.path); setTab('desk') }} onDelete={del} />
+        <Menu items={[{ label: t('Abrir .md'), run: () => { void openFile(c.path); setTab('desk') } }, { label: t('Renombrar…'), run: () => openRename(c.path, c.name, [c.name, ...c.aliases]) }, 'sep', { label: t('Eliminar'), run: del, danger: true }]} />
       </div>
       {c.kind === 'character' && (
         <div className="row">
@@ -172,7 +173,7 @@ export function Breakdown() {
   return (
     <main className="split bd">
       <aside className="bd-groups">
-        <div className="row"><h2>{t('Grupos')}</h2><span className="grow" /><button className="mini ghost" onClick={() => setNewGroup('')}>+</button></div>
+        <div className="row"><h2>{t('Grupos')}</h2><span className="grow" /><button className="mini ghost" title={t('Nuevo grupo')} onClick={() => setNewGroup('')}><Icon name="plus" size={12} /></button></div>
         <ul>
           <li className={group === 'all' ? 'active' : ''} onClick={() => setGroup('all')}><span className="grow">{t('Todos')}</span><span className="muted tiny">{ofKind.length}</span></li>
           {allGroups.map((g) => (
@@ -205,7 +206,10 @@ export function Breakdown() {
             <option value="scenes">{t('Por escenas')}</option>
             <option value="group">{t('Por grupo')}</option>
           </select>
-          <button className={listView ? 'mini on' : 'mini ghost'} onClick={() => setListView((v) => !v)}>{listView ? t('Lista') : t('Tarjetas')}</button>
+          <div className="segmented" role="group" title={t('Vista')}>
+            <button className={listView ? '' : 'on'} onClick={() => setListView(false)}>{t('Tarjetas')}</button>
+            <button className={listView ? 'on' : ''} onClick={() => setListView(true)}>{t('Lista')}</button>
+          </div>
           <select value={season} onChange={(e) => { setSeason(e.target.value); setEpisode('') }} title={t('Temporada')}><option value="">{t('Todas')}</option>{seasons.map((s) => <option key={s} value={s}>{`S${s}`}</option>)}</select>
           <select value={episode} onChange={(e) => setEpisode(e.target.value)} title={t('Episodio')}><option value="">{t('Todos')}</option>{episodes.map((ep) => <option key={ep} value={ep}>{`E${ep}`}</option>)}</select>
           <input placeholder={t('Buscar…')} value={q} onChange={(e) => setQ(e.target.value)} />
@@ -220,9 +224,7 @@ export function Breakdown() {
           <input placeholder={t('Nuevo…')} value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
           <span className="grow" />
           {status && <span className="muted tiny">{status}</span>}
-          <button className="ghost" onClick={toXls}>Excel</button>
-          <button className="ghost" onClick={() => void window.api.exportText(toCsv(cards), 'breakdown.csv')}>CSV</button>
-          <button className="ghost danger" disabled={!list.length} onClick={() => void deleteAll()}>{t('Eliminar todo')}</button>
+          <Menu items={[{ label: t('Exportar Excel'), run: toXls }, { label: t('Exportar CSV'), run: () => void window.api.exportText(toCsv(cards), 'breakdown.csv') }, 'sep', { label: t('Eliminar todo'), run: () => void deleteAll(), danger: true, disabled: !list.length }]} />
         </div>
         <div className={listView ? 'bd-list' : 'cards'}>
           {list.map((c) => <Card key={c.path} c={c} groups={allGroups} epOf={epOf} />)}

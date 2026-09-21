@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { QUESTION_STATUS, uid, type Question, type QuestionStatus } from '../../../core/planning'
 import { t } from '../../i18n'
-import { BlurInput } from '../../ui'
+import { Icon, BlurInput } from '../../ui'
 import { refLabel, useCards, usePlanning, useScripts } from './data'
 import { CharChips, SceneRefPicker, useOpenScene } from './shared'
 
@@ -26,7 +26,7 @@ export function Questions() {
     <main className="page scroll">
       <div className="toolbar wrap">
         <input placeholder={t('Nueva pregunta dramática (¿logrará X…?) · Enter')} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} style={{ width: 420 }} />
-        <button className="mini" onClick={add}>+ {t('Pregunta')}</button>
+        <button className="mini" onClick={add}><Icon name="plus" size={12} />{t('Pregunta')}</button>
         <span className="grow" />
         {(['all', ...QUESTION_STATUS] as const).map((s) => <button key={s} className={filter === s ? 'mini on' : 'mini ghost'} onClick={() => setFilter(s)}>{s === 'all' ? t('Todas') : t(Q_LABEL[s])} ({s === 'all' ? planning.questions.length : planning.questions.filter((q) => q.status === s).length})</button>)}
       </div>
@@ -38,7 +38,7 @@ export function Questions() {
             <BlurInput value={q.text} onCommit={(v) => upd(q.id, { text: v })} />
             <select value={q.status} onChange={(e) => upd(q.id, { status: e.target.value as QuestionStatus })}>{QUESTION_STATUS.map((s) => <option key={s} value={s}>{t(Q_LABEL[s])}</option>)}</select>
             <select value={q.importance} title={t('Importancia')} onChange={(e) => upd(q.id, { importance: Number(e.target.value) })}><option value={1}>★</option><option value={2}>★★</option><option value={3}>★★★</option></select>
-            <button className="mini ghost" onClick={() => void save({ questions: planning.questions.filter((x) => x.id !== q.id) })}>×</button>
+            <button className="mini ghost" title={t('Quitar')} onClick={() => void save({ questions: planning.questions.filter((x) => x.id !== q.id) })}><Icon name="close" size={12} /></button>
           </div>
           <div className="row tiny wrap">
             <span className="muted">{t('Se plantea en')}</span><SceneRefPicker value={q.introduced} onChange={(r) => upd(q.id, { introduced: r })} scripts={scripts} />
