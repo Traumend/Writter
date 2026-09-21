@@ -12,12 +12,21 @@ import { Desk } from './views/Desk'
 import { NeuralMap } from './views/NeuralMap'
 import { Production } from './views/Production'
 import { Settings } from './views/Settings'
+import { Dashboard } from './views/plan/Dashboard'
+import { Planner } from './views/plan/Planner'
+import { Questions } from './views/plan/Questions'
+import { Plants } from './views/plan/Plants'
+import { Ideas } from './views/plan/Ideas'
+import { Clinic } from './views/plan/Clinic'
+import { Index } from './views/plan/Index'
+import { Library } from './views/plan/Library'
 import { estimateTokens } from '../core/safeguards'
 import { getLang, t } from './i18n'
-import { useStore, type DevTab, type Tab } from './store'
+import { useStore, type DevTab, type PlanTab, type Tab } from './store'
 
-const TABS: [Tab, string][] = [['desk', 'Escritorio'], ['breakdown', 'Breakdown'], ['dev', 'Desarrollo'], ['production', 'Producción'], ['settings', 'Ajustes']]
+const TABS: [Tab, string][] = [['desk', 'Escritorio'], ['breakdown', 'Breakdown'], ['dev', 'Desarrollo'], ['plan', 'Planificación'], ['production', 'Producción'], ['settings', 'Ajustes']]
 const DEV: [DevTab, string][] = [['characters', 'Personajes'], ['beats', 'Beat Timeline'], ['map', 'Mapa neural'], ['analysis', 'Análisis'], ['docs', 'Documentos']]
+const PLAN: [PlanTab, string][] = [['dashboard', 'Dashboard'], ['planner', 'Planner'], ['questions', 'Preguntas'], ['plants', 'Plant & Payoff'], ['ideas', 'Ideas'], ['clinic', 'Clinic'], ['index', 'Index'], ['library', 'Biblioteca']]
 
 // Menú desplegable de la barra superior (estilo suite Adobe).
 function AppMenu() {
@@ -77,6 +86,13 @@ export function App() {
             ))}
           </nav>
         )}
+        {s.tab === 'plan' && (
+          <nav className="sub">
+            {PLAN.map(([tb, l]) => (
+              <button key={tb} className={s.planTab === tb ? 'on' : 'ghost'} onClick={() => s.setPlanTab(tb)}>{t(l)}</button>
+            ))}
+          </nav>
+        )}
         <span className="grow" />
         <span className="muted crumb">{s.vault ? s.vault.root.split(/[\\/]/).pop() : t('Sin proyecto')}</span>
         {s.graph && <span className="pill" title={s.graph.reason}>{t('índice')} {s.graph.stale ? t('reindexando') : t('al día')}</span>}
@@ -90,6 +106,14 @@ export function App() {
       {s.tab === 'dev' && s.devTab === 'map' && <NeuralMap />}
       {s.tab === 'dev' && s.devTab === 'analysis' && <Analysis />}
       {s.tab === 'dev' && s.devTab === 'docs' && <DevDocs />}
+      {s.tab === 'plan' && s.planTab === 'dashboard' && <Dashboard />}
+      {s.tab === 'plan' && s.planTab === 'planner' && <Planner />}
+      {s.tab === 'plan' && s.planTab === 'questions' && <Questions />}
+      {s.tab === 'plan' && s.planTab === 'plants' && <Plants />}
+      {s.tab === 'plan' && s.planTab === 'ideas' && <Ideas />}
+      {s.tab === 'plan' && s.planTab === 'clinic' && <Clinic />}
+      {s.tab === 'plan' && s.planTab === 'index' && <Index />}
+      {s.tab === 'plan' && s.planTab === 'library' && <Library />}
       {s.tab === 'production' && <Production />}
       {s.tab === 'settings' && <Settings />}
       <Adoption />

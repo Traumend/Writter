@@ -16,7 +16,8 @@ export type Linker = { root: string; roles: Record<AdoptRole, string> }
 const ADOPT_ROLES: AdoptRole[] = ['script', 'character', 'location', 'prop', 'outline', 'knowledge', 'assets']
 
 export type Proposal = AiProposal & { from: number; to: number; target: string }
-export type Tab = 'desk' | 'breakdown' | 'dev' | 'production' | 'settings'
+export type Tab = 'desk' | 'breakdown' | 'dev' | 'plan' | 'production' | 'settings'
+export type PlanTab = 'dashboard' | 'planner' | 'questions' | 'plants' | 'ideas' | 'clinic' | 'index' | 'library'
 
 // Preferencias de interfaz (solo renderer, localStorage): no son datos del proyecto.
 export type AccentName = 'naranja' | 'ambar' | 'azul' | 'verde' | 'rosa'
@@ -24,8 +25,8 @@ export type Scale = 'compact' | 'normal' | 'large'
 export const DEFAULT_SECTIONS = ['script', 'character', 'location', 'prop', 'outline', 'knowledge']
 // deskLeft/deskRight: ancho de los paneles laterales del Escritorio (arrastrables).
 // sectionOrder/collapsed: orden y plegado de las secciones de biblioteca (arrastrables).
-export type Prefs = { accent: AccentName; scale: Scale; deskLeft: number; deskRight: number; sectionOrder: string[]; collapsed: string[]; tabs: string[]; focus: boolean; page: boolean; lang: Lang }
-export const ALL_TABS = ['desk', 'breakdown', 'dev', 'production', 'settings']
+export type Prefs = { accent: AccentName; scale: Scale; deskLeft: number; deskRight: number; sectionOrder: string[]; collapsed: string[]; tabs: string[]; focus: boolean; page: boolean; lang: Lang; migrated: number; pomodoro: { focus: number; short: number; long: number } }
+export const ALL_TABS = ['desk', 'breakdown', 'dev', 'plan', 'production', 'settings']
 export const ACCENTS: Record<AccentName, [string, string, string]> = {
   naranja: ['#ff5a1f', '#e64d13', '#1a1000'],
   ambar: ['#f5a623', '#e0930f', '#1a1200'],
@@ -34,12 +35,17 @@ export const ACCENTS: Record<AccentName, [string, string, string]> = {
   rosa: ['#ff5a8a', '#e64878', '#1a0410']
 }
 const SCALE_PX: Record<Scale, string> = { compact: '12.5px', normal: '13.5px', large: '15px' }
-const DEFAULT_PREFS: Prefs = { accent: 'naranja', scale: 'normal', deskLeft: 268, deskRight: 350, sectionOrder: DEFAULT_SECTIONS, collapsed: [], tabs: ALL_TABS, focus: false, page: false, lang: 'en' }
+const DEFAULT_PREFS: Prefs = { accent: 'naranja', scale: 'normal', deskLeft: 268, deskRight: 350, sectionOrder: DEFAULT_SECTIONS, collapsed: [], tabs: ALL_TABS, focus: false, page: false, lang: 'en', migrated: 1, pomodoro: { focus: 25, short: 5, long: 15 } }
 export const DEFAULT_LAYOUT = { deskLeft: 268, deskRight: 350, sectionOrder: DEFAULT_SECTIONS, collapsed: [] as string[] }
 
 function loadPrefs(): Prefs {
   try {
-    return { ...DEFAULT_PREFS, ...(JSON.parse(localStorage.getItem('writter.prefs') || '{}') as Partial<Prefs>) }
+    const saved = JSON.parse(localStorage.getItem('writter.prefs') || '{}') as Partial<Prefs>
+    const p = { ...DEFAULT_PREFS, ...saved, pomodoro: { ...DEFAULT_PREFS.pomodoro, ...(saved.pomodoro ?? {}) } }
+    // Migración 1: prefs guardadas antes de la pestaña Planificación -> mostrarla una vez.
+    if ((saved.migrated ?? 0) < 1 && !p.tabs.includes('plan')) p.tabs = [...p.tabs, 'plan']
+    p.migrated = 1
+    return p
   } catch {
     return DEFAULT_PREFS
   }
@@ -60,6 +66,7 @@ export type DevTab = 'characters' | 'beats' | 'map' | 'analysis' | 'docs'
 type State = {
   tab: Tab
   devTab: DevTab
+  planTab: PlanTab
   vault: VaultSummary | null
   files: FileEntry[]
   docs: Doc[] // todo el vault en memoria (breakdown, análisis, alias)
@@ -94,6 +101,7 @@ type State = {
 type Actions = {
   setTab(t: Tab): void
   setDevTab(t: DevTab): void
+  setPlanTab(t: PlanTab): void
   openVault(): Promise<void>
   applySummary(v: VaultSummary): Promise<void>
   openLinker(): void
@@ -170,6 +178,7 @@ export function entityNames(files: FileEntry[], docs: Doc[]): string[] {
 export const useStore = create<State & Actions>((set, get) => ({
   tab: 'desk',
   devTab: 'characters',
+  planTab: 'dashboard',
   vault: null,
   files: [],
   docs: [],
@@ -250,6 +259,7 @@ export const useStore = create<State & Actions>((set, get) => ({
 
   setTab: (tab) => set({ tab }),
   setDevTab: (devTab) => set({ devTab }),
+  setPlanTab: (planTab) => set({ planTab }),
 
   async openVault() {
     const r = await window.api.vaultOpen()

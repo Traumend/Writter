@@ -2,11 +2,11 @@ import { useState } from 'react'
 import { t } from '../i18n'
 import { ACCENTS, useStore, type AccentName, type Scale } from '../store'
 
-const TAB_LABEL: Record<string, string> = { desk: 'Escritorio', breakdown: 'Breakdown', dev: 'Desarrollo', production: 'Producción' }
+const TAB_LABEL: Record<string, string> = { desk: 'Escritorio', breakdown: 'Breakdown', dev: 'Desarrollo', plan: 'Planificación', production: 'Producción' }
 const ROLE_PRESETS: [string, string[]][] = [
-  ['Completo', ['desk', 'breakdown', 'dev', 'production']],
-  ['Escritor', ['desk', 'breakdown', 'dev']],
-  ['Director', ['desk', 'breakdown', 'dev', 'production']],
+  ['Completo', ['desk', 'breakdown', 'dev', 'plan', 'production']],
+  ['Escritor', ['desk', 'breakdown', 'dev', 'plan']],
+  ['Director', ['desk', 'breakdown', 'dev', 'plan', 'production']],
   ['Productor', ['breakdown', 'production']]
 ]
 
