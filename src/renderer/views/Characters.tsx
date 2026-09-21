@@ -3,6 +3,7 @@ import { breakdown } from '../../core/breakdown'
 import { readFrontmatter, writeFrontmatter } from '../../core/frontmatter'
 import { extractLinks, parseFountain } from '../../core/parser/fountain'
 import { MOT_DIMS, readMotivation } from '../../core/planning'
+import { project } from '../../core/projection'
 import { joinSections, splitSections, type Section } from '../../core/sections'
 import { t } from '../i18n'
 import { useStore } from '../store'
@@ -108,13 +109,12 @@ export function Characters() {
     for (const a of card.appearances) {
       const d = docs.find((x) => x.path === a.script)
       if (!d) continue
-      const toks = parseFountain(d.content).tokens
-      const h = toks.find((t) => t.type === 'heading' && t.text.trim().toUpperCase() === a.heading.toUpperCase())
-      if (!h) continue
+      const doc = parseFountain(d.content)
+      const sc = project(doc).scenes[a.scene] // misma proyección que el breakdown (vale también para prosa con secciones)
+      if (!sc || sc.heading.toUpperCase() !== a.heading.toUpperCase()) continue
       let speaking = false
       const lines: string[] = [a.heading]
-      for (const t of toks.slice(h.line + 1)) {
-        if (t.type === 'heading') break
+      for (const t of doc.tokens.slice(sc.startLine + 1, sc.endLine)) {
         if (t.type === 'character') speaking = [card.name, ...card.aliases].some((n) => t.text.toUpperCase().includes(n.toUpperCase()))
         if ((t.type === 'dialogue' && speaking) || t.type === 'action') lines.push(t.text.trim())
       }
