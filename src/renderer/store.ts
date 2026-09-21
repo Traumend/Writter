@@ -111,6 +111,7 @@ type Actions = {
   reloadFromDisk(): Promise<void>
   createFile(path: string, content: string, open?: boolean): Promise<void>
   writeOther(path: string, content: string): Promise<void>
+  deleteEntity(path: string): Promise<void>
   setScope(s: Scope): void
   runAi(instruction: string, allowLocked: boolean): Promise<void>
   acceptProposal(): Promise<void>
@@ -303,6 +304,14 @@ export const useStore = create<State & Actions>((set, get) => ({
 
   async refreshFiles() {
     if (get().vault) set({ files: await window.api.vaultList() })
+  },
+
+  // Borra una ficha (.md). Recuperable desde el historial de versiones. Cierra el editor si estaba abierta.
+  async deleteEntity(path) {
+    await window.api.fileDelete(path)
+    if (get().path === path) set({ path: null, text: '', diskHash: null, dirty: false, projection: EMPTY, pagination: NOPAG })
+    await get().refreshFiles()
+    await get().refreshDocs()
   },
 
   async refreshDocs() {

@@ -116,6 +116,22 @@ ul.bullets li:hover { background: transparent; }
 .center { text-align: center; margin-top: 20vh; color: var(--dim); }
 .crumb { font-size: 12px; }
 .pill { font-size: 11px; padding: 3px 10px; border-radius: 12px; background: var(--sink); color: var(--dim); box-shadow: var(--inset); }
+.pill.ok { color: #3ddc97; }
+.pill.warn { color: var(--warn); }
+.pill.on { color: var(--on-accent); background: var(--accent); }
+/* Breakdown: panel de grupos + menú de tarjeta + vista lista */
+main.split.bd { grid-template-columns: 216px 1fr; }
+.bd-groups { display: flex; flex-direction: column; }
+.bd-groups ul li { display: flex; align-items: center; gap: 8px; }
+.bd-groups li.dragover { outline: 2px dashed var(--accent); outline-offset: -2px; }
+.cardmenu { position: relative; }
+.cardmenu .menu { top: calc(100% + 4px); right: 0; min-width: 150px; }
+.menu-item.danger, button.danger { color: var(--err); }
+.bd-list { display: flex; flex-direction: column; gap: 8px; overflow: auto; padding-bottom: 14px; }
+.bd-list .card { flex-direction: row; align-items: center; flex-wrap: wrap; padding: 10px 12px; }
+.bd-list .card .avatar { width: 34px; height: 34px; border-radius: 8px; font-size: 14px; }
+.bd-list .card .chips { flex-basis: 100%; }
+.card[draggable] { cursor: grab; }
 .banner { background: #2a1e0a; color: var(--warn); padding: 10px 14px; border-radius: var(--r-sm); box-shadow: var(--raise-sm); display: flex; gap: 10px; align-items: center; }
 
 .scopebar, .toolbar { display: flex; gap: 8px; padding: 10px 4px 14px; align-items: center; flex-wrap: wrap; }

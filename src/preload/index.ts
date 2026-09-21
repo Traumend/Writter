@@ -15,6 +15,7 @@ const api: Api = {
   fileWrite: (path, content, expectedHash, origin) => ipcRenderer.invoke('file.write', path, content, expectedHash, origin),
   fileCreate: (path, content) => ipcRenderer.invoke('file.create', path, content),
   fileRename: (oldPath, newPath) => ipcRenderer.invoke('file.rename', oldPath, newPath),
+  fileDelete: (path) => ipcRenderer.invoke('file.delete', path),
   onVaultChange: (cb) => {
     const h = (_e: unknown, e: VaultChange) => cb(e)
     ipcRenderer.on('vault.changed', h)

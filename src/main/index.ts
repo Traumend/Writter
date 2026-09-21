@@ -65,6 +65,11 @@ ipcMain.handle('file.rename', (_e, oldPath: string, newPath: string) => {
   markStale()
   return r
 })
+ipcMain.handle('file.delete', (_e, rel: string) => {
+  const r = V.deleteFile(rel)
+  markStale()
+  return r
+})
 ipcMain.handle('ai.analyze', async (_e, rel: string, text: string): Promise<Analysis> => {
   const a = await analyze(text, V.readConfig())
   const ts = Date.now()

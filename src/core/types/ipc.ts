@@ -89,6 +89,7 @@ export type Api = {
   fileWrite(path: string, content: string, expectedHash?: string, origin?: Version['origin']): Promise<{ hash: string }>
   fileCreate(path: string, content: string): Promise<{ hash: string }>
   fileRename(oldPath: string, newPath: string): Promise<{ path: string }>
+  fileDelete(path: string): Promise<{ path: string }>
   onVaultChange(cb: (e: VaultChange) => void): () => void
   keysSet(provider: string, key: string): Promise<KeyStatus>
   keysStatus(provider: string): Promise<KeyStatus>

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { appendFileSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, watch, writeFileSync, type FSWatcher } from 'node:fs'
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, watch, writeFileSync, type FSWatcher } from 'node:fs'
 import { basename, extname, join, relative, resolve } from 'node:path'
 import { parse, stringify } from 'yaml'
 import { guessRole, roleOf } from '../core/adopt'
@@ -237,6 +237,15 @@ export function renameFile(oldRel: string, newRel: string) {
   mkdirSync(join(to, '..'), { recursive: true })
   renameSync(from, to)
   return { path: newRel }
+}
+
+// Borra un .md del vault. Guarda un snapshot antes, así queda recuperable desde el historial de versiones.
+export function deleteFile(rel: string) {
+  const abs = inVault(rel)
+  if (!existsSync(abs)) throw new Error('no existe')
+  saveVersion(rel, readFileSync(abs, 'utf8'), 'user', 'antes de borrar')
+  rmSync(abs)
+  return { path: rel }
 }
 
 export function listVersions(rel: string): Version[] {

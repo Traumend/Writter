@@ -4,7 +4,7 @@ import { project } from '../projection'
 import type { FileEntry, FileKind } from '../types/ipc'
 
 // Breakdown (B): apariciones de cada entidad por guión y escena, en todo el vault.
-export type Appearance = { script: string; scene: number; heading: string }
+export type Appearance = { script: string; scene: number; heading: string; via: 'cue' | 'link' | 'heading' }
 export type EntityCard = {
   path: string
   kind: FileKind
@@ -52,16 +52,16 @@ export function breakdown(files: FileEntry[], docs: Doc[]): EntityCard[] {
     const p = project(doc)
     for (const sc of p.scenes) {
       const seen = new Set<EntityCard>()
-      const hit = (c: EntityCard | undefined) => {
+      const hit = (c: EntityCard | undefined, via: Appearance['via']) => {
         if (c && !seen.has(c)) {
           seen.add(c)
-          c.appearances.push({ script: f.path, scene: sc.index, heading: sc.heading })
+          c.appearances.push({ script: f.path, scene: sc.index, heading: sc.heading, via })
         }
       }
-      for (const ch of sc.characters) hit(byName.get(norm(ch)))
-      for (const l of sc.links) hit(byName.get(norm(l)))
+      for (const ch of sc.characters) hit(byName.get(norm(ch)), 'cue')
+      for (const l of sc.links) hit(byName.get(norm(l)), 'link')
       const H = norm(sc.heading)
-      for (const c of cards) if (c.kind === 'location' && [c.name, ...c.aliases].some((n) => H.includes(norm(n)))) hit(c)
+      for (const c of cards) if (c.kind === 'location' && [c.name, ...c.aliases].some((n) => H.includes(norm(n)))) hit(c, 'heading')
     }
     // Palabras de diálogo por personaje
     let cur: EntityCard | undefined
