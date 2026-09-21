@@ -20,6 +20,11 @@ import { Ideas } from './views/plan/Ideas'
 import { Clinic } from './views/plan/Clinic'
 import { Index } from './views/plan/Index'
 import { Library } from './views/plan/Library'
+import { Palette } from './views/Palette'
+import { QuickNote } from './views/QuickNote'
+import { exportProjectJson, importProjectJson } from './portable'
+import { PLANNING_PATH, readPlanning } from '../core/planning'
+import { Icon } from './ui'
 import { estimateTokens } from '../core/safeguards'
 import { getLang, t } from './i18n'
 import { useStore, type DevTab, type PlanTab, type Tab } from './store'
@@ -30,7 +35,7 @@ const PLAN: [PlanTab, string][] = [['dashboard', 'Dashboard'], ['planner', 'Plan
 
 // Menú desplegable de la barra superior (estilo suite Adobe).
 function AppMenu() {
-  const { openVault, openPrefs, setTab, openLinker, openSearch, setLanguage, vault } = useStore()
+  const { openVault, openPrefs, setTab, openLinker, openSearch, setLanguage, vault, recents, openVaultPath, setQuickNoteOpen, setPaletteOpen } = useStore()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const lang = getLang()
@@ -51,8 +56,19 @@ function AppMenu() {
           {item(t('Preferencias…'), openPrefs)}
           {vault && item(t('Buscar y reemplazar…'), openSearch)}
           {item(t('Abrir vault…'), () => void openVault())}
+          {recents.filter((r) => r !== vault?.root).length > 0 && (
+            <>
+              <div className="menu-label">{t('Recientes')}</div>
+              {recents.filter((r) => r !== vault?.root).slice(0, 5).map((r) => <button key={r} className="menu-item ell" title={r} onClick={() => { setOpen(false); void openVaultPath(r) }}>{r.split(/[\\/]/).pop()}</button>)}
+            </>
+          )}
           {vault && item(t('Vincular carpetas…'), openLinker)}
           {item(t('Ajustes del proyecto'), () => setTab('settings'))}
+          <div className="menu-sep" />
+          {vault && item(t('Buscar en todo…') + '  Ctrl+K', () => setPaletteOpen(true))}
+          {vault && item(t('Nota rápida…') + '  Ctrl+Shift+N', () => setQuickNoteOpen(true))}
+          {vault && item(t('Exportar proyecto (JSON)'), () => void exportProjectJson())}
+          {vault && item(t('Importar proyecto (JSON)'), () => void importProjectJson())}
           <div className="menu-sep" />
           <div className="menu-label">{t('Idioma')}</div>
           <button className={`menu-item ${lang === 'en' ? 'sel' : ''}`} onClick={() => setLanguage('en')}>{lang === 'en' ? '✓ ' : ' '}{t('Inglés')}</button>
@@ -65,9 +81,34 @@ function AppMenu() {
   )
 }
 
+function Pomodoro() {
+  const { pomo, pomoToggle, pomoReset, pomoSkip } = useStore()
+  const mm = String(Math.floor(pomo.left / 60)).padStart(2, '0'), ss = String(pomo.left % 60).padStart(2, '0')
+  const label = pomo.mode === 'focus' ? t('Foco') : pomo.mode === 'short' ? t('Descanso') : t('Descanso largo')
+  return (
+    <span className={`pomo ${pomo.running ? 'on' : ''} ${pomo.mode}`} title={`${label} · ${t('clic: iniciar/pausar · doble clic: reiniciar')}`}>
+      <button className="ghost mini" onClick={pomoToggle} onDoubleClick={() => pomoReset()}><Icon name="timer" size={12} /> {mm}:{ss}</button>
+      {pomo.running && <button className="ghost mini" title={t('Saltar')} onClick={pomoSkip}>»</button>}
+      {pomo.done > 0 && <span className="muted tiny">{'●'.repeat(Math.min(4, pomo.done % 4 || 4))}</span>}
+    </span>
+  )
+}
+
 export function App() {
   const s = useStore()
   const provider = s.vault?.config.byok.provider ?? 'anthropic'
+  const goal = readPlanning(s.docs.find((d) => d.path === PLANNING_PATH)?.content).goal
+  const totalWords = s.docs.filter((d) => s.files.some((f) => f.path === d.path && f.kind === 'script')).reduce((a, d) => a + d.content.replace(/^---[\s\S]*?---/, '').split(/\s+/).filter(Boolean).length, 0)
+  // Atajos globales: Ctrl+K paleta, Ctrl+Shift+N nota rápida.
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (!useStore.getState().vault) return
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); useStore.getState().setPaletteOpen(true) }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'n') { e.preventDefault(); useStore.getState().setQuickNoteOpen(true) }
+    }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [])
   const scene = s.path ? s.projection.scenes.find((sc) => s.cursorLine >= sc.startLine && s.cursorLine < sc.endLine) : undefined
   const sceneText = scene ? s.text.split('\n').slice(scene.startLine, scene.endLine).join('\n') : ''
   return (
@@ -96,6 +137,7 @@ export function App() {
         <span className="grow" />
         <span className="muted crumb">{s.vault ? s.vault.root.split(/[\\/]/).pop() : t('Sin proyecto')}</span>
         {s.graph && <span className="pill" title={s.graph.reason}>{t('índice')} {s.graph.stale ? t('reindexando') : t('al día')}</span>}
+        {s.vault && <Pomodoro />}
         <button className="ghost" onClick={() => void s.openVault()}>{t('Abrir vault')}</button>
         <AppMenu />
       </header>
@@ -120,11 +162,14 @@ export function App() {
       <Preferences />
       <SearchReplace />
       <Rename />
+      <Palette />
+      <QuickNote />
       <footer>
         <span>{s.status ? t(s.status) : '—'}</span>
         <span className="grow" />
         {scene && <span className="muted">{t('Escena')} {scene.index + 1}: {scene.wordCount} {t('pal')} · ≈{estimateTokens(sceneText)} {t('tok')} · {t('pág')} {s.pagination.lineToPage[scene.startLine] ?? 1}</span>}
         {s.path && <span>{t('Guion')}: {s.projection.wordCount} {t('pal')} · ≈{estimateTokens(s.text)} {t('tok')} · {s.pagination.pages} {t('pág.')}</span>}
+        {goal > 0 && <span className="goal" title={`${totalWords.toLocaleString()} / ${goal.toLocaleString()} ${t('palabras')}`}>{t('Meta')} {Math.min(100, Math.round((totalWords / goal) * 100))}% <span className="goalbar"><span style={{ width: `${Math.min(100, (totalWords / goal) * 100)}%` }} /></span></span>}
         <span>BYOK: {provider} {s.keyStatus?.present || provider === 'ollama' ? '●' : '○'}</span>
       </footer>
     </>

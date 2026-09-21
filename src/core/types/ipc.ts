@@ -80,6 +80,8 @@ export type Graph = { nodes: GraphNode[]; edges: GraphEdge[] }
 
 export type Api = {
   vaultOpen(): Promise<OpenResult>
+  vaultOpenPath(dir: string): Promise<OpenResult>
+  pickText(exts: string[]): Promise<string | null>
   vaultAdopt(root: string, roles: Record<AdoptRole, string[]>): Promise<VaultSummary>
   folderExists(root: string, rel: string): Promise<boolean>
   folderMake(root: string, rel: string): Promise<boolean>

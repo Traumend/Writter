@@ -266,6 +266,21 @@ main.page.bt { min-height: 0; }
 .libcards .card.on { outline: 2px solid var(--accent); }
 .sticky { position: sticky; top: 0; align-self: start; }
 .table tr.link:hover td { background: rgba(255,255,255,.04); }
+/* Paleta global, Pomodoro, meta de palabras, motor de personaje */
+.modal.cmdpal { width: min(640px, 92vw); padding: 12px; }
+.modal.cmdpal .row input { margin: 0; }
+.hit { display: flex; justify-content: space-between; gap: 12px; padding: 7px 10px; border-radius: var(--r-sm); cursor: pointer; }
+.hit.on, .hit:hover { background: var(--sink); box-shadow: var(--inset); }
+.hit .ell:first-child { max-width: 55%; }
+.pomo { display: inline-flex; align-items: center; gap: 4px; }
+.pomo.on.focus button:first-child { color: var(--accent); }
+.pomo.on.short button:first-child, .pomo.on.long button:first-child { color: #3ddc97; }
+.goal { display: inline-flex; align-items: center; gap: 6px; }
+.goalbar { display: inline-block; width: 70px; height: 5px; background: var(--sink); border-radius: 3px; overflow: hidden; box-shadow: var(--inset); }
+.goalbar span { display: block; height: 100%; background: var(--accent); }
+.engine .engine-row { background: var(--sink); border-radius: var(--r-sm); padding: 8px 10px; box-shadow: var(--inset); }
+.engine .engine-row input[type=text], .engine .engine-row input:not([type]) { background: var(--panel); margin-bottom: 4px; font-size: 12px; }
+.engine .engine-row input[type=range] { margin: 2px 0 0; }
 .bt-prog div { height: 100%; background: var(--accent); }
 
 /* análisis */

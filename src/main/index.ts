@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, extname, join, resolve } from 'node:path'
 import { fdxToMd, fountainToMd } from '../core/convert'
 import type { AdoptRole, AiRequest, Analysis, FileEntry, OpenResult, ProjectConfig, VaultChange, Version } from '../core/types/ipc'
@@ -25,6 +25,21 @@ ipcMain.handle('vault.open', async (): Promise<OpenResult> => {
   // Carpeta con contenido y sin proyecto -> proponer adopción; vacía -> crear layout por defecto directo.
   if (folders.length > 0) return { kind: 'adopt', root: dir, folders }
   return { kind: 'opened', summary: V.openVault(dir, notify) }
+})
+// Abre un vault por ruta (Recientes) con la misma lógica que el diálogo.
+ipcMain.handle('vault.openPath', (_e, dir: string): OpenResult => {
+  if (!existsSync(dir)) return null
+  markStale()
+  if (V.hasProject(dir)) return { kind: 'opened', summary: V.openVault(dir, notify) }
+  const folders = V.scanFolder(dir)
+  if (folders.length > 0) return { kind: 'adopt', root: dir, folders }
+  return { kind: 'opened', summary: V.openVault(dir, notify) }
+})
+// Elige y lee un archivo de texto (import JSON del proyecto).
+ipcMain.handle('pick.text', async (_e, exts: string[]): Promise<string | null> => {
+  const r = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: exts.join('/'), extensions: exts }] })
+  const f = r.filePaths[0]
+  return f ? readFileSync(f, 'utf8') : null
 })
 ipcMain.handle('vault.adopt', (_e, root: string, roles: Record<AdoptRole, string[]>) => {
   markStale()

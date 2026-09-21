@@ -4,6 +4,8 @@ import type { Api, VaultChange } from '../core/types/ipc'
 // Superficie mínima: el renderer solo ve estas funciones, nunca fs/claves/red.
 const api: Api = {
   vaultOpen: () => ipcRenderer.invoke('vault.open'),
+  vaultOpenPath: (dir) => ipcRenderer.invoke('vault.openPath', dir),
+  pickText: (exts) => ipcRenderer.invoke('pick.text', exts),
   vaultAdopt: (root, roles) => ipcRenderer.invoke('vault.adopt', root, roles),
   folderExists: (root, rel) => ipcRenderer.invoke('folder.exists', root, rel),
   folderMake: (root, rel) => ipcRenderer.invoke('folder.make', root, rel),

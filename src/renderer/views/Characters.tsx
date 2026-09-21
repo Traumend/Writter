@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { breakdown } from '../../core/breakdown'
 import { readFrontmatter, writeFrontmatter } from '../../core/frontmatter'
 import { extractLinks, parseFountain } from '../../core/parser/fountain'
+import { MOT_DIMS, readMotivation } from '../../core/planning'
 import { joinSections, splitSections, type Section } from '../../core/sections'
 import { t } from '../i18n'
 import { useStore } from '../store'
@@ -68,6 +69,8 @@ export function Characters() {
   const img = useAsset(card?.image ?? '')
   const { data, body } = doc ? readFrontmatter(doc.content) : { data: {}, body: '' }
   const traits = (data['traits'] as Record<string, number> | undefined) ?? {}
+  const mot = readMotivation(data)
+  const setMot = (k: string, v: { text?: string; level?: number }) => patch({ motivation: { ...mot, [k]: { text: mot[k as keyof typeof mot]?.text ?? '', level: mot[k as keyof typeof mot]?.level ?? 5, ...v } } })
   const rels = (Array.isArray(data['relationships']) ? data['relationships'] : []) as Rel[]
   const customSliders = vault?.config.characterSliders ?? []
   const { intro, sections } = useMemo(() => splitSections(body), [body])
@@ -222,6 +225,18 @@ export function Characters() {
             const n = /Necesita:\s*(.*)/i.exec(v)?.[1] ?? ''
             patch({ want: w.trim(), need: n.trim() })
           }} />
+
+          <h2>{t('Motor de personaje')} <span className="muted tiny">{MOT_DIMS.filter(([k]) => mot[k]?.text.trim()).length}/10</span></h2>
+          <p className="muted tiny">{t('Diez dimensiones motivacionales. Se cruzan en la Matriz de motivación (Planificación → Ideas) para generar premisas de escena.')}</p>
+          <div className="grid2 engine">
+            {MOT_DIMS.map(([k, l, hint]) => (
+              <div className="engine-row" key={k}>
+                <div className="row tiny"><b>{t(l)}</b><span className="grow" /><span className="muted">{mot[k]?.level ?? 5}</span></div>
+                <BlurInput value={mot[k]?.text ?? ''} placeholder={t(hint)} onCommit={(v) => setMot(k, { text: v })} />
+                <input type="range" min={0} max={10} value={mot[k]?.level ?? 5} onChange={(e) => setMot(k, { level: Number(e.target.value) })} />
+              </div>
+            ))}
+          </div>
 
           <h2>{t('Profundización')}
             <button className="mini ghost" onClick={() => setSections([...sections, { title: t('Nueva sección'), body: '' }])}><Icon name="plus" size={12} /> {t('Añadir sección')}</button>

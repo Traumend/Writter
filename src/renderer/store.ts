@@ -96,6 +96,10 @@ type State = {
   prefsOpen: boolean
   searchOpen: boolean
   rename: { path: string; name: string; terms: string[] } | null
+  paletteOpen: boolean
+  quickNoteOpen: boolean
+  recents: string[] // vaults recientes (localStorage)
+  pomo: { mode: 'focus' | 'short' | 'long'; left: number; running: boolean; done: number } // Pomodoro (segundos restantes)
 }
 
 type Actions = {
@@ -141,12 +145,21 @@ type Actions = {
   closePrefs(): void
   openSearch(): void
   closeSearch(): void
+  openVaultPath(dir: string): Promise<void>
+  setPaletteOpen(v: boolean): void
+  setQuickNoteOpen(v: boolean): void
+  pomoToggle(): void
+  pomoReset(mode?: 'focus' | 'short' | 'long'): void
+  pomoSkip(): void
   openRename(path: string, name: string, terms: string[]): void
   closeRename(): void
   applyRename(to: string): Promise<void>
 }
 
 const EMPTY: Projection = { scenes: [], characters: [], links: [], wordCount: 0 }
+const RECENTS_KEY = 'writter.recents'
+function loadRecents(): string[] { try { return JSON.parse(localStorage.getItem(RECENTS_KEY) || '[]') as string[] } catch { return [] } }
+let pomoTimer: ReturnType<typeof setInterval> | null = null
 const NOPAG: Pagination = { pages: 1, pageStarts: [], lineToPage: [] }
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -207,6 +220,10 @@ export const useStore = create<State & Actions>((set, get) => ({
   prefs: loadPrefs(),
   prefsOpen: false,
   searchOpen: false,
+  paletteOpen: false,
+  quickNoteOpen: false,
+  recents: loadRecents(),
+  pomo: { mode: 'focus', left: 25 * 60, running: false, done: 0 },
   rename: null,
 
   openRename: (path, name, terms) => set({ rename: { path, name, terms } }),
@@ -256,6 +273,42 @@ export const useStore = create<State & Actions>((set, get) => ({
   closePrefs: () => set({ prefsOpen: false }),
   openSearch: () => set({ searchOpen: true }),
   closeSearch: () => set({ searchOpen: false }),
+  setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
+  setQuickNoteOpen: (quickNoteOpen) => set({ quickNoteOpen }),
+
+  // Abre un vault reciente por ruta (misma lógica que el diálogo: proyecto -> abrir; carpeta ajena -> vinculador).
+  async openVaultPath(dir) {
+    const r = await window.api.vaultOpenPath(dir)
+    if (!r) { set({ recents: get().recents.filter((x) => x !== dir), status: 'La carpeta ya no existe' }); localStorage.setItem(RECENTS_KEY, JSON.stringify(get().recents)); return }
+    if (r.kind === 'adopt') set({ linker: { root: r.root, roles: guessesToRoleMap(r.folders) } })
+    else await get().applySummary(r.summary)
+  },
+
+  // Pomodoro: un solo temporizador global; al terminar alterna foco/descanso (largo cada 4 focos).
+  pomoToggle() {
+    const p = get().pomo
+    if (p.running) { if (pomoTimer) clearInterval(pomoTimer); pomoTimer = null; set({ pomo: { ...p, running: false } }); return }
+    set({ pomo: { ...p, running: true } })
+    pomoTimer = setInterval(() => {
+      const q = get().pomo
+      if (q.left > 1) { set({ pomo: { ...q, left: q.left - 1 } }); return }
+      const done = q.mode === 'focus' ? q.done + 1 : q.done
+      const mode: 'focus' | 'short' | 'long' = q.mode === 'focus' ? (done % 4 === 0 ? 'long' : 'short') : 'focus'
+      const mins = get().prefs.pomodoro[mode]
+      set({ pomo: { mode, left: mins * 60, running: true, done }, status: mode === 'focus' ? 'Pomodoro: foco' : 'Pomodoro: descanso' })
+    }, 1000)
+  },
+  pomoReset(mode) {
+    if (pomoTimer) clearInterval(pomoTimer)
+    pomoTimer = null
+    const m = mode ?? get().pomo.mode
+    set({ pomo: { mode: m, left: get().prefs.pomodoro[m] * 60, running: false, done: mode === 'focus' ? 0 : get().pomo.done } })
+  },
+  pomoSkip() {
+    const q = get().pomo
+    const mode: 'focus' | 'short' | 'long' = q.mode === 'focus' ? 'short' : 'focus'
+    get().pomoReset(mode)
+  },
 
   setTab: (tab) => set({ tab }),
   setDevTab: (devTab) => set({ devTab }),
@@ -304,7 +357,9 @@ export const useStore = create<State & Actions>((set, get) => ({
   },
 
   async applySummary(v) {
-    set({ vault: v, files: v.files, path: null, text: '', diskHash: null, dirty: false, proposal: null, projection: EMPTY, pagination: NOPAG })
+    const recents = [v.root, ...get().recents.filter((x) => x !== v.root)].slice(0, 8)
+    localStorage.setItem(RECENTS_KEY, JSON.stringify(recents))
+    set({ vault: v, files: v.files, path: null, text: '', diskHash: null, dirty: false, proposal: null, projection: EMPTY, pagination: NOPAG, recents })
     set({ keyStatus: await window.api.keysStatus(v.config.byok.provider) })
     await get().refreshDocs()
     void get().refreshGraph()
