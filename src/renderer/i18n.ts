@@ -447,6 +447,21 @@ const EN: Record<string, string> = {
   Todos: 'All',
   'Auto-giro': 'Auto-spin',
 
+  // Beat Timeline
+  'Aplicar plantilla': 'Apply preset',
+  'Aplicar plantilla…': 'Apply preset…',
+  Ajustar: 'Fit',
+  escritas: 'written',
+  'Exportar marcadores': 'Export markers',
+  Filtros: 'Filters',
+  Giro: 'Twist',
+  'Clímax': 'Climax',
+  Sorpresa: 'Surprise',
+  Conectar: 'Connect',
+  'presente en': 'present in',
+  Ficha: 'Card',
+  'Versión actual': 'Current version',
+
   // Characters
   'Más escenas': 'Most scenes',
   'A-Z': 'A-Z',

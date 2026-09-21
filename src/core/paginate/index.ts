@@ -7,6 +7,31 @@ const LINES_PER_PAGE = 55
 
 export type Pagination = { pages: number; pageStarts: number[]; lineToPage: number[] }
 
+// Líneas impresas por línea de token (mismo modelo que paginate). Sirve para estimar duración por escena.
+export function printedLines(tokens: Token[]): number[] {
+  const out: number[] = []
+  let prevBlank = true
+  for (const t of tokens) {
+    let n = 0
+    if (t.type === 'frontmatter' || t.type === 'note' || t.type === 'section' || t.type === 'synopsis') n = 0
+    else if (t.type === 'blank') n = prevBlank ? 0 : 1
+    else n = Math.max(1, Math.ceil(t.text.trim().length / (WIDTH[t.type] ?? 61)))
+    prevBlank = t.type === 'blank'
+    out[t.line] = n
+  }
+  return out
+}
+
+// Minutos estimados por escena (1 página ≈ 1 minuto; 55 líneas/página).
+export function sceneMinutes(tokens: Token[], scenes: { startLine: number; endLine: number }[]): number[] {
+  const pl = printedLines(tokens)
+  return scenes.map((s) => {
+    let sum = 0
+    for (let i = s.startLine; i < s.endLine; i++) sum += pl[i] ?? 0
+    return sum / LINES_PER_PAGE
+  })
+}
+
 export function paginate(tokens: Token[]): Pagination {
   const lineToPage: number[] = []
   const pageStarts: number[] = []

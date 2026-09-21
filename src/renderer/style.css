@@ -191,6 +191,37 @@ main.page.nmap { min-height: 0; }
 .inspector { width: 336px; flex: none; border-radius: var(--r); padding: 14px; background: var(--panel); overflow: auto; box-shadow: var(--raise); }
 .scenetext { font: 12px/1.6 "Courier New", monospace; white-space: pre-wrap; max-height: 40vh; overflow: auto; }
 
+/* Beat Timeline sobre eje de tiempo */
+main.page.bt { min-height: 0; }
+.bt-scroll { flex: 1; min-height: 0; overflow: auto; }
+.bt-lanes { position: relative; display: flex; flex-direction: column; gap: 8px; padding-bottom: 6px; }
+.bt-ruler { position: relative; height: 26px; border-bottom: 1px solid var(--line); margin-bottom: 2px; cursor: pointer; }
+.bt-ruler .tick { position: absolute; top: 4px; font-size: 9px; color: var(--dim); transform: translateX(-50%); border-left: 1px solid var(--line); padding-left: 3px; height: 18px; }
+.bt-ruler .playhead { position: absolute; top: 0; bottom: -1000px; width: 2px; background: var(--accent); z-index: 5; pointer-events: none; }
+.bt-ruler .playhead span { position: absolute; top: -1px; left: 3px; font-size: 9px; color: var(--accent); white-space: nowrap; }
+.bt-lane { position: relative; min-height: 78px; background: var(--panel); border-radius: var(--r); box-shadow: var(--inset); }
+.bt-lane.scenes { min-height: 46px; }
+.bt-lane .lanelabel { position: sticky; left: 0; top: 0; z-index: 3; display: inline-block; width: 76px; padding: 6px 6px; background: var(--panel); border-radius: var(--r) 0 0 0; }
+.bt-block { position: absolute; top: 24px; bottom: 6px; background: var(--sink); border-radius: var(--r-sm); padding: 6px; overflow: hidden; box-shadow: var(--raise-sm); }
+.bt-block input, .bt-block textarea { background: var(--panel); margin-bottom: 4px; font-size: 12px; }
+.bt-beat { position: absolute; top: 22px; width: 168px; transform: translateX(-50%); border-radius: var(--r-sm); padding: 6px; box-shadow: var(--raise-sm); color: #0d0f13; }
+.bt-beat select, .bt-beat input { margin-bottom: 4px; font-size: 11px; }
+.bt-beat .row { gap: 4px; }
+.bt-scene { position: absolute; top: 20px; height: 22px; background: var(--sink); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; font-size: 9px; white-space: nowrap; overflow: hidden; cursor: pointer; display: flex; align-items: center; gap: 4px; box-shadow: var(--raise-sm); }
+.bt-scene.on { border-color: var(--accent); color: var(--accent); }
+.bt-scene.dim { opacity: .28; }
+.bt-scene .dur { color: var(--dim); margin-left: auto; }
+.bt-wall { position: relative; min-height: 280px; margin-top: 10px; }
+.bt-links { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+.note.linking { outline: 2px solid var(--accent); }
+.bt-entities { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 8px; flex-wrap: wrap; max-width: 60%; justify-content: flex-end; }
+.bt-entity { background: var(--sink); border-radius: var(--r-sm); padding: 8px; box-shadow: var(--inset); width: 150px; }
+.bt-legend { display: flex; gap: 14px; flex-wrap: wrap; padding: 8px 2px 0; }
+.bt-legend .dot, .bt-entity .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+.bt-inspector { position: fixed; right: 16px; top: 96px; bottom: 40px; z-index: 30; }
+.bt-prog { height: 6px; background: var(--sink); border-radius: 3px; box-shadow: var(--inset); margin: 6px 0; overflow: hidden; }
+.bt-prog div { height: 100%; background: var(--accent); }
+
 /* análisis */
 .chart { position: relative; background: var(--panel); border-radius: var(--r); padding: 12px; box-shadow: var(--raise); }
 .chart svg { width: 100%; height: auto; display: block; }
