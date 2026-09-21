@@ -34,6 +34,7 @@ const EN: Record<string, string> = {
   'Preferencias…': 'Preferences…',
   'Buscar y reemplazar…': 'Find and replace…',
   'Abrir vault…': 'Open vault…',
+  'No hay guiones en el vault. Vincula la carpeta de tu historia (capítulos o episodios) como Guiones.': 'No scripts in the vault. Link the folder holding your story (chapters or episodes) as Scripts.',
   'Vincular carpetas…': 'Link folders…',
   'Ajustes del proyecto': 'Project settings',
   Recargar: 'Reload',
