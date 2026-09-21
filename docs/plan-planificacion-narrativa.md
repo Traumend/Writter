@@ -50,5 +50,17 @@ Estados de pregunta: open · developing · partial · answered · abandoned.
 4. **Utilidades**: búsqueda global `Ctrl+K`, nota rápida `Ctrl+Shift+N`, Pomodoro, meta de palabras, export/import JSON, vaults recientes.
 5. **Cierre**: i18n de toda la UI nueva, verificación en app (capturas), documentación.
 
-## 4. Fuera de alcance en esta rama
+## 4. Estado (rama `feat/planificacion-narrativa`)
+
+| Fase | Estado |
+|---|---|
+| 1 Core (`planning`, `cmm`, `clinic`, `library`) + tests | ✅ |
+| 2 Pestaña Planificación (8 subvistas) | ✅ |
+| 3 Motor de personaje (10 dimensiones) en la ficha | ✅ |
+| 4 Utilidades (Ctrl+K, nota rápida, Pomodoro, meta, export/import JSON, recientes) | ✅ |
+| 5 i18n, verificación en app, documentación | ✅ |
+
+Pendientes conocidos (fuera de esta rama): overrides por escena de las dimensiones (el campo `sceneMeta[heading].overrides` existe en el modelo, sin UI); mensajes de la Clinic en español (contenido generado en `core/clinic`, no pasa por `t()`); Story Atlas/Constellations propios (cubiertos por el Mapa neural).
+
+## 5. Fuera de alcance en esta rama
 Series de varios libros, Stacks más allá de secciones `#`, SQLite/FTS, segunda ventana, mapa geográfico, multi-selección, tags globales con gestor, estadísticas de sesión, menú nativo completo.

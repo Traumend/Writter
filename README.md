@@ -26,6 +26,16 @@ Pestañas:
 - **Desarrollo → Beat Timeline**: actos, beats y escenas en carriles; muro de notas arrastrables; inspector de escena. Se guarda en `outline/<episodio>.md`.
 - **Desarrollo → Mapa neural**: grafo con capas, escenas como nodos, búsqueda, pan/zoom y arrastre.
 - **Desarrollo → Análisis**: análisis IA por escena (estructura, trama, tema, tono, métricas, emociones) versionado en `.narrative/analysis/`; Script Doctor con heurísticas locales sin IA.
+- **Planificación**: capa de planificación y diagnóstico narrativo (plan: [docs/plan-planificacion-narrativa.md](docs/plan-planificacion-narrativa.md)). Todo vive en `outline/Planning.md` (frontmatter) y en `sceneMeta` de `outline/<episodio>.md`:
+  - **Dashboard**: progreso vs. meta de palabras, estructura, personajes, preguntas, plants, hallazgos de la Clinic, actividad.
+  - **Planner**: tracks (líneas narrativas) × escenas, estado/POV/track por escena.
+  - **Preguntas**: preguntas dramáticas con escena de planteo/resolución, estado, importancia y línea de tiempo.
+  - **Plant & Payoff**: siembras y pagos con distancia y alertas (sin pago, sin siembra, orden invertido).
+  - **Ideas**: escenas huérfanas (integrables al guion) + **Matriz de motivación**: premisas por reglas a partir del Motor de personaje (10 dimensiones en la ficha), sin IA.
+  - **Clinic**: diagnóstico local (estructura, personajes, preguntas, plants, tracks, ritmo) con severidades no absolutas, enlaces a escenas y técnicas sugeridas.
+  - **Index**: navegador tabular de todo el proyecto con orden, búsqueda y CSV.
+  - **Biblioteca**: técnicas, psicología y tropos (contenido original de Writter), con relacionadas, favoritos y "crear nota en el vault".
+- **Utilidades**: `Ctrl+K` búsqueda global y comandos (con `>`), `Ctrl+Shift+N` nota rápida a `knowledge/Inbox`, Pomodoro en la cabecera, meta de palabras en el pie, export/import del proyecto en JSON versionado y vaults recientes en el menú.
 - **Producción**: shot list por escena con storyboard adjunto, en `assets/shots/<episodio>.md`.
 - **Ajustes**: proveedor y modelo, clave, mapa de tags con validador, Graphify, portada del PDF, papel, prompts editables.
 
