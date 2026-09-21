@@ -22,7 +22,8 @@ const RULES: Rule[] = [
 export function premises(a: Actor, b: Actor, lang: 'es' | 'en' = 'es', max = 6): Premise[] {
   const out: Premise[] = []
   const pairs: [Actor, Actor][] = [[a, b], [b, a]]
-  for (const [A, B] of pairs) for (const r of RULES) {
+  for (const [pi, [A, B]] of pairs.entries()) for (const r of RULES) {
+    if (r.a === r.b && pi === 1) continue // regla simétrica: una sola premisa
     const av = A.motivation[r.a], bv = B.motivation[r.b]
     if (!av?.text.trim() || !bv?.text.trim()) continue
     if (A === B && r.a === r.b) continue
