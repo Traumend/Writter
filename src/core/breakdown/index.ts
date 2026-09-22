@@ -86,6 +86,7 @@ export function extractMissing(files: FileEntry[], docs: Doc[]): { characters: s
     const p = project(parseFountain(text))
     for (const c of p.characters) if (!known.has(norm(c))) characters.add(c)
     for (const sc of p.scenes) {
+      if (!/^(INT|EXT|EST|I\/E)[.\s]/i.test(sc.heading.trim())) continue // en prosa las secciones no son lugares
       const loc = sc.heading.replace(/^(INT|EXT|EST|I\/E|INT\.?\/EXT)[.\s]+/i, '').split(/\s+-\s+/)[0]?.trim() ?? ''
       if (loc && !known.has(norm(loc))) locations.add(loc)
     }
