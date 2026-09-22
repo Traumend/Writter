@@ -11,13 +11,18 @@ import * as V from './vault'
 
 let win: BrowserWindow | null = null
 
+// La ventana puede estar destruida cuando llega un evento del watcher o del menú: enviarle algo
+// lanza "Object has been destroyed" como excepción no capturada del proceso principal.
+const alive = () => !!win && !win.isDestroyed()
+const send = (channel: string, payload?: unknown) => { if (alive()) win!.webContents.send(channel, payload) }
+
 const notify = (e: VaultChange) => {
   markStale()
-  win?.webContents.send('vault.changed', e)
+  send('vault.changed', e)
 }
 
 // Menú nativo: el renderer manda idioma, recientes y estado de los conmutadores; se reconstruye entero (barato).
-ipcMain.on('menu.setup', (_e, setup: MenuSetup) => { if (win) buildMenu(win, setup) })
+ipcMain.on('menu.setup', (_e, setup: MenuSetup) => { if (alive()) buildMenu(win!, setup) })
 
 ipcMain.handle('vault.open', async (): Promise<OpenResult> => {
   const r = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] })
@@ -176,6 +181,7 @@ function createWindow() {
     menu.popup()
   })
   buildMenu(win, { lang: 'en', recents: [] })
+  win.on('closed', () => { win = null; V.closeWatcher() })
   const devUrl = process.env['ELECTRON_RENDERER_URL']
   if (devUrl) void win.loadURL(devUrl)
   else void win.loadFile(join(__dirname, '../renderer/index.html'))
@@ -187,15 +193,15 @@ function createWindow() {
     const v = process.env['WRITTER_VAULT']
     if (v) {
       // Igual que el diálogo: proyecto existente -> abrir; carpeta ajena con contenido -> proponer adopción.
-      if (V.hasProject(v)) win?.webContents.send('vault.opened', V.openVault(v, notify))
+      if (V.hasProject(v)) send('vault.opened', V.openVault(v, notify))
       else {
         const folders = V.scanFolder(v)
-        if (folders.length > 0) win?.webContents.send('vault.adopt', { kind: 'adopt', root: resolve(v), folders })
-        else win?.webContents.send('vault.opened', V.openVault(v, notify))
+        if (folders.length > 0) send('vault.adopt', { kind: 'adopt', root: resolve(v), folders })
+        else send('vault.opened', V.openVault(v, notify))
       }
     }
     const menuId = process.env['WRITTER_MENU'] // simula un clic del menú nativo (misma ruta que buildMenu)
-    if (menuId) setTimeout(() => win?.webContents.send('menu', menuId), 1500)
+    if (menuId) setTimeout(() => send('menu', menuId), 1500)
     const shot = process.env['WRITTER_SHOT']
     if (shot) {
       setTimeout(async () => {
@@ -221,4 +227,4 @@ function createWindow() {
 }
 
 void app.whenReady().then(createWindow)
-app.on('window-all-closed', () => app.quit())
+app.on('window-all-closed', () => { V.closeWatcher(); app.quit() })

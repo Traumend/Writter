@@ -129,16 +129,41 @@ export function readAll(): Doc[] {
 
 export const hasProject = (dir: string) => existsSync(join(resolve(dir), '.narrative/project.yaml'))
 
+// Ruta relativa de contenido que vale la pena notificar: .md fuera de cualquier carpeta oculta.
+// Ojo: un vault anidado (Obsidian abierto antes en una subcarpeta) tiene `<sub>/.narrative/versions/<archivo>.md`,
+// que son DIRECTORIOS terminados en .md; leerlos como archivo reventaba el proceso principal con EISDIR.
+export function watchRel(file: string): string | null {
+  const rel = file.split('\\').join('/')
+  if (!rel.endsWith('.md')) return null
+  if (rel.split('/').some((seg) => seg.startsWith('.'))) return null
+  return rel
+}
+
+export function closeWatcher(): void {
+  try { watcher?.close() } catch { /* ya cerrado */ }
+  watcher = null
+}
+
+export const watcherForTest = (): FSWatcher | null => watcher
+
 function startWatcher(onChange: (e: VaultChange) => void) {
-  watcher?.close()
+  closeWatcher()
   // ponytail: fs.watch recursivo nativo (Win/mac/Linux>=20); chokidar solo si falla en algún FS.
   watcher = watch(root!, { recursive: true }, (_ev, file) => {
-    if (!file || !file.toString().endsWith('.md') || file.toString().startsWith('.narrative')) return
-    const rel = file.toString().split('\\').join('/')
+    const rel = file ? watchRel(file.toString()) : null
+    if (!rel) return
     const abs = join(root!, rel)
-    onChange({ path: rel, hash: existsSync(abs) ? sha(readFileSync(abs, 'utf8')) : null })
+    try {
+      const st = existsSync(abs) ? statSync(abs) : null
+      onChange({ path: rel, hash: st?.isFile() ? sha(readFileSync(abs, 'utf8')) : null })
+    } catch {
+      /* archivo en tránsito (borrado, bloqueado o sincronizando en iCloud/OneDrive): el siguiente evento lo recoge */
+    }
   })
+  // Sin este listener, un EPERM del observador (carpeta movida, borrada o bloqueada) tumba el proceso principal.
+  watcher.on('error', () => closeWatcher())
 }
+
 
 // Abre un proyecto existente, o inicializa el layout por defecto si la carpeta no es un proyecto Writter.
 export function openVault(dir: string, onChange: (e: VaultChange) => void): VaultSummary {
