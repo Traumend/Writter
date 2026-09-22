@@ -198,6 +198,8 @@ export function App() {
   const crumb = [s.vault ? s.vault.root.split(SEP).pop() : t('Sin proyecto'), t(TABS.find(([tb]) => tb === s.tab)?.[1] ?? ''), sub ? t(sub) : ''].filter(Boolean).join(' / ')
   const scene = s.path ? s.projection.scenes.find((sc) => s.cursorLine >= sc.startLine && s.cursorLine < sc.endLine) : undefined
   const sceneText = scene ? s.text.split('\n').slice(scene.startLine, scene.endLine).join('\n') : ''
+  // Recuento de la selección (PRD §98): la selección del editor viene en líneas [desde, hasta).
+  const selWords = s.selection ? s.text.split('\n').slice(s.selection.from, s.selection.to).join(' ').split(/\s+/).filter(Boolean).length : 0
   return (
     <>
       <header>
@@ -257,6 +259,7 @@ export function App() {
       <footer>
         <span>{s.status ? t(s.status) : '—'}</span>
         <span className="grow" />
+        {selWords > 0 && <span className="muted">{t('Selección')}: {selWords} {t('pal')}</span>}
         {scene && <span className="muted">{t('Escena')} {scene.index + 1}: {scene.wordCount} {t('pal')} · ≈{estimateTokens(sceneText)} {t('tok')} · {t('pág')} {s.pagination.lineToPage[scene.startLine] ?? 1}</span>}
         {s.path && <span>{t('Guion')}: {s.projection.wordCount} {t('pal')} · ≈{estimateTokens(s.text)} {t('tok')} · {s.pagination.pages} {t('pág.')}</span>}
         {goal > 0 && <span className="goal" title={`${totalWords.toLocaleString()} / ${goal.toLocaleString()} ${t('palabras')}`}>{t('Meta')} {Math.min(100, Math.round((totalWords / goal) * 100))}% <span className="goalbar"><span style={{ width: `${Math.min(100, (totalWords / goal) * 100)}%` }} /></span></span>}

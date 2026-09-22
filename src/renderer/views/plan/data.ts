@@ -1,15 +1,15 @@
 import { useMemo } from 'react'
-import { breakdown } from '../../../core/breakdown'
+import { breakdown, extractMissing } from '../../../core/breakdown'
 import { clinic, type Issue } from '../../../core/clinic'
 import { readFrontmatter, writeFrontmatter } from '../../../core/frontmatter'
 import { sceneMinutes } from '../../../core/paginate'
 import { parseFountain } from '../../../core/parser/fountain'
-import { PLANNING_PATH, planningTemplate, readArc, readPlanning, readSceneMeta, type Planning, type SceneMeta, type SceneRef } from '../../../core/planning'
+import { PLANNING_PATH, planningTemplate, readArc, readMotivation, readPlanning, readSceneMeta, MOT_DIMS, type Planning, type SceneMeta, type SceneRef } from '../../../core/planning'
 import { project, type Scene } from '../../../core/projection'
 import { useStore } from '../../store'
 
 // Datos derivados del vault para la capa de planificación (una historia, muchas vistas).
-export type ScriptInfo = { path: string; name: string; season: string; episode: string; scenes: Scene[]; minutes: number[]; acts: { title: string; from: number; to: number }[]; outlinePath: string; sceneMeta: Record<string, SceneMeta>; words: number }
+export type ScriptInfo = { path: string; name: string; season: string; episode: string; scenes: Scene[]; minutes: number[]; acts: { title: string; from: number; to: number }[]; beats: { id?: string; title?: string; scene: number; kind?: string; tension?: number; characters?: string[] }[]; outlinePath: string; sceneMeta: Record<string, SceneMeta>; words: number }
 
 export function useScripts(): ScriptInfo[] {
   const { files, docs } = useStore()
@@ -20,8 +20,10 @@ export function useScripts(): ScriptInfo[] {
     const p = project(doc)
     const outlinePath = `outline/${f.path.split('/').pop()!}`
     const od = docs.find((x) => x.path === outlinePath)
-    const acts = od ? ((readFrontmatter(od.content).data['acts'] as { title: string; from: number; to: number }[] | undefined) ?? []) : []
-    return { path: f.path, name: f.name, season: String(fm['season'] ?? ''), episode: String(fm['episode'] ?? ''), scenes: p.scenes, minutes: sceneMinutes(doc.tokens, p.scenes), acts, outlinePath, sceneMeta: readSceneMeta(od?.content), words: p.wordCount }
+    const outline = od ? readFrontmatter(od.content).data : {}
+    const acts = (outline['acts'] as { title: string; from: number; to: number }[] | undefined) ?? []
+    const beats = (outline['beats'] as ScriptInfo['beats'] | undefined) ?? []
+    return { path: f.path, name: f.name, season: String(fm['season'] ?? ''), episode: String(fm['episode'] ?? ''), scenes: p.scenes, minutes: sceneMinutes(doc.tokens, p.scenes), acts, beats, outlinePath, sceneMeta: readSceneMeta(od?.content), words: p.wordCount }
   }), [files, docs])
 }
 
@@ -66,9 +68,10 @@ export function useClinicIssues(): Issue[] {
   const scripts = useScripts()
   const cards = useCards()
   const { planning } = usePlanning()
-  const { docs } = useStore()
+  const { files, docs } = useStore()
+  const missing = useMemo(() => extractMissing(files, docs), [files, docs])
   return useMemo(() => clinic({
-    scripts: scripts.map((s) => ({ path: s.path, name: s.name, scenes: s.scenes.map((x, i) => ({ heading: x.heading, characters: x.characters, wordCount: x.wordCount, minutes: s.minutes[i] ?? 0 })), acts: s.acts, sceneMeta: s.sceneMeta })),
+    scripts: scripts.map((s) => ({ path: s.path, name: s.name, scenes: s.scenes.map((x, i) => ({ heading: x.heading, characters: x.characters, wordCount: x.wordCount, minutes: s.minutes[i] ?? 0 })), acts: s.acts, sceneMeta: s.sceneMeta, beats: s.beats })),
     characters: cards.filter((c) => c.kind === 'character').map((c) => {
       const data = readFrontmatter(docs.find((d) => d.path === c.path)?.content ?? '').data
       const arc = readArc(data)
@@ -76,10 +79,12 @@ export function useClinicIssues(): Issue[] {
         name: c.name, group: c.group, appearances: c.appearances.length,
         relationships: ((data['relationships'] as { target: string }[] | undefined) ?? []).map((r) => r.target),
         arcPoints: arc.filter((p) => p.note.trim() || p.ref).length,
-        arcLinked: arc.filter((p) => p.ref).length
+        arcLinked: arc.filter((p) => p.ref).length,
+        motDims: MOT_DIMS.filter(([k]) => readMotivation(data)[k]?.text.trim()).length
       }
     }),
     locations: cards.filter((c) => c.kind === 'location').map((c) => ({ name: c.name, appearances: c.appearances.length })),
+    missing,
     planning
-  }), [scripts, cards, planning, docs])
+  }), [scripts, cards, planning, docs, missing])
 }

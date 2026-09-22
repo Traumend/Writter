@@ -4,13 +4,14 @@ import { SUGGEST } from '../library'
 import { resolveRef, type Planning, type SceneMeta, type SceneRef } from '../planning'
 
 export type Severity = 'info' | 'review' | 'inconsistency' | 'incomplete'
-export type Area = 'structure' | 'characters' | 'questions' | 'plants' | 'tracks' | 'pacing' | 'ideas'
+export type Area = 'structure' | 'characters' | 'motivation' | 'continuity' | 'questions' | 'plants' | 'tracks' | 'pacing' | 'ideas'
 export type Issue = { id: string; area: Area; severity: Severity; title: string; detail: string; refs: SceneRef[]; techniques: string[] }
 
-export type ClinicScript = { path: string; name: string; scenes: { heading: string; characters: string[]; wordCount: number; minutes: number }[]; acts: { title: string; from: number; to: number }[]; sceneMeta: Record<string, SceneMeta> }
-export type ClinicCharacter = { name: string; group: string; appearances: number; relationships: string[]; arcPoints?: number; arcLinked?: number }
+export type ClinicScript = { path: string; name: string; scenes: { heading: string; characters: string[]; wordCount: number; minutes: number }[]; acts: { title: string; from: number; to: number }[]; sceneMeta: Record<string, SceneMeta>; beats?: { scene: number; tension?: number }[] }
+export type ClinicCharacter = { name: string; group: string; appearances: number; relationships: string[]; arcPoints?: number; arcLinked?: number; motDims?: number }
 export type ClinicLocation = { name: string; appearances: number }
-export type ClinicInput = { scripts: ClinicScript[]; characters: ClinicCharacter[]; locations?: ClinicLocation[]; planning: Planning }
+// `missing`: nombres que aparecen en el guion pero no tienen ficha (continuidad).
+export type ClinicInput = { scripts: ClinicScript[]; characters: ClinicCharacter[]; locations?: ClinicLocation[]; missing?: { characters: string[]; locations: string[] }; planning: Planning }
 
 const gaps = (present: boolean[]): { from: number; to: number }[] => {
   const out: { from: number; to: number }[] = []
@@ -43,6 +44,21 @@ export function clinic(input: ClinicInput): Issue[] {
       if (avg > 0 && x.minutes > avg * 2.5 && x.minutes > 2) add('pacing', 'review', `${s.name} #${i + 1}: escena muy larga (${x.minutes.toFixed(1)}m)`, `Supera 2,5× la media del episodio (${avg.toFixed(1)}m). Considera partirla o entrar más tarde.`, [ref(s.path, i)])
       if (x.wordCount < 15) add('pacing', 'incomplete', `${s.name} #${i + 1}: escena casi vacía`, 'Menos de 15 palabras: encabezado sin desarrollar.', [ref(s.path, i)])
     })
+    // Estructura: escenas que quedan fuera de todos los actos definidos.
+    if (s.acts.length) {
+      const inAct = s.scenes.map((_, i) => s.acts.some((a) => i >= a.from && i <= a.to))
+      const loose = inAct.filter((x) => !x).length
+      if (loose) add('structure', 'incomplete', `${s.name}: ${loose} escena(s) fuera de los actos`, 'Hay escenas que no caen dentro de ningún acto; ajusta los rangos en el Beat Timeline.', [ref(s.path, inAct.indexOf(false))])
+    }
+    // Ritmo: curva de tensión de los beats (metadato opcional, PRD §65).
+    const withT = (s.beats ?? []).filter((b) => typeof b.tension === 'number' && b.tension > 0)
+    if ((s.beats?.length ?? 0) >= 4 && withT.length === 0) add('pacing', 'incomplete', `${s.name}: beats sin tensión anotada`, 'Sin tensión por beat no se puede ver la curva del episodio. Anótala en el inspector del Beat Timeline.')
+    else if (withT.length >= 4) {
+      const sorted = [...withT].sort((a, b) => a.scene - b.scene)
+      const half = Math.floor(sorted.length / 2)
+      const avg = (list: typeof sorted) => list.reduce((a, b) => a + (b.tension ?? 0), 0) / Math.max(1, list.length)
+      if (avg(sorted.slice(half)) <= avg(sorted.slice(0, half))) add('pacing', 'review', `${s.name}: la tensión no sube hacia el final`, `Primera mitad ${avg(sorted.slice(0, half)).toFixed(1)} vs. segunda ${avg(sorted.slice(half)).toFixed(1)}. Revisa si el clímax está colocado donde quieres.`)
+    }
     // Personajes: ausencia prolongada del principal y personajes de una sola escena.
     const counts = new Map<string, boolean[]>()
     s.scenes.forEach((x, i) => x.characters.forEach((c) => { if (!counts.has(c)) counts.set(c, Array(n).fill(false)); counts.get(c)![i] = true }))
@@ -66,6 +82,16 @@ export function clinic(input: ClinicInput): Issue[] {
   }
   // Locaciones con ficha pero sin uso en el guion.
   for (const l of input.locations ?? []) if (l.appearances === 0 && totalScenes > 0) add('structure', 'info', `Locación "${l.name}" sin escenas`, 'Tiene ficha pero no aparece en ningún encabezado ni mención. ¿Worldbuilding o descarte?')
+
+  // Motivación: el motor de personaje vacío en quien sostiene la historia (PRD §57).
+  for (const c of input.characters) {
+    if (c.appearances < 3 || c.motDims === undefined) continue
+    if (c.motDims === 0) add('motivation', 'incomplete', `${c.name}: sin motivación definida`, 'Ninguna de las diez dimensiones tiene texto. Sin meta, miedo ni herida, sus decisiones son difíciles de justificar.')
+    else if (c.motDims < 4 && c.group === 'protagonist') add('motivation', 'info', `${c.name}: motivación incompleta (${c.motDims}/10)`, 'Un protagonista con pocas dimensiones rellenas rinde menos en la Matriz de motivación.')
+  }
+  // Continuidad: nombres que el guion usa y el vault no conoce.
+  for (const n of input.missing?.characters ?? []) add('continuity', 'incomplete', `${n}: habla en el guion y no tiene ficha`, 'Créala desde Breakdown → Extraer del guión para que entre en el breakdown, el grafo y el diagnóstico.')
+  for (const n of input.missing?.locations ?? []) add('continuity', 'incomplete', `${n}: locación del guion sin ficha`, 'Aparece en un encabezado pero no existe como entidad; no se puede planificar ni desglosar.')
 
   // Relaciones declaradas sin coincidencia en escena.
   const coAppear = new Set<string>()

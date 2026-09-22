@@ -37,3 +37,5 @@ Pruebas: `tests/core/stats.test.ts` (3) y casos nuevos en `tests/core/planning.t
 ## 3. Fuera de alcance (coherente con el producto)
 
 Cuenta, licencias, suscripción, telemetría, sincronización y colaboración (§150-155, §174-175, §215): Writter es local-first, offline y mono-usuario; el manuscrito no sale del disco del autor. SQLite + FTS (§134-135): el vault vive en memoria y la búsqueda es instantánea; se revisará si un proyecto real lo pide.
+
+Tercera pasada (ficha de escena, tensión de beats, matriz completa, columnas del Index, jerarquía de lugares, áreas nuevas de la Clinic, carpetas de notas y enfoque del mapa): [docs/plan-prd-fase-3.md](plan-prd-fase-3.md).

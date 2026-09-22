@@ -161,6 +161,23 @@ export function Breakdown() {
   const countIn = (g: string) => ofKind.filter((c) => (g === 'none' ? !c.group || c.group === 'none' : c.group === g)).length
   const inScope = (c: EntityCard) => (!season && !episode) || c.appearances.some((a) => { const m = scriptMeta.get(a.script); return (!season || m?.season === season) && (!episode || m?.episode === episode) })
 
+  // Jerarquía de lugares (PRD §43): cada ficha declara `parent`; los huérfanos cuelgan de la raíz.
+  const parentOf = (c: EntityCard) => String(readFrontmatter(docs.find((d) => d.path === c.path)?.content ?? '').data['parent'] ?? '')
+  const tree = (l: EntityCard[]): { c: EntityCard; depth: number }[] => {
+    const byName = new Map(l.map((c) => [c.name, c]))
+    const kids = new Map<string, EntityCard[]>()
+    const roots: EntityCard[] = []
+    for (const c of [...l].sort((a, b) => a.name.localeCompare(b.name))) {
+      const p = parentOf(c)
+      if (p && byName.has(p) && p !== c.name) kids.set(p, [...(kids.get(p) ?? []), c])
+      else roots.push(c)
+    }
+    const out: { c: EntityCard; depth: number }[] = []
+    const walk = (c: EntityCard, depth: number) => { out.push({ c, depth }); if (depth < 6) for (const k of kids.get(c.name) ?? []) walk(k, depth + 1) }
+    for (const r of roots) walk(r, 0)
+    return out
+  }
+
   const list = useMemo(() => {
     let l = ofKind.filter((c) =>
       (group === 'all' || (group === 'none' ? !c.group || c.group === 'none' : c.group === group)) &&
@@ -170,8 +187,9 @@ export function Breakdown() {
     if (sortBy === 'az') l = [...l].sort((a, b) => a.name.localeCompare(b.name))
     else if (sortBy === 'scenes') l = [...l].sort((a, b) => b.appearances.length - a.appearances.length)
     else if (sortBy === 'group') l = [...l].sort((a, b) => a.group.localeCompare(b.group))
-    return l
-  }, [ofKind, group, orphansOnly, season, episode, q, sortBy])
+    else if (sortBy === 'tree' && kind === 'location') return tree(l)
+    return l.map((c) => ({ c, depth: 0 }))
+  }, [ofKind, group, orphansOnly, season, episode, q, sortBy, kind, docs])
 
   const patchGroup = (path: string, g: string) => { const d = docs.find((x) => x.path === path); if (d) void writeOther(path, writeFrontmatter(d.content, { group: g })) }
   const extract = async () => {
@@ -198,11 +216,11 @@ export function Breakdown() {
   }
   const deleteAll = async () => {
     if (!window.confirm(`${t('¿Eliminar las')} ${list.length} ${t('fichas visibles? (recuperables en Versiones)')}`)) return
-    for (const c of list) await deleteEntity(c.path)
+    for (const { c } of list) await deleteEntity(c.path)
   }
   const toXls = () => {
     const esc = (s: string) => s.replace(/[&<>]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m]!))
-    const rows = list.map((c) => `<tr><td>${esc(c.name)}</td><td>${esc(groupLabel(c.group))}</td><td>${esc(c.actor)}</td><td>${c.appearances.length}</td><td>${esc(c.aliases.join('; '))}</td></tr>`).join('')
+    const rows = list.map(({ c }) => `<tr><td>${esc(c.name)}</td><td>${esc(groupLabel(c.group))}</td><td>${esc(c.actor)}</td><td>${c.appearances.length}</td><td>${esc(c.aliases.join('; '))}</td></tr>`).join('')
     const html = `<table border=1><tr><th>Name</th><th>Group</th><th>Actor</th><th>Scenes</th><th>Aliases</th></tr>${rows}</table>`
     void window.api.exportText(html, `${kind}.xls`)
   }
@@ -245,6 +263,7 @@ export function Breakdown() {
             <option value="az">A-Z</option>
             <option value="scenes">{t('Por escenas')}</option>
             <option value="group">{t('Por grupo')}</option>
+            {kind === 'location' && <option value="tree">{t('Por jerarquía')}</option>}
           </select>
           <div className="segmented" role="group" title={t('Vista')}>
             <button className={listView ? '' : 'on'} onClick={() => setListView(false)}>{t('Tarjetas')}</button>
@@ -267,7 +286,7 @@ export function Breakdown() {
           <Menu items={[{ label: t('Exportar Excel'), run: toXls }, { label: t('Exportar CSV'), run: () => void window.api.exportText(toCsv(cards), 'breakdown.csv') }, 'sep', { label: t('Eliminar todo'), run: () => void deleteAll(), danger: true, disabled: !list.length }]} />
         </div>
         <div className={listView ? 'bd-list' : 'cards'}>
-          {list.map((c) => <Card key={c.path} c={c} groups={allGroups} epOf={epOf} places={places} refs={refsOf(c)} />)}
+          {list.map(({ c, depth }) => <div key={c.path} style={depth ? { marginLeft: depth * 18 } : undefined}><Card c={c} groups={allGroups} epOf={epOf} places={places} refs={refsOf(c)} /></div>)}
           {list.length === 0 && <p className="muted">{t('Sin fichas. Usa "Extraer del guión" o crea una.')}</p>}
         </div>
       </section>

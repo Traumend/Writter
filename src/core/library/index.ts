@@ -75,6 +75,8 @@ export const byId = (id: string) => LIBRARY.find((e) => e.id === id)
 export const SUGGEST: Record<string, string[]> = {
   structure: ['t-punto-medio', 't-escalada', 't-lectura-fria'],
   characters: ['t-querer-necesitar', 't-herida', 't-voz-propia'],
+  motivation: ['t-querer-necesitar', 't-herida', 'p-ambivalencia'],
+  continuity: ['t-chejov', 't-lectura-fria'],
   questions: ['t-pregunta-motor', 't-ironia-dramatica'],
   plants: ['t-siembra-pago', 't-chejov'],
   tracks: ['t-inactividad-subtrama', 't-respiracion'],

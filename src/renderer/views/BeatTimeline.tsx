@@ -4,6 +4,7 @@ import { readFrontmatter, writeFrontmatter } from '../../core/frontmatter'
 import { sceneMinutes } from '../../core/paginate'
 import { parseFountain } from '../../core/parser/fountain'
 import { project, type Scene } from '../../core/projection'
+import { SCENE_FIELDS, readSceneMeta, type SceneMeta } from '../../core/planning'
 import { nextActRange, pack } from '../../core/timeline'
 import { t } from '../i18n'
 import { useStore } from '../store'
@@ -14,9 +15,9 @@ import { TEMPLATE, NoScripts } from './Desk'
 // empaquetado en subfilas cuando dos tarjetas comparten tiempo, inspector persistente para editar y muro de notas.
 // Todo se guarda en outline/<episodio>.md (acts, beats, notes) — docs/plan-beat-timeline-v2.md.
 type Act = { title: string; summary: string; from: number; to: number; color?: string }
-type Beat = { id: string; title: string; note: string; scene: number; kind: string }
+type Beat = { id: string; title: string; note: string; scene: number; kind: string; tension?: number; characters?: string[] }
 type Note = { id: string; title?: string; text: string; x: number; y: number; color: string; kind: string; tags?: string[]; links?: string[] }
-type Ep = { path: string; outlinePath: string; outlineContent: string | null; name: string; season: string; episode: string; code: string; content: string; scenes: Scene[]; mins: number[]; starts: number[]; runtime: number; offset: number; acts: Act[]; beats: Beat[]; notes: Note[] }
+type Ep = { path: string; outlinePath: string; outlineContent: string | null; name: string; season: string; episode: string; code: string; content: string; scenes: Scene[]; mins: number[]; starts: number[]; runtime: number; offset: number; acts: Act[]; beats: Beat[]; notes: Note[]; sceneMeta: Record<string, SceneMeta> }
 type SelKind = 'act' | 'beat' | 'note' | 'scene'
 type Sel = { kind: SelKind; ep: string; key: number | string } | null
 
@@ -88,7 +89,8 @@ export function BeatTimeline() {
       const ep: Ep = {
         path: f.path, outlinePath, outlineContent: od?.content ?? null, name: f.name, season, episode, code: epCode(season, episode), content: d?.content ?? '',
         scenes, mins, starts, runtime: s, offset,
-        acts: (Array.isArray(data['acts']) ? data['acts'] : []) as Act[], beats: (Array.isArray(data['beats']) ? data['beats'] : []) as Beat[], notes: (Array.isArray(data['notes']) ? data['notes'] : []) as Note[]
+        acts: (Array.isArray(data['acts']) ? data['acts'] : []) as Act[], beats: (Array.isArray(data['beats']) ? data['beats'] : []) as Beat[], notes: (Array.isArray(data['notes']) ? data['notes'] : []) as Note[],
+        sceneMeta: readSceneMeta(od?.content)
       }
       offset += Math.max(s, 0.5) // un episodio vacío ocupa medio minuto para que se vea su bloque
       return ep
@@ -133,6 +135,8 @@ export function BeatTimeline() {
     const all = eps.flatMap((ep) => ep.beats.map((b, i) => ({ ep, i, b, cx: Math.max(GUT + 6, x(ep.offset + (ep.starts[b.scene] ?? 0))) }))).sort((p, q) => p.cx - q.cx)
     return pack(all.map((it, k) => { const next = all.slice(k + 1).find((o) => o.cx > it.cx); const w = Math.max(44, Math.min(BEAT_W, next ? next.cx - it.cx - 4 : BEAT_W)); return { a: it.cx, b: it.cx + w, it: { ...it, w } } }))
   })()
+  // Puntos de la curva: beats con tensión anotada, en orden temporal.
+  const tension = eps.flatMap((ep) => ep.beats.filter((b) => (b.tension ?? 0) > 0).map((b) => ({ cx: Math.max(GUT + 6, x(ep.offset + (ep.starts[b.scene] ?? 0))), v: b.tension ?? 0, title: b.title }))).sort((a, b) => a.cx - b.cx)
   const seasons = useMemo(() => { const out: { season: string; a: number; b: number }[] = []; for (const ep of eps) { const last = out[out.length - 1]; const end = ep.offset + Math.max(ep.runtime, 0.5); if (last && last.season === ep.season) last.b = end; else out.push({ season: ep.season, a: ep.offset, b: end }) } return out }, [eps])
   const showSeasons = scope === 'series' && seasons.some((s) => s.season)
 
@@ -287,6 +291,16 @@ export function BeatTimeline() {
               ))}
             </div>
 
+            {/* Curva de tensión (PRD §65): metadato por beat, dibujado como carril propio cuando existe. */}
+            {tension.length > 1 && (
+              <div className="bt-lane bt-tension" style={{ height: 52 }}><span className="lanelabel">{t('Tensión')}</span>
+                <svg width={width} height={52} aria-label={t('Curva de tensión')}>
+                  <polyline points={tension.map((p) => `${p.cx},${46 - (p.v / 10) * 38}`).join(' ')} fill="none" stroke="var(--accent)" strokeWidth={2} />
+                  {tension.map((p, i) => <circle key={i} cx={p.cx} cy={46 - (p.v / 10) * 38} r={3.5} fill="var(--accent)"><title>{`${p.title}: ${p.v}/10`}</title></circle>)}
+                </svg>
+              </div>
+            )}
+
             <div className="bt-lane" style={{ height: 40 }}><span className="lanelabel">{t('Escenas')}</span>
               {flat.map((f) => {
                 const h = f.s.heading.toUpperCase()
@@ -329,7 +343,7 @@ export function BeatTimeline() {
           </div>
         </div>
 
-        {insp && <Inspector sel={sel} eps={eps} active={active} save={save} setSel={setSel} versions={versions} openScene={(ep, i) => { void openFile(ep.path, ep.scenes[i]?.startLine); setTab('desk') }} />}
+        {insp && <Inspector sel={sel} eps={eps} active={active} save={save} setSel={setSel} versions={versions} chars={cards.map((c) => c.name)} openScene={(ep, i) => { void openFile(ep.path, ep.scenes[i]?.startLine); setTab('desk') }} />}
       </div>
 
       <div className="bt-legend">
@@ -356,7 +370,7 @@ export function BeatTimeline() {
 }
 
 // Inspector: edita la tarjeta seleccionada (acto, beat, nota o escena). El timeline solo muestra.
-function Inspector({ sel, eps, active, save, setSel, versions, openScene }: { sel: Sel; eps: Ep[]; active: Ep; save: (ep: Ep, patch: Record<string, unknown>) => void; setSel: (s: Sel) => void; versions: { id: string; ts: number; label?: string; origin: string }[]; openScene: (ep: Ep, i: number) => void }) {
+function Inspector({ sel, eps, active, save, setSel, versions, openScene, chars }: { sel: Sel; eps: Ep[]; active: Ep; save: (ep: Ep, patch: Record<string, unknown>) => void; setSel: (s: Sel) => void; versions: { id: string; ts: number; label?: string; origin: string }[]; openScene: (ep: Ep, i: number) => void; chars: string[] }) {
   const ep = sel ? eps.find((e) => e.path === sel.ep) : undefined
   const head = (title: string) => <div className="row"><strong className="ell grow">{title}</strong><button className="mini ghost" title={t('Cerrar')} onClick={() => setSel(null)}><Icon name="close" size={12} /></button></div>
   const sceneOpts = (e: Ep) => e.scenes.map((s, i) => <option key={i} value={i}>#{i + 1} {s.heading.slice(0, 28)}</option>)
@@ -387,6 +401,8 @@ function Inspector({ sel, eps, active, save, setSel, versions, openScene }: { se
         <div className="row"><label className="field grow"><span>{t('Tipo')}</span><select value={b.kind} onChange={(e) => upd({ kind: e.target.value })}>{Object.keys(KINDS).map((k) => <option key={k} value={k}>{t(KIND_LABEL[k] ?? k)}</option>)}</select></label>
           <label className="field grow"><span>{t('Escena')}</span><select value={b.scene} onChange={(e) => upd({ scene: Number(e.target.value) })}>{sceneOpts(ep)}</select></label></div>
         <label className="field"><span>{t('Nota')}</span><BlurInput textarea rows={5} value={b.note} placeholder={t('Qué pasa y por qué importa')} onCommit={(v) => upd({ note: v })} /></label>
+        <div className="field"><span>{t('Tensión')} {b.tension ?? 0}/10</span><input type="range" min={0} max={10} value={b.tension ?? 0} onChange={(e) => upd({ tension: Number(e.target.value) })} /></div>
+        <div className="field"><span>{t('Personajes')}</span><div className="chips">{chars.map((c) => <button key={c} className={b.characters?.includes(c) ? 'mini on' : 'mini ghost'} onClick={() => upd({ characters: b.characters?.includes(c) ? b.characters.filter((z) => z !== c) : [...(b.characters ?? []), c] })}><span className="ell">{c}</span></button>)}</div></div>
         <button className="ghost danger" onClick={() => { save(ep, { beats: ep.beats.filter((y) => y.id !== b.id) }); setSel(null) }}><Icon name="trash" size={12} />{t('Eliminar beat')}</button>
       </aside>
     )
@@ -406,6 +422,7 @@ function Inspector({ sel, eps, active, save, setSel, versions, openScene }: { se
     )
   }
   const i = Number(sel.key); const s = ep.scenes[i]; if (!s) return null
+  const meta = ep.sceneMeta[s.heading] ?? {}
   const lines = ep.content.split('\n').slice(s.startLine, s.endLine)
   const written = ep.scenes.filter((z) => z.wordCount > 15).length
   return (
@@ -413,6 +430,12 @@ function Inspector({ sel, eps, active, save, setSel, versions, openScene }: { se
       {versions.length > 0 && ep === active && <select><option>{t('Versión actual')}</option>{versions.map((v) => <option key={v.id}>{new Date(v.ts).toLocaleDateString()} · {v.label ?? v.origin}</option>)}</select>}
       <div className="bt-prog"><div style={{ width: `${Math.round((written / Math.max(1, ep.scenes.length)) * 100)}%` }} /></div>
       <div className="muted tiny">{s.characters.join(', ') || s.links.join(', ')} · {s.wordCount} {t('palabras')} · {(ep.mins[i] ?? 0).toFixed(1)} min</div>
+      {/* Ficha de la escena (PRD §16): el texto vive en el guion; propósito, conflicto y resultado, en el outline. */}
+      {SCENE_FIELDS.map(([k, label, hint]) => (
+        <label className="field" key={k}><span>{t(label)}</span>
+          <BlurInput textarea={k !== 'summary'} rows={2} value={String(meta[k] ?? '')} placeholder={t(hint)} onCommit={(v) => save(ep, { sceneMeta: { ...ep.sceneMeta, [s.heading]: { ...meta, [k]: v } } })} />
+        </label>
+      ))}
       <pre className="scenetext">{lines.join('\n')}</pre>
       <button onClick={() => openScene(ep, i)}>{t('Abrir en Escritorio')}</button>
     </aside>

@@ -288,6 +288,10 @@ main.page.bt { min-height: 0; gap: 8px; }
 .table.planner td:first-child input { width: 140px; margin: 0; padding: 4px 6px; font-size: 12px; }
 .table.planner .cell { cursor: pointer; }
 .pip { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%; color: #0c0c0c; }
+.bt-tension svg { display: block; overflow: visible; }
+.table.cmm th, .table.cmm td { padding: 3px 5px; text-align: center; font-size: 11px; }
+.table.cmm td:first-child, .table.cmm th:first-child { text-align: left; max-width: 140px; }
+.cmmcell .lvl { display: inline-block; min-width: 18px; border-radius: 4px; background: var(--accent); color: var(--on-accent); font-weight: 700; }
 .pipbtn { background: none; border: 0; padding: 2px; margin: 0; box-shadow: none; cursor: pointer; line-height: 0; }
 .pipbtn:hover { box-shadow: none; transform: none; }
 .qcard { margin-bottom: 10px; }

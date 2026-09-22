@@ -7,7 +7,7 @@ import { Icon } from '../../ui'
 import { useClinicIssues, usePlanning, useScripts } from './data'
 import { SEV_COLOR, SEV_LABEL, useOpenScene } from './shared'
 
-const AREA_LABEL: Record<Area, string> = { structure: 'Estructura', characters: 'Personajes', questions: 'Preguntas', plants: 'Plant & Payoff', tracks: 'Tracks', pacing: 'Ritmo', ideas: 'Ideas' }
+const AREA_LABEL: Record<Area, string> = { structure: 'Estructura', characters: 'Personajes', motivation: 'Motivación', continuity: 'Continuidad', questions: 'Preguntas', plants: 'Plant & Payoff', tracks: 'Tracks', pacing: 'Ritmo', ideas: 'Ideas' }
 
 // Clinic: diagnóstico narrativo local. Muestra señales, no veredictos; cada hallazgo enlaza a escenas y técnicas.
 export function Clinic() {
@@ -29,7 +29,7 @@ export function Clinic() {
   return (
     <main className="page scroll">
       <div className="toolbar wrap">
-        {(['all', 'structure', 'characters', 'questions', 'plants', 'tracks', 'pacing', 'ideas'] as const).map((a) => (
+        {(['all', 'structure', 'characters', 'motivation', 'continuity', 'questions', 'plants', 'tracks', 'pacing', 'ideas'] as const).map((a) => (
           <button key={a} className={area === a ? 'mini on' : 'mini ghost'} onClick={() => setArea(a)}>{a === 'all' ? t('Todo') : t(AREA_LABEL[a])} ({count(a)})</button>
         ))}
         <span className="grow" />
@@ -46,6 +46,7 @@ export function Clinic() {
               {i.area === 'questions' && <button className="mini ghost" onClick={() => setPlanTab('questions')}>{t('Abrir preguntas')}</button>}
               {i.area === 'plants' && <button className="mini ghost" onClick={() => setPlanTab('plants')}>{t('Abrir Plant & Payoff')}</button>}
               {i.area === 'tracks' && <button className="mini ghost" onClick={() => setPlanTab('planner')}>{t('Abrir Planner')}</button>}
+              {(i.area === 'motivation' || i.area === 'continuity') && <button className="mini ghost" onClick={() => { const s = useStore.getState(); s.setTab(i.area === 'motivation' ? 'dev' : 'breakdown'); if (i.area === 'motivation') s.setDevTab('characters') }}>{t(i.area === 'motivation' ? 'Abrir personajes' : 'Abrir Breakdown')}</button>}
               <span className="grow" />
               <button className="mini ghost" onClick={() => setDismissed((s) => new Set([...s, i.title]))}>{t('Descartar')}</button>
             </div>

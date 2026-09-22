@@ -18,7 +18,16 @@ export type Planning = { goal: number; dailyGoal: number; logline: string; synop
 export type SceneStatus = 'idea' | 'outline' | 'planned' | 'draft' | 'revision' | 'revised' | 'final' | 'cut'
 export const SCENE_STATUS: SceneStatus[] = ['idea', 'outline', 'planned', 'draft', 'revision', 'revised', 'final', 'cut']
 export const QUESTION_STATUS: QuestionStatus[] = ['open', 'developing', 'partial', 'answered', 'abandoned']
-export type SceneMeta = { track?: string; status?: SceneStatus; pov?: string; tags?: string[]; overrides?: Record<string, string> }
+// Campos narrativos de la escena (PRD §16): el texto sigue en el guion; esto es la ficha de planificación.
+export type SceneMeta = { track?: string; status?: SceneStatus; pov?: string; tags?: string[]; overrides?: Record<string, string>; summary?: string; purpose?: string; conflict?: string; outcome?: string; stakes?: string; value?: string }
+export const SCENE_FIELDS: [keyof SceneMeta, string, string][] = [
+  ['summary', 'Sinopsis', 'Qué pasa en una línea'],
+  ['purpose', 'Propósito', '¿Por qué existe esta escena?'],
+  ['conflict', 'Conflicto', '¿Quién quiere qué y quién se opone?'],
+  ['outcome', 'Resultado', '¿Cómo termina y qué cambia?'],
+  ['stakes', 'Lo que está en juego', '¿Qué se pierde si sale mal?'],
+  ['value', 'Cambio de valor', 'De esperanza a miedo, de poder a impotencia…']
+]
 
 export const TRACK_COLORS = ['#4f8cff', '#e8437f', '#3ddc97', '#c47d1a', '#b388ff', '#59c1d6', '#ff8fb1', '#9bd659']
 export const uid = () => Math.random().toString(36).slice(2, 9)

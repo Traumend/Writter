@@ -2,7 +2,7 @@ import { expect, test } from 'vitest'
 import { clinic } from '../../src/core/clinic'
 import { premises } from '../../src/core/cmm'
 import { LIBRARY, SUGGEST, byId } from '../../src/core/library'
-import { ARC_STAGES, defaultArc, readArc, readMotivation, readPlanning, readSceneMeta, resolveRef } from '../../src/core/planning'
+import { ARC_STAGES, SCENE_FIELDS, defaultArc, readArc, readMotivation, readPlanning, readSceneMeta, resolveRef, type SceneMeta } from '../../src/core/planning'
 
 test('readPlanning tolera campos faltantes y desconocidos', () => {
   const p = readPlanning('---\ntype: planning\ngoal: 500\nquestions:\n  - text: "¿Quién?"\n    foo: bar\nplants: []\n---\n')
@@ -108,4 +108,36 @@ test('clinic avisa de arco sin hitos, locación sin escenas y pregunta sin desar
     locations: [{ name: 'Hotel Aurora', appearances: 4 }]
   }).map((i) => i.title).join('\n')
   expect(clean).not.toMatch(/arco sin hitos|sin escenas|sin desarrollo intermedio/)
+})
+
+test('clinic: escenas fuera de los actos, curva de tensión, motivación vacía y nombres sin ficha', () => {
+  const scenes = Array.from({ length: 10 }, (_, i) => ({ heading: `INT. S${i} - DÍA`, characters: ['A'], wordCount: 100, minutes: 1 }))
+  const planning = { goal: 0, dailyGoal: 0, logline: '', synopsis: '', genre: '', status: 'idea' as const, tracks: [], questions: [], plants: [], ideas: [] }
+  const beats = [{ scene: 0, tension: 9 }, { scene: 2, tension: 8 }, { scene: 6, tension: 3 }, { scene: 9, tension: 2 }]
+  const issues = clinic({
+    scripts: [{ path: 's.md', name: 's', scenes, acts: [{ title: 'A1', from: 0, to: 6 }], sceneMeta: {}, beats }],
+    characters: [{ name: 'A', group: 'protagonist', appearances: 10, relationships: [], arcPoints: 2, arcLinked: 1, motDims: 0 }],
+    missing: { characters: ['ZORAIDA'], locations: ['PUENTE VIEJO'] },
+    planning
+  })
+  const titles = issues.map((i) => i.title).join('\n')
+  expect(titles).toMatch(/3 escena\(s\) fuera de los actos/)
+  expect(titles).toMatch(/la tensión no sube hacia el final/)
+  expect(titles).toMatch(/A: sin motivación definida/)
+  expect(titles).toMatch(/ZORAIDA: habla en el guion y no tiene ficha/)
+  expect(titles).toMatch(/PUENTE VIEJO: locación del guion sin ficha/)
+  expect(issues.filter((i) => i.area === 'motivation' || i.area === 'continuity').every((i) => i.techniques.length > 0)).toBe(true)
+
+  // Con beats sin tensión anotada el aviso cambia de tono (dato incompleto, no juicio).
+  const flat = clinic({
+    scripts: [{ path: 's.md', name: 's', scenes, acts: [{ title: 'A1', from: 0, to: 9 }], sceneMeta: {}, beats: beats.map((b) => ({ scene: b.scene })) }],
+    characters: [], planning
+  })
+  expect(flat.map((i) => i.title).join('\n')).toMatch(/beats sin tensión anotada/)
+})
+
+test('SCENE_FIELDS cubre la ficha narrativa de la escena y son claves de SceneMeta', () => {
+  expect(SCENE_FIELDS.map(([k]) => k)).toEqual(['summary', 'purpose', 'conflict', 'outcome', 'stakes', 'value'])
+  const meta: SceneMeta = Object.fromEntries(SCENE_FIELDS.map(([k]) => [k, 'x']))
+  expect(meta.summary).toBe('x')
 })

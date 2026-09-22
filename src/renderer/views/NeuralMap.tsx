@@ -62,6 +62,8 @@ export function NeuralMap() {
   const [season, setSeason] = useState('')
   const [episode, setEpisode] = useState('')
   const [q, setQ] = useState('')
+  const [focus, setFocus] = useState<string | null>(null) // nodo enfocado (clic derecho)
+  const [depth, setDepth] = useState(1) // niveles de conexión visibles; 0 = todo el grafo
   const [view, setView] = useState({ x: 0, y: 0, k: 1 })
   const [spin, setSpin] = useState(false)
   const [rot, setRot] = useState(0)
@@ -87,10 +89,27 @@ export function NeuralMap() {
     for (const e of edges) { deg.set(e.s, (deg.get(e.s) ?? 0) + 1); deg.set(e.t, (deg.get(e.t) ?? 0) + 1) }
     let ns = built.nodes.filter((n) => kept.has(n.id))
     if (!showUnconnected) ns = ns.filter((n) => (deg.get(n.id) ?? 0) > 0)
-    const finalIds = new Set(ns.map((n) => n.id))
-    const es = edges.filter((e) => finalIds.has(e.s) && finalIds.has(e.t))
+    let finalIds = new Set(ns.map((n) => n.id))
+    let es = edges.filter((e) => finalIds.has(e.s) && finalIds.has(e.t))
+    // Modo enfoque (PRD §77): solo el nodo elegido y sus vecinos hasta `depth` saltos.
+    if (focus && depth > 0 && finalIds.has(focus)) {
+      const near = new Set([focus])
+      let frontier = [focus]
+      for (let d = 0; d < depth; d++) {
+        const next: string[] = []
+        for (const e of es) {
+          if (near.has(e.s) && !near.has(e.t)) { near.add(e.t); next.push(e.t) }
+          else if (near.has(e.t) && !near.has(e.s)) { near.add(e.s); next.push(e.s) }
+        }
+        frontier = next
+        if (!frontier.length) break
+      }
+      ns = ns.filter((n) => near.has(n.id))
+      finalIds = new Set(ns.map((n) => n.id))
+      es = es.filter((e) => finalIds.has(e.s) && finalIds.has(e.t))
+    }
     return { ns, es, deg, comp: components(ns, es) }
-  }, [built, layers, etypes, showWeak, showUnconnected, showCatalog, season, episode])
+  }, [built, layers, etypes, showWeak, showUnconnected, showCatalog, season, episode, focus, depth])
 
   // Layout: coloca nodos (islas -> un centro por componente en anillo; nube -> centro único).
   useEffect(() => {
@@ -172,6 +191,16 @@ export function NeuralMap() {
           {chk(showCatalog, t('Catálogo sin aparición'), () => setShowCatalog((v) => !v), orphans)}
           {chk(bridges, t('Puentes críticos'), () => setBridges((v) => !v), art.size)}
           {chk(islands, t('Islas'), () => setIslands((v) => !v))}
+          <h3>{t('Enfoque')}</h3>
+          {focus ? (
+            <>
+              <p className="tiny ell" title={focus}>{built.nodes.find((n) => n.id === focus)?.label ?? focus}</p>
+              <div className="row tiny wrap">
+                {[1, 2, 3, 0].map((d) => <button key={d} className={depth === d ? 'mini on' : 'mini ghost'} onClick={() => setDepth(d)}>{d === 0 ? t('Todo') : `${d} ${t('niveles')}`}</button>)}
+                <button className="mini ghost" onClick={() => setFocus(null)}>{t('Quitar')}</button>
+              </div>
+            </>
+          ) : <p className="muted tiny">{t('Clic derecho en un nodo para enfocarlo y ver solo sus conexiones.')}</p>}
 
           <h3>{t('Disposición')}</h3>
           <label className="field"><span>{t('Modo')}</span>
@@ -224,7 +253,7 @@ export function NeuralMap() {
               const isArt = bridges && art.has(n.id)
               const col = COLOR[n.kind] ?? '#888'
               return (
-                <g key={n.id} transform={`translate(${n.x},${n.y})`} opacity={dim ? 0.2 : 1} onPointerDown={dragNode(n.id)} onDoubleClick={() => { if (n.kind !== 'scene') { void openFile(n.id); setTab('desk') } else if (n.scriptPath) { void openFile(n.scriptPath); setTab('desk') } }} style={{ cursor: 'grab' }}>
+                <g key={n.id} transform={`translate(${n.x},${n.y})`} opacity={dim ? 0.2 : 1} onPointerDown={dragNode(n.id)} onContextMenu={(e) => { e.preventDefault(); setFocus((f) => (f === n.id ? null : n.id)) }} onDoubleClick={() => { if (n.kind !== 'scene') { void openFile(n.id); setTab('desk') } else if (n.scriptPath) { void openFile(n.scriptPath); setTab('desk') } }} style={{ cursor: 'grab' }}>
                   {n.kind === 'scene'
                     ? <polygon points={`0,${-r} ${r},0 0,${r} ${-r},0`} fill={col} stroke={isArt ? '#fff' : (hit(n) ? '#fff' : 'none')} strokeWidth={isArt ? 3 : 2} />
                     : <circle r={r} fill={col} stroke={isArt ? '#fff' : (hit(n) ? '#fff' : 'none')} strokeWidth={isArt ? 3 : 2} />}
