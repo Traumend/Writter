@@ -146,7 +146,8 @@ export function BeatTimeline() {
   const addAct = () => { if (!active) return; const r = nextActRange(active.acts, Math.max(1, active.scenes.length)); save(active, { acts: [...r.acts, { title: `${t('Acto')} ${active.acts.length + 1}`, summary: '', from: r.from, to: r.to, color: ACT_COLORS[active.acts.length % ACT_COLORS.length] }] }); setSel({ kind: 'act', ep: active.path, key: active.acts.length }) }
   const addBeat = () => { if (!active) return; const at = flat.find((f) => f.ep === active && play >= f.start && play < f.start + f.dur)?.i ?? (sel?.kind === 'scene' && sel.ep === active.path ? Number(sel.key) : 0); const id = uid(); save(active, { beats: [...active.beats, { id, title: t('Nuevo beat'), note: '', scene: at, kind: 'setup' }] }); setSel({ kind: 'beat', ep: active.path, key: id }) }
   const addNote = () => { if (!active) return; const id = uid(); save(active, { notes: [...active.notes, { id, title: '', text: '', ...freeSpot(active.notes), color: NOTE_COLORS[active.notes.length % NOTE_COLORS.length]!, kind: 'idea', tags: [] }] }); setSel({ kind: 'note', ep: active.path, key: id }) }
-  const addScene = () => { if (!active) return; const n = active.scenes.length + 1; void writeOther(active.path, active.content.replace(/\n+$/, '') + `\n\nINT. ${t('NUEVA ESCENA')} ${n} - DÍA\n\n`) }
+  // Si el episodio está abierto en el Escritorio, parte del texto vivo (puede haber cambios aún sin autoguardar).
+  const addScene = () => { if (!active) return; const st = useStore.getState(); const base = st.path === active.path ? st.text : active.content; const n = active.scenes.length + 1; void writeOther(active.path, base.replace(/\n+$/, '') + `\n\nINT. ${t('NUEVA ESCENA')} ${n} - DÍA\n\n`) }
 
   const exportMarkers = () => {
     const rows = [

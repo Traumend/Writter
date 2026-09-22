@@ -114,6 +114,7 @@ export const EN: Record<string, string> = {
   'duda': 'doubt',
   'setup': 'setup',
   'payoff': 'payoff',
+  'Ctrl+clic en [[Nombre]]': 'Ctrl+click on [[Name]]',
   'Vincular carpetas…': 'Link folders…',
   'Ajustes del proyecto': 'Project settings',
   Recargar: 'Reload',

@@ -48,7 +48,7 @@ export function Plants() {
               <tr key={p.id} className="vtop">
                 <td>
                   <BlurInput value={p.title} onCommit={(v) => upd(p.id, { title: v })} />
-                  <input placeholder={t('Tipo (objeto, información, gesto…)')} value={p.type} onChange={(e) => upd(p.id, { type: e.target.value })} />
+                  <BlurInput value={p.type} placeholder={t('Tipo (objeto, información, gesto…)')} onCommit={(v) => upd(p.id, { type: v })} />
                   <CharChips all={chars} value={p.characters} onChange={(v) => upd(p.id, { characters: v })} />
                 </td>
                 <td>

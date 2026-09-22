@@ -96,6 +96,7 @@ type State = {
   prefsOpen: boolean
   searchOpen: boolean
   rename: { path: string; name: string; terms: string[] } | null
+  lastRenamed: { from: string; to: string } | null // para que las vistas sigan a la ficha renombrada
   paletteOpen: boolean
   quickNoteOpen: boolean
   newEntity: Exclude<FileKind, 'other'> | null // modal "Nuevo…" (menú Historia / botón +)
@@ -235,6 +236,7 @@ export const useStore = create<State & Actions>((set, get) => ({
   recents: loadRecents(),
   pomo: { mode: 'focus', left: 25 * 60, running: false, done: 0 },
   rename: null,
+  lastRenamed: null,
 
   openRename: (path, name, terms) => set({ rename: { path, name, terms } }),
   closeRename: () => set({ rename: null }),
@@ -259,6 +261,7 @@ export const useStore = create<State & Actions>((set, get) => ({
     set({ rename: null, status: `Renombrado a "${to}"` })
     await get().refreshFiles()
     await get().refreshDocs()
+    set({ lastRenamed: { from: r.path, to: newPath } })
     if (get().path === r.path) await get().openFile(newPath)
   },
 

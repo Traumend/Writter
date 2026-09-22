@@ -142,7 +142,7 @@ function Shortcuts() {
       <div className="modal" style={{ width: 'min(560px, 92vw)' }} onClick={(e) => e.stopPropagation()}>
         <div className="row"><h1>{t('Atajos de teclado')}</h1><span className="grow" /><button className="mini ghost" onClick={() => setShortcutsOpen(false)}>{t('Cerrar')}</button></div>
         <table className="table"><tbody>
-          {[...rows, ...EXTRA_SHORTCUTS.map(([k, l]) => [k, t(l)] as [string, string])].map(([k, l]) => <tr key={k + l}><td><kbd>{k}</kbd></td><td>{l}</td></tr>)}
+          {[...rows, ...EXTRA_SHORTCUTS.map(([k, l]) => [t(k), t(l)] as [string, string])].map(([k, l]) => <tr key={k + l}><td><kbd>{k}</kbd></td><td>{l}</td></tr>)}
         </tbody></table>
       </div>
     </div>

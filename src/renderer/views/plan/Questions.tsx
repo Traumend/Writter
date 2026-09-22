@@ -43,7 +43,7 @@ export function Questions() {
           <div className="row tiny wrap">
             <span className="muted">{t('Se plantea en')}</span><SceneRefPicker value={q.introduced} onChange={(r) => upd(q.id, { introduced: r })} scripts={scripts} />
             <span className="muted">{t('Se resuelve en')}</span><SceneRefPicker value={q.resolved} onChange={(r) => upd(q.id, { resolved: r })} scripts={scripts} />
-            <input placeholder={t('Categoría')} value={q.category} onChange={(e) => upd(q.id, { category: e.target.value })} style={{ width: 140 }} />
+            <span style={{ width: 160 }}><BlurInput value={q.category} placeholder={t('Categoría')} onCommit={(v) => upd(q.id, { category: v })} /></span>
           </div>
           {/* Línea de tiempo de la pregunta: introducción → resolución sobre el total de escenas. */}
           {(q.introduced || q.resolved) && total > 0 && (

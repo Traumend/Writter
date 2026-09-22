@@ -56,7 +56,7 @@ function Chart({ a, cmp, markers, chars, on, onPick, onGo, svgRef, zoom }: { a: 
           {SERIES.filter(([k]) => on.has(k)).map(([k, l, c]) => (
             <div key={k}><span className="sw" style={{ background: c }} /> {t(l)}: <b>{hs[k]}/10</b> <span className="minibar"><span style={{ width: `${hs[k] * 10}%`, background: c }} /></span></div>
           ))}
-          {chars(hover!).length > 0 && <div className="muted">👥 {chars(hover!).join(', ')}</div>}
+          {chars(hover!).length > 0 && <div className="muted row" style={{ gap: 4 }}><Icon name="actor" size={11} />{chars(hover!).join(', ')}</div>}
           <div className="muted">{hs.summary}</div>
           <div className="muted tiny">{t('doble-clic → ir a la escena')}</div>
         </div>
@@ -211,7 +211,7 @@ export function Analysis() {
           {pick !== null && cur.scenes[pick] && (
             <div className="block panelbox">
               <h2>E{cur.scenes[pick]!.index + 1} · {cur.scenes[pick]!.emotion} <button className="mini ghost" onClick={() => goScene(pick)}>{t('Abrir en Escritorio')}</button></h2>
-              <div className="muted tiny">👥 {charsAt(pick).join(', ') || '—'}</div>
+              <div className="muted tiny row" style={{ gap: 4 }}><Icon name="actor" size={11} />{charsAt(pick).join(', ') || '—'}</div>
               <p>{cur.scenes[pick]!.summary}</p>
               <ul className="bullets">{cur.scenes[pick]!.notes.map((nt, i) => <li key={i}>{nt}</li>)}</ul>
             </div>

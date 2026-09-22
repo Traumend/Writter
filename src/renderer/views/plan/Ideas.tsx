@@ -29,9 +29,11 @@ export function Ideas() {
   const integrate = async (idea: Idea, scriptPath: string) => {
     const d = docs.find((x) => x.path === scriptPath)
     if (!d) return
+    const st = useStore.getState()
+    const base = st.path === scriptPath ? st.text : d.content // texto vivo si el guion está abierto
     const heading = idea.title.toUpperCase().startsWith('INT') || idea.title.toUpperCase().startsWith('EXT') ? idea.title : `INT. ${idea.title.toUpperCase()} - DÍA`
     const block = `\n\n${heading}\n\n${idea.summary ? `%% ${idea.summary} %%\n\n` : ''}`
-    await useStore.getState().writeOther(scriptPath, d.content.replace(/\n+$/, '') + block)
+    await useStore.getState().writeOther(scriptPath, base.replace(/\n+$/, '') + block)
     await save({ ideas: planning.ideas.filter((x) => x.id !== idea.id) })
     void openFile(scriptPath); setTab('desk')
   }

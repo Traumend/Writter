@@ -29,3 +29,26 @@ test('iconos: todo <Icon name="…"> existe en el catálogo', () => {
   for (const f of walk('src/renderer')) for (const m of src(f).matchAll(/<Icon name="([a-z]+)"/g)) used.add(m[1]!)
   expect([...used].filter((n) => !names.has(n))).toEqual([])
 })
+
+test('ningún input de texto escribe en disco en cada pulsación (usar BlurInput)', () => {
+  const bad: string[] = []
+  for (const f of walk('src/renderer/views')) {
+    src(f).split('\n').forEach((ln, i) => {
+      if (/<input(?![^>]*type=("?)(range|checkbox|number|radio)\1)[^>]*value=\{[^}]*\}[^>]*onChange=\{\(e\) => (void )?(upd|save|patch|writeMeta)\(/.test(ln)) bad.push(`${f}:${i + 1}`)
+    })
+  }
+  expect(bad).toEqual([])
+})
+
+test('sin emojis en el código: los iconos son SVG', () => {
+  const emoji = /[\u{1F300}-\u{1FAFF}]/u
+  const bad: string[] = []
+  for (const f of walk('src')) src(f).split('\n').forEach((ln, i) => { if (emoji.test(ln)) bad.push(`${f}:${i + 1}`) })
+  expect(bad).toEqual([])
+})
+
+test('las rutas de conocimiento pasan por el mapa de roles (roleDir), no por "knowledge/" fijo', () => {
+  const bad: string[] = []
+  for (const f of walk('src/renderer/views')) src(f).split('\n').forEach((ln, i) => { if (/`knowledge\//.test(ln)) bad.push(`${f}:${i + 1}`) })
+  expect(bad).toEqual([])
+})
