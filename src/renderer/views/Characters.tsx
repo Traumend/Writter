@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { breakdown } from '../../core/breakdown'
 import { readFrontmatter, writeFrontmatter } from '../../core/frontmatter'
 import { extractLinks, parseFountain } from '../../core/parser/fountain'
-import { MOT_DIMS, readMotivation } from '../../core/planning'
+import { MOT_DIMS, defaultArc, readArc, readMotivation, uid, type ArcPoint } from '../../core/planning'
 import { project } from '../../core/projection'
 import { joinSections, splitSections, type Section } from '../../core/sections'
 import { t } from '../i18n'
 import { useStore } from '../store'
 import { AiSuggest, BlurInput, Field, Icon, useAsset } from '../ui'
+import { useScripts } from './plan/data'
+import { SceneRefPicker, useOpenScene } from './plan/shared'
 
 const TRAITS: [string, string, string, string, string][] = [
   ['initiative', 'Iniciativa', 'Reactivo', 'Proactivo', '#ff5a1f'],
@@ -50,6 +52,8 @@ type Rel = { target: string; kind: string; note: string }
 
 export function Characters() {
   const { files, docs, writeOther, openFile, setTab, vault, saveConfig, path: openPath, lastRenamed } = useStore()
+  const scripts = useScripts()
+  const openScene = useOpenScene()
   const [sortBy, setSortBy] = useState('scenes')
   const cards = useMemo(() => {
     const list = breakdown(files, docs).filter((c) => c.kind === 'character')
@@ -77,6 +81,9 @@ export function Characters() {
   const mot = readMotivation(data)
   const setMot = (k: string, v: { text?: string; level?: number }) => patch({ motivation: { ...mot, [k]: { text: mot[k as keyof typeof mot]?.text ?? '', level: mot[k as keyof typeof mot]?.level ?? 5, ...v } } })
   const rels = (Array.isArray(data['relationships']) ? data['relationships'] : []) as Rel[]
+  const arc = readArc(data)
+  const setArc = (next: ArcPoint[]) => patch({ arc_points: next })
+  const updArc = (i: number, p: Partial<ArcPoint>) => setArc(arc.map((x, j) => (j === i ? { ...x, ...p } : x)))
   const customSliders = vault?.config.characterSliders ?? []
   const { intro, sections } = useMemo(() => splitSections(body), [body])
 
@@ -241,6 +248,29 @@ export function Characters() {
               </div>
             ))}
           </div>
+
+          {/* Arco del personaje (PRD §39): hitos del cambio anclados a escenas del guion. */}
+          <h2>{t('Arco del personaje')} <span className="muted tiny">{arc.filter((p) => p.ref).length}/{arc.length}</span></h2>
+          <p className="muted tiny">{t('Hitos del cambio, cada uno anclado a la escena donde ocurre. La Clinic avisa si un personaje con presencia no tiene arco.')}</p>
+          {arc.length === 0 ? (
+            <button className="ghost" onClick={() => setArc(defaultArc())}><Icon name="plus" size={12} />{t('Crear arco (6 hitos)')}</button>
+          ) : (
+            <div className="arc">
+              {arc.map((p, i) => (
+                <div className={`arc-row ${p.ref ? 'linked' : ''}`} key={p.id}>
+                  <span className="dot" aria-hidden />
+                  <BlurInput value={p.stage} placeholder={t('Hito')} onCommit={(v) => updArc(i, { stage: v })} />
+                  <BlurInput value={p.note} placeholder={t('Qué cambia aquí')} onCommit={(v) => updArc(i, { note: v })} />
+                  <span className="row">
+                    <SceneRefPicker value={p.ref} onChange={(r) => updArc(i, { ref: r })} scripts={scripts} />
+                    {p.ref && <button className="mini ghost" title={t('Ir a la escena')} onClick={() => openScene(scripts, p.ref)}><Icon name="link" size={12} /></button>}
+                    <button className="mini ghost" title={t('Quitar')} onClick={() => setArc(arc.filter((_, j) => j !== i))}><Icon name="close" size={12} /></button>
+                  </span>
+                </div>
+              ))}
+              <button className="mini ghost" onClick={() => setArc([...arc, { id: uid(), stage: '', note: '' }])}><Icon name="plus" size={12} />{t('Hito')}</button>
+            </div>
+          )}
 
           <h2>{t('Profundización')}
             <button className="mini ghost" onClick={() => setSections([...sections, { title: t('Nueva sección'), body: '' }])}><Icon name="plus" size={12} />{t('Añadir sección')}</button>

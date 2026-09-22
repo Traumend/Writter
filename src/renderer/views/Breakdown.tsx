@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { breakdown, extractMissing, toCsv, type Appearance, type EntityCard } from '../../core/breakdown'
 import { readFrontmatter, writeFrontmatter } from '../../core/frontmatter'
+import { extractLinks } from '../../core/parser/fountain'
 import type { FileKind } from '../../core/types/ipc'
 import { t } from '../i18n'
 import { useStore } from '../store'
@@ -40,16 +41,33 @@ function Menu({ items }: { items: MenuItem[] }) {
   )
 }
 
-function Card({ c, groups, epOf }: { c: EntityCard; groups: string[]; epOf: (s: string) => string }) {
+// Ficha de lugar (PRD §42, Location Engine): campos propios del espacio narrativo, en el frontmatter de la locación.
+const LOC_FIELDS: [string, string][] = [
+  ['type', 'Tipo (interior, ciudad, nave…)'],
+  ['region', 'Región o mundo'],
+  ['atmosphere', 'Atmósfera: luz, sonido, olor…'],
+  ['purpose', 'Propósito narrativo: ¿por qué aquí?'],
+  ['symbolism', 'Simbolismo'],
+  ['secrets', 'Secretos del lugar']
+]
+
+function Card({ c, groups, epOf, places = [], refs = 0 }: { c: EntityCard; groups: string[]; epOf: (s: string) => string; places?: string[]; refs?: number }) {
   const { docs, writeOther, openFile, setTab, files, deleteEntity, openRename } = useStore()
   const img = useAsset(c.image)
   const [expand, setExpand] = useState(false)
+  const [sheet, setSheet] = useState(false)
   const doc = docs.find((d) => d.path === c.path)
+  const data = doc ? readFrontmatter(doc.content).data : {}
   const patch = (p: Record<string, unknown>) => doc && void writeOther(c.path, writeFrontmatter(doc.content, p))
   const scripts = files.filter((f) => f.kind === 'script')
   const episodes = new Set(c.appearances.map((a) => epOf(a.script)).filter(Boolean)).size
   const shown = expand ? c.appearances : c.appearances.slice(0, 14)
-  const del = () => { if (window.confirm(`${t('¿Eliminar')} "${c.name}"? ${t('(recuperable en Versiones)')}`)) void deleteEntity(c.path) }
+  // Borrado con recuento de referencias (PRD §163): el usuario ve qué pierde antes de confirmar.
+  const del = () => {
+    const uses = c.appearances.length + refs
+    const detail = uses ? `${t('Referenciado en')} ${c.appearances.length} ${t('escena(s)')}${refs ? ` ${t('y')} ${refs} ${t('ficha(s)')}` : ''}. ` : ''
+    if (window.confirm(`${t('¿Eliminar')} "${c.name}"? ${detail}${t('(recuperable en Versiones)')}`)) void deleteEntity(c.path)
+  }
   return (
     <div className="card" draggable onDragStart={() => (dragCard = c.path)} onDragEnd={() => (dragCard = null)}>
       <div className="row">
@@ -57,7 +75,7 @@ function Card({ c, groups, epOf }: { c: EntityCard; groups: string[]; epOf: (s: 
           {img ? <img src={img} alt="" /> : <span>{c.name.slice(0, 1)}</span>}
         </div>
         <div className="grow">
-          <div className="tiny muted">{c.kind}</div>
+          <div className="tiny muted ell">{c.kind}{data['parent'] ? ` · ${t('en')} ${String(data['parent'])}` : ''}</div>
           <strong className="link" onClick={() => { void openFile(c.path); setTab('desk') }}>{c.name}</strong>
         </div>
         <Menu items={[{ label: t('Abrir .md'), run: () => { void openFile(c.path); setTab('desk') } }, { label: t('Renombrar…'), run: () => openRename(c.path, c.name, [c.name, ...c.aliases]) }, 'sep', { label: t('Eliminar'), run: del, danger: true }]} />
@@ -73,6 +91,20 @@ function Card({ c, groups, epOf }: { c: EntityCard; groups: string[]; epOf: (s: 
       )}
       <BlurInput textarea rows={2} value={c.description} placeholder={t('Descripción')} onCommit={(v) => patch({ description: v })} />
       <BlurInput value={c.aliases.join(', ')} placeholder={t('Alias separados por comas')} onCommit={(v) => patch({ aliases: v.split(',').map((x) => x.trim()).filter(Boolean) })} />
+      {c.kind === 'location' && (
+        <>
+          <div className="row tiny">
+            <span className="muted">{t('Dentro de')}</span>
+            <select value={String(data['parent'] ?? '')} onChange={(e) => patch({ parent: e.target.value })}>
+              <option value="">—</option>
+              {places.filter((p) => p !== c.name).map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+            <span className="grow" />
+            <button className="mini ghost" onClick={() => setSheet((s) => !s)}>{t('Ficha de lugar')}</button>
+          </div>
+          {sheet && LOC_FIELDS.map(([k, ph]) => <BlurInput key={k} value={String(data[k] ?? '')} placeholder={t(ph)} onCommit={(v) => patch({ [k]: v })} />)}
+        </>
+      )}
       <div className="tiny muted">{c.appearances.length} {t('escenas')} · {episodes} {t('episodios')}{c.kind === 'character' ? ` · ${c.words} ${t('palabras')}` : ''}</div>
       <div className="chips">
         {shown.map((a, i) => (
@@ -106,6 +138,14 @@ export function Breakdown() {
   const [status, setStatus] = useState('')
   const cards = useMemo(() => breakdown(files, docs), [files, docs])
   const missing = useMemo(() => extractMissing(files, docs), [files, docs])
+  const places = useMemo(() => cards.filter((c) => c.kind === 'location').map((c) => c.name), [cards])
+  // Menciones [[ ]] por nombre: alimentan el recuento de referencias del borrado (PRD §163).
+  const links = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const d of docs) for (const l of extractLinks(d.content)) m.set(l.toLowerCase(), (m.get(l.toLowerCase()) ?? 0) + 1)
+    return m
+  }, [docs])
+  const refsOf = (c: EntityCard) => [c.name, ...c.aliases].reduce((a, n) => a + (links.get(n.toLowerCase()) ?? 0), 0)
 
   const scriptMeta = useMemo(() => new Map(files.filter((f) => f.kind === 'script').map((f) => {
     const fm = readFrontmatter(docs.find((d) => d.path === f.path)?.content ?? '').data
@@ -227,7 +267,7 @@ export function Breakdown() {
           <Menu items={[{ label: t('Exportar Excel'), run: toXls }, { label: t('Exportar CSV'), run: () => void window.api.exportText(toCsv(cards), 'breakdown.csv') }, 'sep', { label: t('Eliminar todo'), run: () => void deleteAll(), danger: true, disabled: !list.length }]} />
         </div>
         <div className={listView ? 'bd-list' : 'cards'}>
-          {list.map((c) => <Card key={c.path} c={c} groups={allGroups} epOf={epOf} />)}
+          {list.map((c) => <Card key={c.path} c={c} groups={allGroups} epOf={epOf} places={places} refs={refsOf(c)} />)}
           {list.length === 0 && <p className="muted">{t('Sin fichas. Usa "Extraer del guión" o crea una.')}</p>}
         </div>
       </section>

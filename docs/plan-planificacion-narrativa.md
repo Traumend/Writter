@@ -62,5 +62,7 @@ Estados de pregunta: open · developing · partial · answered · abandoned.
 
 Pendientes conocidos (fuera de esta rama): overrides por escena de las dimensiones (el campo `sceneMeta[heading].overrides` existe en el modelo, sin UI); mensajes de la Clinic en español (contenido generado en `core/clinic`, no pasa por `t()`); Story Atlas/Constellations propios (cubiertos por el Mapa neural).
 
+Segunda pasada sobre el PRD (ficha de proyecto, estadísticas de sesión, arco de personaje, ficha de lugar, Index editable, hitos de pregunta, reglas nuevas de Clinic, plantillas con fusionar/reemplazar, estado de trabajo y accesibilidad): [docs/plan-prd-fase-2.md](plan-prd-fase-2.md).
+
 ## 5. Fuera de alcance en esta rama
 Series de varios libros, Stacks más allá de secciones `#`, SQLite/FTS, segunda ventana, mapa geográfico, multi-selección, tags globales con gestor, estadísticas de sesión, menú nativo completo.

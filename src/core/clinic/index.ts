@@ -8,8 +8,9 @@ export type Area = 'structure' | 'characters' | 'questions' | 'plants' | 'tracks
 export type Issue = { id: string; area: Area; severity: Severity; title: string; detail: string; refs: SceneRef[]; techniques: string[] }
 
 export type ClinicScript = { path: string; name: string; scenes: { heading: string; characters: string[]; wordCount: number; minutes: number }[]; acts: { title: string; from: number; to: number }[]; sceneMeta: Record<string, SceneMeta> }
-export type ClinicCharacter = { name: string; group: string; appearances: number; relationships: string[] }
-export type ClinicInput = { scripts: ClinicScript[]; characters: ClinicCharacter[]; planning: Planning }
+export type ClinicCharacter = { name: string; group: string; appearances: number; relationships: string[]; arcPoints?: number; arcLinked?: number }
+export type ClinicLocation = { name: string; appearances: number }
+export type ClinicInput = { scripts: ClinicScript[]; characters: ClinicCharacter[]; locations?: ClinicLocation[]; planning: Planning }
 
 const gaps = (present: boolean[]): { from: number; to: number }[] => {
   const out: { from: number; to: number }[] = []
@@ -57,6 +58,15 @@ export function clinic(input: ClinicInput): Issue[] {
   }
   for (const t of input.planning.tracks) if (!input.scripts.some((s) => s.scenes.some((x) => s.sceneMeta[x.heading]?.track === t.id))) add('tracks', 'incomplete', `Track "${t.name}" sin escenas`, 'Asigna escenas al track desde el Planner o elimínalo.')
 
+  // Arco de personaje: hitos declarados en la ficha y su anclaje a escenas (una historia, muchas vistas).
+  for (const c of input.characters) {
+    if (c.appearances < 3) continue
+    if (!c.arcPoints) add('characters', 'incomplete', `${c.name}: arco sin hitos`, 'Aparece en varias escenas pero su arco no tiene hitos definidos (partida, catalizador, crisis, llegada…).')
+    else if (!c.arcLinked) add('characters', 'incomplete', `${c.name}: hitos del arco sin escena`, 'Los hitos del arco no apuntan a ninguna escena; no se puede verificar dónde ocurre el cambio.')
+  }
+  // Locaciones con ficha pero sin uso en el guion.
+  for (const l of input.locations ?? []) if (l.appearances === 0 && totalScenes > 0) add('structure', 'info', `Locación "${l.name}" sin escenas`, 'Tiene ficha pero no aparece en ningún encabezado ni mención. ¿Worldbuilding o descarte?')
+
   // Relaciones declaradas sin coincidencia en escena.
   const coAppear = new Set<string>()
   for (const s of input.scripts) for (const x of s.scenes) for (const a of x.characters) for (const b of x.characters) if (a !== b) coAppear.add(`${a.toUpperCase()}|${b.toUpperCase()}`)
@@ -71,6 +81,7 @@ export function clinic(input: ClinicInput): Issue[] {
     if (i0 !== null && i1 !== null && q.introduced!.script === q.resolved!.script) {
       if (i1 < i0) add('questions', 'inconsistency', `Pregunta "${q.text.slice(0, 40)}" se resuelve antes de plantearse`, `Introducida en #${i0 + 1}, resuelta en #${i1 + 1}.`, [q.introduced!, q.resolved!])
       else if (i1 - i0 <= 1) add('questions', 'review', `Pregunta "${q.text.slice(0, 40)}" se responde de inmediato`, 'Apenas hay desarrollo entre la pregunta y la respuesta.', [q.introduced!, q.resolved!])
+      else if (i1 - i0 >= 5 && q.beats.length === 0) add('questions', 'review', `Pregunta "${q.text.slice(0, 40)}" sin desarrollo intermedio`, `Entre #${i0 + 1} y #${i1 + 1} no hay ningún hito registrado: el público puede olvidarla. Añade pistas intermedias.`, [q.introduced!, q.resolved!])
     }
     if (q.status === 'answered' && !q.introduced) add('questions', 'incomplete', `Pregunta respondida sin escena de introducción: "${q.text.slice(0, 40)}"`, 'Registra dónde se plantea para verificar el setup.')
   }

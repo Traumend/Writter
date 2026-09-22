@@ -8,6 +8,7 @@ import { guessesToRoleMap } from '../core/adopt'
 import { renameEntity } from '../core/rename'
 import { writeFrontmatter } from '../core/frontmatter'
 import { roleDir as roleDirOf } from '../core/types/ipc'
+import { record as recordDay, type WriteLog } from '../core/stats'
 import { setLang, type Lang } from './i18n'
 import type { AdoptionProposal, AdoptRole, AiProposal, Doc, FileEntry, FileKind, GraphStatus, KeyStatus, ProjectConfig, Scope, VaultSummary, Version } from '../core/types/ipc'
 
@@ -104,6 +105,7 @@ type State = {
   deskPanel: 'ai' | 'versions' | 'export' | null // petición para el panel derecho del Escritorio (menú Archivo → Exportar)
   recents: string[] // vaults recientes (localStorage)
   pomo: { mode: 'focus' | 'short' | 'long'; left: number; running: boolean; done: number } // Pomodoro (segundos restantes)
+  stats: WriteLog // palabras por día del proyecto abierto (localStorage, sin contenido)
 }
 
 type Actions = {
@@ -156,6 +158,7 @@ type Actions = {
   setShortcutsOpen(v: boolean): void
   setDeskPanel(p: 'ai' | 'versions' | 'export' | null): void
   cycleTab(dir: 1 | -1): void
+  recordStats(): void
   pomoToggle(): void
   pomoReset(mode?: 'focus' | 'short' | 'long'): void
   pomoSkip(): void
@@ -167,6 +170,28 @@ type Actions = {
 const EMPTY: Projection = { scenes: [], characters: [], links: [], wordCount: 0 }
 const RECENTS_KEY = 'writter.recents'
 function loadRecents(): string[] { try { return JSON.parse(localStorage.getItem(RECENTS_KEY) || '[]') as string[] } catch { return [] } }
+
+// Estado de trabajo por proyecto (PRD §186): última vista al reabrir el vault.
+const WS_KEY = 'writter.workspace'
+type Workspace = { tab: Tab; devTab: DevTab; planTab: PlanTab }
+const readJson = <T,>(key: string, fallback: T): T => { try { return JSON.parse(localStorage.getItem(key) || 'null') as T ?? fallback } catch { return fallback } }
+function saveWorkspace(root: string | undefined, ws: Partial<Workspace>) {
+  if (!root) return
+  const all = readJson<Record<string, Workspace>>(WS_KEY, {})
+  const next = { ...all, [root]: { tab: 'desk' as Tab, devTab: 'characters' as DevTab, planTab: 'dashboard' as PlanTab, ...all[root], ...ws } }
+  const keys = Object.keys(next).slice(-8)
+  localStorage.setItem(WS_KEY, JSON.stringify(Object.fromEntries(keys.map((k) => [k, next[k]!]))))
+}
+
+// Registro de escritura por día (PRD §98-100): solo totales de palabras, nunca contenido.
+const STATS_KEY = 'writter.stats'
+const loadStats = (root: string | undefined): WriteLog => (root ? readJson<Record<string, WriteLog>>(STATS_KEY, {})[root] ?? {} : {})
+function saveStats(root: string | undefined, log: WriteLog) {
+  if (!root) return
+  const all = readJson<Record<string, WriteLog>>(STATS_KEY, {})
+  localStorage.setItem(STATS_KEY, JSON.stringify({ ...all, [root]: log }))
+}
+const countWords = (s: string) => s.replace(/^---[\s\S]*?---/, '').split(/\s+/).filter(Boolean).length
 let pomoTimer: ReturnType<typeof setInterval> | null = null
 const NOPAG: Pagination = { pages: 1, pageStarts: [], lineToPage: [] }
 let saveTimer: ReturnType<typeof setTimeout> | null = null
@@ -235,6 +260,7 @@ export const useStore = create<State & Actions>((set, get) => ({
   deskPanel: null,
   recents: loadRecents(),
   pomo: { mode: 'focus', left: 25 * 60, running: false, done: 0 },
+  stats: {},
   rename: null,
   lastRenamed: null,
 
@@ -334,9 +360,20 @@ export const useStore = create<State & Actions>((set, get) => ({
     get().pomoReset(mode)
   },
 
-  setTab: (tab) => set({ tab }),
-  setDevTab: (devTab) => set({ devTab }),
-  setPlanTab: (planTab) => set({ planTab }),
+  setTab: (tab) => { saveWorkspace(get().vault?.root, { tab }); set({ tab }) },
+  setDevTab: (devTab) => { saveWorkspace(get().vault?.root, { devTab }); set({ devTab }) },
+  setPlanTab: (planTab) => { saveWorkspace(get().vault?.root, { planTab }); set({ planTab }) },
+
+  // Anota el total de palabras del proyecto en el registro del día (al abrir y tras cada guardado).
+  recordStats() {
+    const { vault, files, docs } = get()
+    if (!vault) return
+    const scripts = new Set(files.filter((f) => f.kind === 'script').map((f) => f.path))
+    const total = docs.filter((d) => scripts.has(d.path)).reduce((a, d) => a + countWords(d.content), 0)
+    const stats = recordDay(get().stats, total)
+    saveStats(vault.root, stats)
+    set({ stats })
+  },
 
   async openVault() {
     const r = await window.api.vaultOpen()
@@ -383,9 +420,11 @@ export const useStore = create<State & Actions>((set, get) => ({
   async applySummary(v) {
     const recents = [v.root, ...get().recents.filter((x) => x !== v.root)].slice(0, 8)
     localStorage.setItem(RECENTS_KEY, JSON.stringify(recents))
-    set({ vault: v, files: v.files, path: null, text: '', diskHash: null, dirty: false, proposal: null, projection: EMPTY, pagination: NOPAG, recents })
+    const ws = readJson<Record<string, Workspace>>(WS_KEY, {})[v.root]
+    set({ vault: v, files: v.files, path: null, text: '', diskHash: null, dirty: false, proposal: null, projection: EMPTY, pagination: NOPAG, recents, stats: loadStats(v.root), ...(ws ?? {}) })
     set({ keyStatus: await window.api.keysStatus(v.config.byok.provider) })
     await get().refreshDocs()
+    get().recordStats()
     void get().refreshGraph()
     const first = v.files.find((f) => f.kind === 'script')
     if (first) void get().openFile(first.path)
@@ -435,7 +474,8 @@ export const useStore = create<State & Actions>((set, get) => ({
       const { hash } = await window.api.fileWrite(path, text, force ? undefined : (diskHash ?? undefined), 'user')
       set({ diskHash: hash, dirty: false, conflict: false, status: 'Guardado' })
       set({ versions: await window.api.versionList(path) })
-      void get().refreshDocs()
+      await get().refreshDocs()
+      get().recordStats()
     } catch (e) {
       if (String(e).includes('conflict')) set({ conflict: true, status: 'Conflicto: el archivo cambió en disco' })
       else set({ status: `Error al guardar: ${String(e)}` })

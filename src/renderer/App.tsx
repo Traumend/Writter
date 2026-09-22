@@ -33,6 +33,7 @@ import type { FileKind } from '../core/types/ipc'
 
 const TABS: [Tab, string][] = [['desk', 'Escritorio'], ['breakdown', 'Breakdown'], ['dev', 'Desarrollo'], ['plan', 'Planificación'], ['production', 'Producción'], ['settings', 'Ajustes']]
 const DEV: [DevTab, string][] = [['characters', 'Personajes'], ['beats', 'Beat Timeline'], ['map', 'Mapa neural'], ['analysis', 'Análisis'], ['docs', 'Documentos']]
+const SEP = /[\\/]/ // separador de ruta (Windows y POSIX) para el nombre del proyecto en las migas
 const PLAN: [PlanTab, string][] = [['dashboard', 'Dashboard'], ['planner', 'Planner'], ['questions', 'Preguntas'], ['plants', 'Plant & Payoff'], ['ideas', 'Ideas'], ['clinic', 'Clinic'], ['index', 'Index'], ['library', 'Biblioteca']]
 
 // Menú desplegable de la barra superior (estilo suite Adobe).
@@ -192,6 +193,9 @@ export function App() {
   // Menú nativo: ejecuta sus comandos y le manda idioma, recientes y estado de los conmutadores de Ver.
   useEffect(() => { window.api.onMenu((id) => (id.startsWith('openPath:') ? void useStore.getState().openVaultPath(id.slice(9)) : runCommand(id))) }, [])
   useEffect(() => { window.api.menuSetup({ lang: getLang(), recents: s.recents, focus: s.prefs.focus, page: s.prefs.page, tags: s.showTags }) }, [s.recents, s.prefs.focus, s.prefs.page, s.showTags])
+  // Migas (PRD 193): proyecto / vista / subvista, para saber donde se esta sin leer las pestanas.
+  const sub = s.tab === 'dev' ? DEV.find(([d]) => d === s.devTab)?.[1] : s.tab === 'plan' ? PLAN.find(([p]) => p === s.planTab)?.[1] : undefined
+  const crumb = [s.vault ? s.vault.root.split(SEP).pop() : t('Sin proyecto'), t(TABS.find(([tb]) => tb === s.tab)?.[1] ?? ''), sub ? t(sub) : ''].filter(Boolean).join(' / ')
   const scene = s.path ? s.projection.scenes.find((sc) => s.cursorLine >= sc.startLine && s.cursorLine < sc.endLine) : undefined
   const sceneText = scene ? s.text.split('\n').slice(scene.startLine, scene.endLine).join('\n') : ''
   return (
@@ -218,7 +222,7 @@ export function App() {
           </nav>
         )}
         <span className="grow" />
-        <span className="muted crumb">{s.vault ? s.vault.root.split(/[\\/]/).pop() : t('Sin proyecto')}</span>
+        <span className="muted crumb ell" title={crumb}>{crumb}</span>
         {s.graph && <span className="pill" title={s.graph.reason}>{t('índice')} {s.graph.stale ? t('reindexando') : t('al día')}</span>}
         {s.vault && <QuickAdd />}
         {s.vault && <Pomodoro />}

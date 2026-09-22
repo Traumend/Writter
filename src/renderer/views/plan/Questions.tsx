@@ -18,7 +18,7 @@ export function Questions() {
   const [filter, setFilter] = useState<'all' | QuestionStatus>('all')
   const chars = cards.filter((c) => c.kind === 'character').map((c) => c.name)
   const upd = (id: string, p: Partial<Question>) => void save({ questions: planning.questions.map((q) => (q.id === id ? { ...q, ...p } : q)) })
-  const add = () => { if (!text.trim()) return; void save({ questions: [...planning.questions, { id: uid(), text: text.trim(), category: '', status: 'open', importance: 2, characters: [], notes: '' }] }); setText('') }
+  const add = () => { if (!text.trim()) return; void save({ questions: [...planning.questions, { id: uid(), text: text.trim(), category: '', status: 'open', importance: 2, beats: [], characters: [], notes: '' }] }); setText('') }
   const list = planning.questions.filter((q) => filter === 'all' || q.status === filter)
   const total = scripts.reduce((a, s) => a + s.scenes.length, 0)
 
@@ -45,13 +45,24 @@ export function Questions() {
             <span className="muted">{t('Se resuelve en')}</span><SceneRefPicker value={q.resolved} onChange={(r) => upd(q.id, { resolved: r })} scripts={scripts} />
             <span style={{ width: 160 }}><BlurInput value={q.category} placeholder={t('Categoría')} onCommit={(v) => upd(q.id, { category: v })} /></span>
           </div>
-          {/* Línea de tiempo de la pregunta: introducción → resolución sobre el total de escenas. */}
+          {/* Hitos intermedios (PRD §48): pistas entre el planteamiento y la respuesta. */}
+          <div className="row tiny wrap">
+            <span className="muted">{t('Hitos')}</span>
+            {q.beats.map((b, i) => (
+              <span className="row tiny" key={i}>
+                <SceneRefPicker value={b} onChange={(r) => upd(q.id, { beats: r ? q.beats.map((x, j) => (j === i ? r : x)) : q.beats.filter((_, j) => j !== i) })} scripts={scripts} />
+                <button className="mini ghost" title={t('Ir a la escena')} onClick={() => openScene(scripts, b)}>{refLabel(b, scripts)}</button>
+              </span>
+            ))}
+            <button className="mini ghost" onClick={() => upd(q.id, { beats: [...q.beats, q.introduced ?? { script: scripts[0]?.path ?? '', heading: scripts[0]?.scenes[0]?.heading ?? '' }] })}><Icon name="plus" size={12} />{t('hito')}</button>
+          </div>
+          {/* Línea de tiempo de la pregunta: planteamiento → hitos → resolución sobre el total de escenas. */}
           {(q.introduced || q.resolved) && total > 0 && (
             <div className="qline" title={`${refLabel(q.introduced, scripts)} → ${refLabel(q.resolved, scripts)}`}>
-              {[q.introduced, q.resolved].map((r, k) => {
+              {[[q.introduced, '#c47d1a'] as const, ...q.beats.map((b) => [b, '#4f8cff'] as const), [q.resolved, '#3ddc97'] as const].map(([r, color], k) => {
                 const s = scripts.find((x) => x.path === r?.script)
                 const i = s?.scenes.findIndex((x) => x.heading.trim().toUpperCase() === (r?.heading ?? '').trim().toUpperCase()) ?? -1
-                return r && i >= 0 ? <span key={k} className="qdot link" style={{ left: `${(i / Math.max(1, (s?.scenes.length ?? 1) - 1)) * 100}%`, background: k ? '#3ddc97' : '#c47d1a' }} onClick={() => openScene(scripts, r)} title={`#${i + 1}`} /> : null
+                return r && i >= 0 ? <span key={k} className="qdot link" style={{ left: `${(i / Math.max(1, (s?.scenes.length ?? 1) - 1)) * 100}%`, background: color }} onClick={() => openScene(scripts, r)} title={`#${i + 1}`} /> : null
               })}
             </div>
           )}

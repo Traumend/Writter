@@ -1,10 +1,9 @@
-import { useMemo } from 'react'
-import { clinic } from '../../../core/clinic'
-import { readFrontmatter } from '../../../core/frontmatter'
-import { resolveRef } from '../../../core/planning'
+import { PROJECT_STATUS, resolveRef, type ProjectStatus } from '../../../core/planning'
+import { series, streak, written } from '../../../core/stats'
 import { t } from '../../i18n'
 import { useStore } from '../../store'
-import { useCards, usePlanning, useScripts } from './data'
+import { BlurInput } from '../../ui'
+import { useCards, useClinicIssues, usePlanning, useScripts } from './data'
 import { SEV_COLOR, SEV_LABEL } from './shared'
 
 // Dashboard: vista ejecutiva del proyecto (progreso, estructura, personajes, preguntas, plants, actividad).
@@ -12,7 +11,7 @@ export function Dashboard() {
   const scripts = useScripts()
   const cards = useCards()
   const { planning, save } = usePlanning()
-  const { docs, setTab, setPlanTab, versions } = useStore()
+  const { setTab, setPlanTab, versions, stats } = useStore()
   const words = scripts.reduce((a, s) => a + s.words, 0)
   const scenes = scripts.reduce((a, s) => a + s.scenes.length, 0)
   const chars = cards.filter((c) => c.kind === 'character')
@@ -24,24 +23,47 @@ export function Dashboard() {
   const orphanPlants = planning.plants.filter((p) => p.payoffs.length === 0).length
   const orphanPayoffs = planning.plants.filter((p) => !p.plant).length
   const complete = planning.plants.filter((p) => p.plant && p.payoffs.length > 0 && resolveRef(p.plant, headings) !== null).length
-  const issues = useMemo(() => clinic({
-    scripts: scripts.map((s) => ({ path: s.path, name: s.name, scenes: s.scenes.map((x, i) => ({ heading: x.heading, characters: x.characters, wordCount: x.wordCount, minutes: s.minutes[i] ?? 0 })), acts: s.acts, sceneMeta: s.sceneMeta })),
-    characters: chars.map((c) => ({ name: c.name, group: c.group, appearances: c.appearances.length, relationships: ((readFrontmatter(docs.find((d) => d.path === c.path)?.content ?? '').data['relationships'] as { target: string }[] | undefined) ?? []).map((r) => r.target) })),
-    planning
-  }), [scripts, chars, planning, docs])
+  const issues = useClinicIssues()
   const pct = planning.goal > 0 ? Math.min(100, Math.round((words / planning.goal) * 100)) : 0
+  const today = written(stats)
+  const run = streak(stats)
+  const last14 = series(stats)
+  const maxDay = Math.max(...last14.map((d) => d.words), 1)
+  const dayPct = planning.dailyGoal > 0 ? Math.min(100, Math.round((today / planning.dailyGoal) * 100)) : 0
   const recent = [...versions].sort((a, b) => b.ts - a.ts).slice(0, 6)
   const go = (tab: 'dashboard' | 'planner' | 'questions' | 'plants' | 'ideas' | 'clinic' | 'index' | 'library') => setPlanTab(tab)
 
   return (
     <main className="page scroll">
       <div className="grid3">
+        {/* Ficha del proyecto (PRD §12): estado, género, logline y sinopsis; vive en outline/Planning.md. */}
+        <div className="panelbox">
+          <h2>{t('Proyecto')}</h2>
+          <div className="row tiny">
+            <select value={planning.status} onChange={(e) => void save({ status: e.target.value as ProjectStatus })}>
+              {PROJECT_STATUS.map(([s, l]) => <option key={s} value={s}>{t(l)}</option>)}
+            </select>
+            <BlurInput value={planning.genre} placeholder={t('Género')} onCommit={(v) => void save({ genre: v })} />
+          </div>
+          <BlurInput textarea rows={2} value={planning.logline} placeholder={t('Logline: de qué va en una frase')} onCommit={(v) => void save({ logline: v })} />
+          <BlurInput textarea rows={4} value={planning.synopsis} placeholder={t('Sinopsis')} onCommit={(v) => void save({ synopsis: v })} />
+        </div>
         <div className="panelbox">
           <h2>{t('Progreso')}</h2>
           <div className="big">{words.toLocaleString()} <span className="muted tiny">{t('palabras')}</span></div>
           <div className="row tiny"><span className="muted">{t('Meta')}</span><input type="number" min={0} value={planning.goal || ''} placeholder="0" style={{ width: 110 }} onChange={(e) => void save({ goal: Number(e.target.value) || 0 })} /><span className="muted">{planning.goal ? `${pct}%` : ''}</span></div>
           {planning.goal > 0 && <div className="bt-prog"><div style={{ width: `${pct}%` }} /></div>}
           <div className="row tiny muted" style={{ marginTop: 8 }}><span>{scenes} {t('escenas')}</span><span>·</span><span>{scripts.length} {t('episodios')}</span><span>·</span><span>{chars.length} {t('personajes')}</span></div>
+        </div>
+        {/* Sesión de escritura (PRD §99-100): palabras de hoy, meta diaria y racha. Registro local, sin contenido. */}
+        <div className="panelbox">
+          <h2>{t('Hoy')}</h2>
+          <div className="big">{today.toLocaleString()} <span className="muted tiny">{t('palabras')}</span></div>
+          <div className="row tiny"><span className="muted">{t('Meta diaria')}</span><input type="number" min={0} value={planning.dailyGoal || ''} placeholder="0" style={{ width: 90 }} onChange={(e) => void save({ dailyGoal: Number(e.target.value) || 0 })} /><span className="grow" /><span className="muted">{t('Racha')} {run} {t('día(s)')}</span></div>
+          {planning.dailyGoal > 0 && <div className="bt-prog"><div style={{ width: `${dayPct}%` }} /></div>}
+          <div className="spark" title={t('Palabras por día (14 días)')}>
+            {last14.map((d) => <span key={d.day} className={d.words ? '' : 'zero'} title={`${d.day}: ${d.words}`} style={{ height: `${d.words ? Math.max(3, Math.round((d.words / maxDay) * 34)) : 2}px` }} />)}
+          </div>
         </div>
         <div className="panelbox">
           <h2>{t('Estructura')}</h2>

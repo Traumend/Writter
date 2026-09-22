@@ -44,7 +44,14 @@ export function Planner() {
                 <td><span className="cdot" style={{ background: tr.color }} /> <BlurInput value={tr.name} onCommit={(v) => void save({ tracks: planning.tracks.map((x) => (x.id === tr.id ? { ...x, name: v } : x)) })} /></td>
                 {script.scenes.map((s, i) => {
                   const on = meta(s.heading).track === tr.id
-                  return <td key={i} className="cell" onClick={() => void writeMeta(script, s.heading, { track: on ? '' : tr.id })}><span className="pip" style={{ background: on ? tr.color : 'var(--line)' }} /></td>
+                  // No solo color (PRD §168): la presencia lleva marca y etiqueta accesible, y se activa con teclado.
+                  return (
+                    <td key={i} className="cell">
+                      <button className="pipbtn" aria-pressed={on} title={`${tr.name} · #${i + 1}: ${on ? t('presente') : t('ausente')}`} aria-label={`${tr.name} · ${t('escena')} ${i + 1}`} onClick={() => void writeMeta(script, s.heading, { track: on ? '' : tr.id })}>
+                        <span className="pip" style={{ background: on ? tr.color : 'var(--line)' }}>{on && <Icon name="check" size={9} />}</span>
+                      </button>
+                    </td>
+                  )
                 })}
                 <td><button className="mini ghost" title={t('Quitar')} onClick={() => delTrack(tr.id)}><Icon name="close" size={12} /></button></td>
               </tr>

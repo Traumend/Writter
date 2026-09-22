@@ -7,10 +7,13 @@ export const PLANNING_PATH = 'outline/Planning.md'
 export type SceneRef = { script: string; heading: string }
 export type Track = { id: string; name: string; color: string }
 export type QuestionStatus = 'open' | 'developing' | 'partial' | 'answered' | 'abandoned'
-export type Question = { id: string; text: string; category: string; status: QuestionStatus; importance: number; introduced?: SceneRef; resolved?: SceneRef; characters: string[]; notes: string }
+// `beats`: hitos intermedios (pistas) entre el planteamiento y la respuesta — la Clinic avisa si no hay ninguno.
+export type Question = { id: string; text: string; category: string; status: QuestionStatus; importance: number; introduced?: SceneRef; beats: SceneRef[]; resolved?: SceneRef; characters: string[]; notes: string }
 export type Plant = { id: string; title: string; type: string; plant?: SceneRef; payoffs: SceneRef[]; characters: string[]; notes: string }
 export type Idea = { id: string; title: string; summary: string; characters: string[]; track: string; created: number }
-export type Planning = { goal: number; tracks: Track[]; questions: Question[]; plants: Plant[]; ideas: Idea[] }
+export type ProjectStatus = 'idea' | 'planning' | 'drafting' | 'revising' | 'done' | 'archived'
+export const PROJECT_STATUS: [ProjectStatus, string][] = [['idea', 'Idea'], ['planning', 'Planificando'], ['drafting', 'Escribiendo'], ['revising', 'Revisando'], ['done', 'Terminado'], ['archived', 'Archivado']]
+export type Planning = { goal: number; dailyGoal: number; logline: string; synopsis: string; genre: string; status: ProjectStatus; tracks: Track[]; questions: Question[]; plants: Plant[]; ideas: Idea[] }
 
 export type SceneStatus = 'idea' | 'outline' | 'planned' | 'draft' | 'revision' | 'revised' | 'final' | 'cut'
 export const SCENE_STATUS: SceneStatus[] = ['idea', 'outline', 'planned', 'draft', 'revision', 'revised', 'final', 'cut']
@@ -21,7 +24,7 @@ export const TRACK_COLORS = ['#4f8cff', '#e8437f', '#3ddc97', '#c47d1a', '#b388f
 export const uid = () => Math.random().toString(36).slice(2, 9)
 
 export function planningTemplate(): string {
-  return `---\ntype: planning\ngoal: 0\ntracks: []\nquestions: []\nplants: []\nideas: []\n---\n\nPlanificación del proyecto: tracks, preguntas dramáticas, plants & payoffs e ideas de escena.\n`
+  return `---\ntype: planning\ngoal: 0\ndailyGoal: 0\nlogline: ""\nsynopsis: ""\ngenre: ""\nstatus: idea\ntracks: []\nquestions: []\nplants: []\nideas: []\n---\n\nPlanificación del proyecto: tracks, preguntas dramáticas, plants & payoffs e ideas de escena.\n`
 }
 
 const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : [])
@@ -32,10 +35,16 @@ export function readPlanning(content: string | undefined): Planning {
   const d = content ? readFrontmatter(content).data : {}
   return {
     goal: Number(d['goal'] ?? 0) || 0,
+    dailyGoal: Number(d['dailyGoal'] ?? 0) || 0,
+    logline: String(d['logline'] ?? ''),
+    synopsis: String(d['synopsis'] ?? ''),
+    genre: String(d['genre'] ?? ''),
+    status: (PROJECT_STATUS.some(([s]) => s === d['status']) ? d['status'] : 'idea') as ProjectStatus,
     tracks: arr<Partial<Track>>(d['tracks']).map((t, i) => ({ id: String(t.id ?? `t${i}`), name: String(t.name ?? ''), color: String(t.color ?? TRACK_COLORS[i % TRACK_COLORS.length]) })),
     questions: arr<Partial<Question>>(d['questions']).map((q, i) => ({
       id: String(q.id ?? `q${i}`), text: String(q.text ?? ''), category: String(q.category ?? ''), status: (QUESTION_STATUS.includes(q.status as QuestionStatus) ? q.status : 'open') as QuestionStatus,
-      importance: Math.max(1, Math.min(3, Number(q.importance ?? 2) || 2)), introduced: ref(q.introduced), resolved: ref(q.resolved), characters: arr<string>(q.characters).map(String), notes: String(q.notes ?? '')
+      importance: Math.max(1, Math.min(3, Number(q.importance ?? 2) || 2)), introduced: ref(q.introduced), beats: arr<unknown>(q.beats).map(ref).filter((x): x is SceneRef => !!x),
+      resolved: ref(q.resolved), characters: arr<string>(q.characters).map(String), notes: String(q.notes ?? '')
     })),
     plants: arr<Partial<Plant>>(d['plants']).map((p, i) => ({
       id: String(p.id ?? `p${i}`), title: String(p.title ?? ''), type: String(p.type ?? ''), plant: ref(p.plant), payoffs: arr<unknown>(p.payoffs).map(ref).filter((x): x is SceneRef => !!x),
@@ -76,6 +85,15 @@ export const MOT_DIMS: [MotDim, string, string][] = [
   ['pressure', 'Presión', '¿Qué fuerzas externas lo empujan?'],
   ['transformation', 'Transformación', '¿Qué cambio necesita para llegar al final?']
 ]
+// Arco del personaje: hitos ordenados, cada uno anclado (opcionalmente) a una escena.
+// Vive en `arc_points` del frontmatter del personaje (`arc` ya lo usa el tipo de arco: positivo/negativo/plano…).
+export type ArcPoint = { id: string; stage: string; note: string; ref?: SceneRef }
+export const ARC_STAGES = ['Punto de partida', 'Catalizador', 'Resistencia', 'Crisis', 'Cambio', 'Punto de llegada']
+export function readArc(data: Record<string, unknown>): ArcPoint[] {
+  return arr<Partial<ArcPoint>>(data['arc_points']).map((p, i) => ({ id: String(p.id ?? `a${i}`), stage: String(p.stage ?? ARC_STAGES[i] ?? ''), note: String(p.note ?? ''), ref: ref(p.ref) }))
+}
+export const defaultArc = (): ArcPoint[] => ARC_STAGES.map((stage, i) => ({ id: `a${i}${uid()}`, stage, note: '' }))
+
 export function readMotivation(data: Record<string, unknown>): Motivation {
   const m = data['motivation']
   if (!m || typeof m !== 'object') return {}

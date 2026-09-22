@@ -64,6 +64,7 @@ export function BeatTimeline() {
   const [entFilter, setEntFilter] = useState<Set<string>>(new Set())
   const [linking, setLinking] = useState<string | null>(null)
   const [exportOpen, setExportOpen] = useState(false)
+  const [tpl, setTpl] = useState<string | null>(null) // plantilla elegida, pendiente de fusionar o reemplazar
   const [versions, setVersions] = useState<{ id: string; ts: number; label?: string; origin: string }[]>([])
   const wall = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -135,13 +136,18 @@ export function BeatTimeline() {
   const seasons = useMemo(() => { const out: { season: string; a: number; b: number }[] = []; for (const ep of eps) { const last = out[out.length - 1]; const end = ep.offset + Math.max(ep.runtime, 0.5); if (last && last.season === ep.season) last.b = end; else out.push({ season: ep.season, a: ep.offset, b: end }) } return out }, [eps])
   const showSeasons = scope === 'series' && seasons.some((s) => s.season)
 
-  const applyPreset = (name: string) => {
+  // Aplicar plantilla (PRD §91): fusionar respeta lo que ya hay; reemplazar pide confirmación porque destruye actos y beats.
+  const applyPreset = (name: string, mode: 'merge' | 'replace') => {
     const p = PRESETS[name]; if (!p || !active || !active.scenes.length) return
+    if (mode === 'replace' && (active.acts.length || active.beats.length) && !window.confirm(`${t('Reemplazar la estructura de')} ${active.name}: ${active.acts.length} ${t('acto(s)')} ${t('y')} ${active.beats.length} beat(s) ${t('se perderán. ¿Continuar?')}`)) return
     const n = active.scenes.length
     const patch: Record<string, unknown> = {}
-    if (p.acts) { let prevTo = -1; patch['acts'] = p.acts.map(([title, , b], i) => { const from = Math.min(prevTo + 1, n - 1); const to = Math.max(from, Math.round(b * (n - 1)) - (i < p.acts!.length - 1 ? 1 : 0)); prevTo = to; return { title, summary: '', from, to, color: ACT_COLORS[i % ACT_COLORS.length] } }) }
-    if (p.beats) patch['beats'] = [...active.beats, ...p.beats.map(([title, kind, f]) => ({ id: uid(), title, note: '', kind, scene: Math.round(f * (n - 1)) }))]
+    const presetActs = p.acts ? (() => { let prevTo = -1; return p.acts.map(([title, , b], i) => { const from = Math.min(prevTo + 1, n - 1); const to = Math.max(from, Math.round(b * (n - 1)) - (i < p.acts!.length - 1 ? 1 : 0)); prevTo = to; return { title, summary: '', from, to, color: ACT_COLORS[i % ACT_COLORS.length] } }) })() : null
+    const presetBeats = p.beats ? p.beats.map(([title, kind, f]) => ({ id: uid(), title, note: '', kind, scene: Math.round(f * (n - 1)) })) : null
+    if (presetActs && (mode === 'replace' || !active.acts.length)) patch['acts'] = presetActs
+    if (presetBeats) patch['beats'] = mode === 'replace' ? presetBeats : [...active.beats, ...presetBeats.filter((b) => !active.beats.some((x) => x.title === b.title))]
     save(active, patch)
+    setTpl(null)
   }
   const addAct = () => { if (!active) return; const r = nextActRange(active.acts, Math.max(1, active.scenes.length)); save(active, { acts: [...r.acts, { title: `${t('Acto')} ${active.acts.length + 1}`, summary: '', from: r.from, to: r.to, color: ACT_COLORS[active.acts.length % ACT_COLORS.length] }] }); setSel({ kind: 'act', ep: active.path, key: active.acts.length }) }
   const addBeat = () => { if (!active) return; const at = flat.find((f) => f.ep === active && play >= f.start && play < f.start + f.dur)?.i ?? (sel?.kind === 'scene' && sel.ep === active.path ? Number(sel.key) : 0); const id = uid(); save(active, { beats: [...active.beats, { id, title: t('Nuevo beat'), note: '', scene: at, kind: 'setup' }] }); setSel({ kind: 'beat', ep: active.path, key: id }) }
@@ -203,7 +209,7 @@ export function BeatTimeline() {
         <select value={script ?? ''} onChange={(e) => setEpPath(e.target.value)} title={t('Episodio')}>
           {scripts.map((f) => { const m = eps.find((e) => e.path === f.path); return <option key={f.path} value={f.path}>{m?.code ? `${m.code} · ` : ''}{f.name}</option> })}
         </select>
-        <select defaultValue="" disabled={loading} onChange={(e) => { if (e.target.value) applyPreset(e.target.value); e.target.value = '' }} title={t('Aplicar plantilla')}>
+        <select value="" disabled={loading} onChange={(e) => { if (e.target.value) setTpl(e.target.value) }} title={t('Aplicar plantilla')}>
           <option value="">{t('Aplicar plantilla…')}</option>
           {Object.keys(PRESETS).map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
@@ -330,6 +336,21 @@ export function BeatTimeline() {
         {Object.entries(KINDS).map(([k, c]) => <span key={k}><span className="dot" style={{ background: c }} /> {t(KIND_LABEL[k] ?? k)}</span>)}
         <span className="muted">· {t('borde punteado = escena sin escribir')}</span>
       </div>
+
+      {/* Aplicar plantilla (PRD §91): fusionar o reemplazar, nunca sobrescribir en silencio. */}
+      {tpl && (
+        <div className="modal-backdrop" onClick={() => setTpl(null)}>
+          <div className="modal" style={{ width: 'min(460px, 92vw)' }} onClick={(e) => e.stopPropagation()}>
+            <div className="row"><h1>{t('Aplicar plantilla')}: {tpl}</h1><span className="grow" /><button className="mini ghost" onClick={() => setTpl(null)}>{t('Cerrar')}</button></div>
+            <p className="muted tiny">{t('Se coloca sobre')} {active.name} · {active.scenes.length} {t('escenas')} · {active.acts.length} {t('acto(s)')} · {active.beats.length} beat(s).</p>
+            <div className="row">
+              <button onClick={() => applyPreset(tpl, 'merge')}>{t('Fusionar')}</button>
+              <button className="ghost danger" onClick={() => applyPreset(tpl, 'replace')}>{t('Reemplazar')}</button>
+            </div>
+            <p className="muted tiny">{t('Fusionar conserva tus actos y añade solo los beats que falten. Reemplazar descarta la estructura actual.')}</p>
+          </div>
+        </div>
+      )}
     </main>
   )
 }

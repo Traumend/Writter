@@ -1,11 +1,10 @@
-import { useMemo, useState } from 'react'
-import { clinic, type Area, type Severity } from '../../../core/clinic'
-import { readFrontmatter } from '../../../core/frontmatter'
+import { useState } from 'react'
+import { type Area, type Severity } from '../../../core/clinic'
 import { byId } from '../../../core/library'
 import { t } from '../../i18n'
 import { useStore } from '../../store'
 import { Icon } from '../../ui'
-import { useCards, usePlanning, useScripts } from './data'
+import { useClinicIssues, usePlanning, useScripts } from './data'
 import { SEV_COLOR, SEV_LABEL, useOpenScene } from './shared'
 
 const AREA_LABEL: Record<Area, string> = { structure: 'Estructura', characters: 'Personajes', questions: 'Preguntas', plants: 'Plant & Payoff', tracks: 'Tracks', pacing: 'Ritmo', ideas: 'Ideas' }
@@ -13,19 +12,13 @@ const AREA_LABEL: Record<Area, string> = { structure: 'Estructura', characters: 
 // Clinic: diagnóstico narrativo local. Muestra señales, no veredictos; cada hallazgo enlaza a escenas y técnicas.
 export function Clinic() {
   const scripts = useScripts()
-  const cards = useCards()
   const { planning } = usePlanning()
-  const { docs, setPlanTab } = useStore()
+  const { setPlanTab } = useStore()
   const openScene = useOpenScene()
   const [area, setArea] = useState<Area | 'all'>('all')
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
   const [lib, setLib] = useState<string | null>(null)
-  const chars = cards.filter((c) => c.kind === 'character')
-  const issues = useMemo(() => clinic({
-    scripts: scripts.map((s) => ({ path: s.path, name: s.name, scenes: s.scenes.map((x, i) => ({ heading: x.heading, characters: x.characters, wordCount: x.wordCount, minutes: s.minutes[i] ?? 0 })), acts: s.acts, sceneMeta: s.sceneMeta })),
-    characters: chars.map((c) => ({ name: c.name, group: c.group, appearances: c.appearances.length, relationships: ((readFrontmatter(docs.find((d) => d.path === c.path)?.content ?? '').data['relationships'] as { target: string }[] | undefined) ?? []).map((r) => r.target) })),
-    planning
-  }), [scripts, chars, planning, docs])
+  const issues = useClinicIssues()
   const shown = issues.filter((i) => (area === 'all' || i.area === area) && !dismissed.has(i.title))
   const count = (a: Area | 'all') => issues.filter((i) => (a === 'all' || i.area === a) && !dismissed.has(i.title)).length
   const entry = lib ? byId(lib) : null
@@ -67,7 +60,7 @@ export function Clinic() {
             <div key={s.path} className="panelbox scrollx">
               <div className="muted tiny">{s.name}</div>
               <table className="table planner"><tbody>
-                {rows.map(({ tr, pres }) => <tr key={tr.id}><td><span className="cdot" style={{ background: tr.color }} /> {tr.name}</td>{pres.map((p, i) => <td key={i} className="cell"><span className="pip" style={{ background: p ? tr.color : 'var(--line)' }} /></td>)}</tr>)}
+                {rows.map(({ tr, pres }) => <tr key={tr.id}><td><span className="cdot" style={{ background: tr.color }} /> {tr.name}</td>{pres.map((p, i) => <td key={i} className="cell"><span className="pip" title={`${tr.name} · #${i + 1}: ${p ? t('presente') : t('ausente')}`} style={{ background: p ? tr.color : 'var(--line)' }}>{p && <Icon name="check" size={9} />}</span></td>)}</tr>)}
               </tbody></table>
             </div>
           ))}

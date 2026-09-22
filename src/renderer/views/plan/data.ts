@@ -1,9 +1,10 @@
 import { useMemo } from 'react'
 import { breakdown } from '../../../core/breakdown'
+import { clinic, type Issue } from '../../../core/clinic'
 import { readFrontmatter, writeFrontmatter } from '../../../core/frontmatter'
 import { sceneMinutes } from '../../../core/paginate'
 import { parseFountain } from '../../../core/parser/fountain'
-import { PLANNING_PATH, planningTemplate, readPlanning, readSceneMeta, type Planning, type SceneMeta, type SceneRef } from '../../../core/planning'
+import { PLANNING_PATH, planningTemplate, readArc, readPlanning, readSceneMeta, type Planning, type SceneMeta, type SceneRef } from '../../../core/planning'
 import { project, type Scene } from '../../../core/projection'
 import { useStore } from '../../store'
 
@@ -57,4 +58,28 @@ export const refLabel = (r: SceneRef | undefined, scripts: ScriptInfo[]) => {
   const s = scripts.find((x) => x.path === r.script)
   const i = s?.scenes.findIndex((x) => x.heading.trim().toUpperCase() === r.heading.trim().toUpperCase()) ?? -1
   return i >= 0 ? `${scripts.length > 1 ? s!.name.slice(0, 8) + ' ' : ''}#${i + 1}` : '?'
+}
+
+// Diagnóstico del proyecto: una sola construcción de la entrada de la Clinic para todas las vistas
+// (Dashboard y Clinic mostraban distinto si se duplicaba).
+export function useClinicIssues(): Issue[] {
+  const scripts = useScripts()
+  const cards = useCards()
+  const { planning } = usePlanning()
+  const { docs } = useStore()
+  return useMemo(() => clinic({
+    scripts: scripts.map((s) => ({ path: s.path, name: s.name, scenes: s.scenes.map((x, i) => ({ heading: x.heading, characters: x.characters, wordCount: x.wordCount, minutes: s.minutes[i] ?? 0 })), acts: s.acts, sceneMeta: s.sceneMeta })),
+    characters: cards.filter((c) => c.kind === 'character').map((c) => {
+      const data = readFrontmatter(docs.find((d) => d.path === c.path)?.content ?? '').data
+      const arc = readArc(data)
+      return {
+        name: c.name, group: c.group, appearances: c.appearances.length,
+        relationships: ((data['relationships'] as { target: string }[] | undefined) ?? []).map((r) => r.target),
+        arcPoints: arc.filter((p) => p.note.trim() || p.ref).length,
+        arcLinked: arc.filter((p) => p.ref).length
+      }
+    }),
+    locations: cards.filter((c) => c.kind === 'location').map((c) => ({ name: c.name, appearances: c.appearances.length })),
+    planning
+  }), [scripts, cards, planning, docs])
 }

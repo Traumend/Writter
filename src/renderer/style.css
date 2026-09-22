@@ -270,6 +270,16 @@ main.page.bt { min-height: 0; gap: 8px; }
 .big { font-size: 26px; font-weight: 700; margin: 4px 0; }
 .minitl { display: flex; gap: 2px; height: 18px; }
 .minitl span { background: var(--sink); border-radius: 3px; font-size: 9px; padding: 2px 4px; overflow: hidden; white-space: nowrap; box-shadow: var(--inset); }
+.spark { display: flex; align-items: flex-end; gap: 2px; height: 36px; margin-top: 8px; }
+.spark span { flex: 1; background: var(--accent); border-radius: 2px 2px 0 0; opacity: .75; min-height: 2px; }
+.spark span.zero { background: var(--line); opacity: 1; }
+/* arco de personaje (hitos) */
+.arc { display: grid; gap: 6px; }
+.arc-row { display: grid; grid-template-columns: 18px minmax(96px, 150px) minmax(0, 1fr) auto; align-items: center; gap: 8px; background: var(--sink); border-radius: var(--r-sm); padding: 6px 8px; box-shadow: var(--inset); }
+.arc-row .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--line); }
+.arc-row.linked .dot { background: var(--accent); }
+.arc-row input, .arc-row select { margin: 0; font-size: 12px; }
+.arc-row .refpick select { max-width: 170px; }
 .panelbox.link { cursor: pointer; }
 .panelbox.link:hover { box-shadow: 6px 6px 16px var(--sh-d), -6px -6px 16px var(--sh-l); }
 .scrollx { overflow-x: auto; }
@@ -277,7 +287,9 @@ main.page.bt { min-height: 0; gap: 8px; }
 .table.planner td:first-child, .table.planner th:first-child { text-align: left; white-space: nowrap; }
 .table.planner td:first-child input { width: 140px; margin: 0; padding: 4px 6px; font-size: 12px; }
 .table.planner .cell { cursor: pointer; }
-.pip { display: inline-block; width: 12px; height: 12px; border-radius: 50%; }
+.pip { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%; color: #0c0c0c; }
+.pipbtn { background: none; border: 0; padding: 2px; margin: 0; box-shadow: none; cursor: pointer; line-height: 0; }
+.pipbtn:hover { box-shadow: none; transform: none; }
 .qcard { margin-bottom: 10px; }
 .qcard .row input { margin-bottom: 0; }
 .qline { position: relative; height: 10px; margin: 8px 10px; background: var(--sink); border-radius: 5px; box-shadow: var(--inset); }
