@@ -46,7 +46,10 @@ const PATHS: Record<string, string> = {
   minus: 'M5 12h14',
   link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1.5 1.5M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1.5-1.5',
   more: 'M5 12h.01M12 12h.01M19 12h.01',
-  check: 'M5 12l5 5L20 7'
+  check: 'M5 12l5 5L20 7',
+  play: 'M8 5v14l11-7z',
+  pause: 'M7 5v14M17 5v14',
+  panel: 'M3 5h18v14H3zM15 5v14'
 }
 export function Icon({ name, size = 16 }: { name: keyof typeof PATHS; size?: number }) {
   return (

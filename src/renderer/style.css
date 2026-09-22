@@ -206,61 +206,63 @@ button.chip:hover { background: var(--sink); color: var(--accent); filter: none;
 .proposal { background: var(--sink); border-radius: var(--r-sm); padding: 12px; margin-top: 8px; box-shadow: var(--inset); }
 .proposal p { margin: 0 0 8px; white-space: pre-wrap; }
 
-/* timeline */
-.timeline { display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0; overflow: auto; }
-.lane { display: flex; gap: 10px; }
-.lanelabel { width: 72px; flex: none; font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--dim); padding-top: 8px; }
-.track { flex: 1; position: relative; min-height: 108px; background: var(--panel); border-radius: var(--r); box-shadow: var(--inset); }
-.track.beats { min-height: 132px; }
-.act { position: absolute; top: 6px; bottom: 6px; background: var(--panel); border-radius: var(--r-sm); padding: 8px; overflow: hidden; min-width: 150px; box-shadow: var(--raise-sm); }
-.act input, .act textarea { background: var(--sink); margin-bottom: 6px; }
-.beat { position: absolute; top: 8px; width: 186px; background: var(--panel); border-radius: var(--r-sm); padding: 8px; box-shadow: var(--raise-sm); }
-.beat .dot { cursor: default; }
-.beat input, .beat textarea, .beat select { margin-bottom: 5px; font-size: 12px; }
-.scenesrow { display: flex; min-height: 42px; }
-.scenechip { flex: none; border-right: 1px solid var(--line); padding: 8px 5px; font-size: 10px; overflow: hidden; white-space: nowrap; cursor: pointer; }
-.scenechip.on, .scenechip:hover { background: var(--sink); color: var(--accent); }
-.wallwrap { display: flex; gap: 10px; flex: 1; min-height: 260px; }
-.wall { flex: 1; position: relative; background: var(--panel); border-radius: var(--r); overflow: hidden; min-height: 260px; box-shadow: var(--inset); }
-.note { position: absolute; width: 194px; border-radius: var(--r-sm); padding: 8px; box-shadow: var(--raise); cursor: grab; }
-.note textarea { background: rgba(0, 0, 0, 0.15); box-shadow: none; margin: 0; color: var(--fg); }
-.dot { width: 12px; height: 12px; border-radius: 50%; cursor: pointer; border: 1px solid #fff3; }
-.inspector { width: 336px; flex: none; border-radius: var(--r); padding: 14px; background: var(--panel); overflow: auto; box-shadow: var(--raise); }
-.scenetext { font: 12px/1.6 "Courier New", monospace; white-space: pre-wrap; max-height: 40vh; overflow: auto; }
-
-/* Beat Timeline sobre eje de tiempo */
-main.page.bt { min-height: 0; }
-.bt-scroll { flex: 1; min-height: 0; overflow: auto; }
-.bt-lanes { position: relative; display: flex; flex-direction: column; gap: 8px; padding-bottom: 6px; }
-.bt-ruler { position: relative; height: 26px; border-bottom: 1px solid var(--line); margin-bottom: 2px; cursor: pointer; }
-.bt-ruler .tick { position: absolute; top: 4px; font-size: 9px; color: var(--dim); transform: translateX(-50%); border-left: 1px solid var(--line); padding-left: 3px; height: 18px; }
-.bt-ruler .playhead { position: absolute; top: 0; bottom: -1000px; width: 2px; background: var(--accent); z-index: 5; pointer-events: none; }
-.bt-ruler .playhead span { position: absolute; top: -1px; left: 3px; font-size: 9px; color: var(--accent); white-space: nowrap; }
-.bt-lane { position: relative; min-height: 78px; background: var(--panel); border-radius: var(--r); box-shadow: var(--inset); }
-.bt-lane.scenes { min-height: 46px; }
-.bt-lane.beats { min-height: 104px; } /* la tarjeta de beat (2 selects + título) cabe entera */
-.bt-lane .lanelabel { position: sticky; left: 0; top: 0; z-index: 3; display: inline-block; width: 76px; padding: 6px 6px; background: var(--panel); border-radius: var(--r) 0 0 0; }
-.bt-block { position: absolute; top: 24px; bottom: 6px; background: var(--sink); border-radius: var(--r-sm); padding: 6px; overflow: hidden; box-shadow: var(--raise-sm); }
-.bt-block input, .bt-block textarea { background: var(--panel); margin-bottom: 4px; font-size: 12px; }
-.bt-beat { position: absolute; top: 22px; width: 190px; transform: translateX(-50%); border-radius: var(--r-sm); padding: 6px; box-shadow: var(--raise-sm); color: #0d0f13; }
-.bt-beat select, .bt-beat input { margin-bottom: 4px; font-size: 11px; }
-.bt-beat .row { gap: 4px; }
-.bt-beat .row > select { flex: 2 1 0; min-width: 0; } /* los dos selects y el botón caben en los 190px */
-.bt-beat .row > select:first-child { flex: 3 1 0; } /* el tipo de beat necesita más letras que "#12" */
-.bt-scene { position: absolute; top: 20px; height: 22px; background: var(--sink); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; font-size: 9px; white-space: nowrap; overflow: hidden; cursor: pointer; display: flex; align-items: center; gap: 4px; box-shadow: var(--raise-sm); }
-.bt-scene.on { border-color: var(--accent); color: var(--accent); }
+/* Beat Timeline v2: línea de tiempo PLANA (sin relieve neumórfico dentro de main.bt). Carriles = bandas hundidas
+   sin sombra; tarjetas = bloques de color sólido con borde de 1px y texto; las notas del muro conservan una sombra
+   suave de post-it. La edición ocurre en el inspector de la derecha, no dentro de las tarjetas. */
+main.page.bt { min-height: 0; gap: 8px; }
+.bt-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.bt-body.with-insp { grid-template-columns: minmax(0, 1fr) 320px; }
+.bt-scroll { min-height: 0; overflow: auto; }
+.bt-lanes { position: relative; display: flex; flex-direction: column; gap: 6px; padding-bottom: 6px; }
+.bt-ruler { position: relative; height: 42px; border-bottom: 1px solid var(--line); margin-bottom: 2px; cursor: pointer; user-select: none; }
+.bt-ruler .bt-tc { position: sticky; left: 0; display: inline-block; padding: 4px 8px; font: 700 12px/1 "Courier New", monospace; color: var(--accent); background: var(--bg); z-index: 4; }
+.bt-ruler .tick { position: absolute; top: 22px; font-size: 9px; color: var(--dim); transform: translateX(-50%); border-left: 1px solid var(--line); padding-left: 3px; height: 18px; }
+.bt-lanes .playhead { position: absolute; top: 0; bottom: 6px; width: 2px; background: var(--accent); z-index: 5; pointer-events: none; }
+.bt-lane { position: relative; background: var(--sink); border-radius: 8px; }
+.bt-lane .lanelabel { position: sticky; left: 0; top: 0; z-index: 3; display: inline-block; width: 76px; padding: 5px 6px; font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--dim); background: var(--sink); border-radius: 8px 0 0 0; }
+.bt-card { position: absolute; box-sizing: border-box; height: 50px; border-radius: 6px; border: 1px solid rgba(255,255,255,.14); padding: 4px 8px; overflow: hidden; color: #0d0f13; cursor: pointer; display: flex; flex-direction: column; gap: 1px; transition: filter .12s; }
+.bt-card:hover { filter: brightness(1.08); }
+.bt-card.on { outline: 2px solid var(--fg); outline-offset: 1px; z-index: 2; }
+.bt-card b { font-size: 12px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bt-card span { font-size: 10.5px; line-height: 1.25; opacity: .85; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.bt-card.season { top: 4px; height: 26px; background: #2c3140; color: var(--fg); border-color: var(--line); justify-content: center; }
+.bt-card.episode { top: 6px; height: 34px; background: #2f3542; color: var(--fg); border-color: var(--line); justify-content: center; }
+.bt-card.episode.on { background: #3a4152; outline: none; border-color: var(--accent); }
+.bt-card.episode span { display: block; -webkit-line-clamp: 1; color: var(--dim); }
+.bt-card.act { height: 52px; }
+.bt-card.beat { height: 44px; flex-direction: row; align-items: center; gap: 6px; }
+.bt-card.beat .badge { flex: none; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 4px; background: rgba(0,0,0,.28); color: #fff; }
+.bt-card.beat b { flex: 1; min-width: 0; }
+.bt-scene { position: absolute; top: 8px; height: 24px; background: #262b34; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; font-size: 9px; white-space: nowrap; overflow: hidden; cursor: pointer; display: flex; align-items: center; gap: 4px; color: var(--fg); }
+.bt-scene.int { background: #2b3a55; }
+.bt-scene.ext { background: #234b3a; }
+.bt-scene.unwritten { border: 1px dashed var(--dim); background: transparent; color: var(--dim); }
+.bt-scene:hover { filter: brightness(1.15); }
+.bt-scene.on { border-color: var(--fg); outline: 1px solid var(--fg); z-index: 2; }
 .bt-scene.dim { opacity: .28; }
 .bt-scene .dur { color: var(--dim); margin-left: auto; }
-.bt-wall { position: relative; min-height: 280px; margin-top: 10px; }
+.bt-wall { position: relative; min-height: 300px; margin-top: 8px; background: var(--sink); border-radius: 8px; overflow: hidden; }
 .bt-links { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+.note { position: absolute; width: 194px; min-height: 96px; border-radius: 8px; padding: 6px 8px 8px; box-shadow: 0 6px 14px rgba(0,0,0,.35); cursor: grab; border: 1px solid rgba(255,255,255,.08); z-index: 2; }
+.note:active { cursor: grabbing; }
+.note .row { gap: 2px; }
+.note b { font-size: 12px; }
+.note p { margin: 4px 0 0; font-size: 12px; line-height: 1.35; max-height: 4.1em; overflow: hidden; white-space: pre-wrap; }
+.note .chips { margin-top: 6px; }
+.note .chip { box-shadow: none; background: rgba(0,0,0,.25); color: var(--fg); }
+.note.on { outline: 2px solid var(--fg); }
 .note.linking { outline: 2px solid var(--accent); }
 .bt-entities { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 8px; flex-wrap: wrap; max-width: 60%; justify-content: flex-end; }
-.bt-entity { background: var(--sink); border-radius: var(--r-sm); padding: 8px; box-shadow: var(--inset); width: 150px; }
+.bt-entity { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px; width: 150px; }
 .bt-entity strong { display: block; } /* nombre en su línea, con ellipsis */
-.bt-legend { display: flex; gap: 14px; flex-wrap: wrap; padding: 8px 2px 0; }
+.bt-legend { display: flex; gap: 14px; flex-wrap: wrap; padding: 4px 2px 0; font-size: 11.5px; }
 .bt-legend .dot, .bt-entity .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
-.bt-inspector { position: fixed; right: 16px; top: 96px; bottom: 40px; z-index: 30; }
-.bt-prog { height: 6px; background: var(--sink); border-radius: 3px; box-shadow: var(--inset); margin: 6px 0; overflow: hidden; }
+.dot { width: 12px; height: 12px; border-radius: 50%; cursor: pointer; border: 1px solid #fff3; }
+.bt-insp { min-height: 0; overflow: auto; background: var(--panel); border-radius: var(--r); padding: 14px; }
+.bt-insp .field { margin-bottom: 10px; }
+.bt-insp .scenetext { font: 12px/1.6 "Courier New", monospace; white-space: pre-wrap; max-height: 40vh; overflow: auto; margin: 10px 0; }
+.bt-prog { height: 6px; background: var(--sink); border-radius: 3px; margin: 6px 0; overflow: hidden; }
+.bt-prog div { height: 100%; background: var(--accent); }
 
 /* Planificación narrativa */
 .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
@@ -306,8 +308,6 @@ main.page.bt { min-height: 0; }
 .engine .engine-row { background: var(--sink); border-radius: var(--r-sm); padding: 8px 10px; box-shadow: var(--inset); }
 .engine .engine-row input[type=text], .engine .engine-row input:not([type]) { background: var(--panel); margin-bottom: 4px; font-size: 12px; }
 .engine .engine-row input[type=range] { margin: 2px 0 0; }
-.bt-prog div { height: 100%; background: var(--accent); }
-
 /* análisis */
 .chart { position: relative; background: var(--panel); border-radius: var(--r); padding: 12px; box-shadow: var(--raise); }
 .chart svg { width: 100%; height: auto; display: block; }

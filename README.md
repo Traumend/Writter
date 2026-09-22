@@ -23,7 +23,7 @@ Pestañas:
 - **Escritorio**: episodios por temporada, escenas con búsqueda y reordenar, gutter con etiquetas de elemento, saltos de página estimados, subrayado de entidades, Script Assistant, versiones con snapshot y comparar, exportar.
 - **Breakdown**: tarjetas de personajes/locaciones/ítems con foto, grupo, actor, alias y apariciones por escena; extracción automática desde el guión; CSV.
 - **Desarrollo → Personajes**: ficha estructurada, sliders de rasgos, relaciones con mapa, sugerencias de IA por campo (aceptar/rechazar).
-- **Desarrollo → Beat Timeline**: actos, beats y escenas en carriles; muro de notas arrastrables; inspector de escena. Se guarda en `outline/<episodio>.md`.
+- **Desarrollo → Beat Timeline**: línea de tiempo plana con carriles Temporada · Episodio · Actos · Beats · Escenas (alcance episodio o serie), tarjetas de color, inspector para editar (acto, beat, nota, escena), cabezal reproducible, muro de notas con etiquetas y conexiones, exportación de marcadores CSV/JSON. Se guarda en `outline/<episodio>.md`.
 - **Desarrollo → Mapa neural**: grafo con capas, escenas como nodos, búsqueda, pan/zoom y arrastre.
 - **Desarrollo → Análisis**: análisis IA por escena (estructura, trama, tema, tono, métricas, emociones) versionado en `.narrative/analysis/`; Script Doctor con heurísticas locales sin IA.
 - **Planificación**: capa de planificación y diagnóstico narrativo (plan: [docs/plan-planificacion-narrativa.md](docs/plan-planificacion-narrativa.md)). Todo vive en `outline/Planning.md` (frontmatter) y en `sceneMeta` de `outline/<episodio>.md`:
