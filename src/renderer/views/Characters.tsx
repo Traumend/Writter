@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { breakdown } from '../../core/breakdown'
 import { readFrontmatter, writeFrontmatter } from '../../core/frontmatter'
 import { extractLinks, parseFountain } from '../../core/parser/fountain'
@@ -49,7 +49,7 @@ const SORTS: [string, string][] = [['scenes', 'Más escenas'], ['az', 'A-Z'], ['
 type Rel = { target: string; kind: string; note: string }
 
 export function Characters() {
-  const { files, docs, writeOther, openFile, setTab, vault, saveConfig } = useStore()
+  const { files, docs, writeOther, openFile, setTab, vault, saveConfig, path: openPath } = useStore()
   const [sortBy, setSortBy] = useState('scenes')
   const cards = useMemo(() => {
     const list = breakdown(files, docs).filter((c) => c.kind === 'character')
@@ -63,6 +63,8 @@ export function Characters() {
   const [newSlider, setNewSlider] = useState('')
   const [showGuide, setShowGuide] = useState(false)
   const [mapBig, setMapBig] = useState(false)
+  // Si el archivo abierto en el store es una ficha (botón "Ficha", "Nuevo personaje…"), se selecciona aquí.
+  useEffect(() => { if (openPath && cards.some((c) => c.path === openPath)) setSel(openPath) }, [openPath, cards])
   const path = sel ?? cards[0]?.path ?? null
   const card = cards.find((c) => c.path === path)
   const doc = docs.find((d) => d.path === path)

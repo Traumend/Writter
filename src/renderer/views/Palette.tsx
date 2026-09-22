@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { LIBRARY } from '../../core/library'
 import { PLANNING_PATH, readPlanning } from '../../core/planning'
+import { COMMANDS, PALETTE, label, runCommand } from '../commands'
 import { t } from '../i18n'
 import { useStore, type PlanTab } from '../store'
 import { Icon } from '../ui'
-import { exportProjectJson, importProjectJson } from '../portable'
 
 type Hit = { group: string; label: string; hint?: string; run: () => void }
 const KIND_LABEL: Record<string, string> = { script: 'Episodios', character: 'Personajes', location: 'Locaciones', prop: 'Ítems', outline: 'Escaleta', knowledge: 'Notas', other: 'Otros' }
@@ -21,17 +21,7 @@ export function Palette() {
     const close = () => s.setPaletteOpen(false)
     const go = (tab: PlanTab) => { s.setTab('plan'); s.setPlanTab(tab) }
     if (q.startsWith('>')) {
-      const cmds: Hit[] = [
-        { group: 'Comando', label: t('Nueva nota rápida'), hint: 'Ctrl+Shift+N', run: () => { close(); s.setQuickNoteOpen(true) } },
-        { group: 'Comando', label: t('Abrir Dashboard'), run: () => { close(); go('dashboard') } },
-        { group: 'Comando', label: t('Abrir Planner'), run: () => { close(); go('planner') } },
-        { group: 'Comando', label: t('Abrir Clinic'), run: () => { close(); go('clinic') } },
-        { group: 'Comando', label: s.pomo.running ? t('Pausar Pomodoro') : t('Iniciar Pomodoro'), run: () => { close(); s.pomoToggle() } },
-        { group: 'Comando', label: t('Exportar proyecto (JSON)'), run: () => { close(); void exportProjectJson() } },
-        { group: 'Comando', label: t('Importar proyecto (JSON)'), run: () => { close(); void importProjectJson() } },
-        { group: 'Comando', label: t('Preferencias…'), run: () => { close(); s.openPrefs() } },
-        { group: 'Comando', label: t('Buscar y reemplazar…'), run: () => { close(); s.openSearch() } }
-      ]
+      const cmds: Hit[] = PALETTE.map((id) => ({ group: 'Comando', label: label(id), hint: COMMANDS[id]?.shortcut, run: () => { close(); runCommand(id) } }))
       const ql = q.slice(1).trim().toLowerCase()
       return cmds.filter((c) => !ql || c.label.toLowerCase().includes(ql))
     }

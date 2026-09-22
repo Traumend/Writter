@@ -33,7 +33,7 @@ export function Plants() {
   return (
     <main className="page scroll">
       <div className="toolbar wrap">
-        <input placeholder={t('Nueva siembra (objeto, frase, gesto…) · Enter')} value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} style={{ width: 380 }} />
+        <input data-new placeholder={t('Nueva siembra (objeto, frase, gesto…) · Enter')} value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} style={{ width: 380 }} />
         <button className="mini" onClick={add}><Icon name="plus" size={12} />Plant</button>
         <span className="grow" />
         <span className="pill warn">{planning.plants.filter((p) => !p.payoffs.length).length} {t('sin pago')}</span>

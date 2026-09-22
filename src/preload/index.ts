@@ -3,6 +3,8 @@ import type { Api, VaultChange } from '../core/types/ipc'
 
 // Superficie mínima: el renderer solo ve estas funciones, nunca fs/claves/red.
 const api: Api = {
+  menuSetup: (setup) => ipcRenderer.send('menu.setup', setup),
+  onMenu: (cb) => { ipcRenderer.on('menu', (_e, id: string) => cb(id)); ipcRenderer.on('menu.openPath', (_e, dir: string) => cb('openPath:' + dir)) },
   vaultOpen: () => ipcRenderer.invoke('vault.open'),
   vaultOpenPath: (dir) => ipcRenderer.invoke('vault.openPath', dir),
   pickText: (exts) => ipcRenderer.invoke('pick.text', exts),

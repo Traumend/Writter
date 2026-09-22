@@ -25,7 +25,7 @@ export function Questions() {
   return (
     <main className="page scroll">
       <div className="toolbar wrap">
-        <input placeholder={t('Nueva pregunta dramática (¿logrará X…?) · Enter')} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} style={{ width: 420 }} />
+        <input data-new placeholder={t('Nueva pregunta dramática (¿logrará X…?) · Enter')} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} style={{ width: 420 }} />
         <button className="mini" onClick={add}><Icon name="plus" size={12} />{t('Pregunta')}</button>
         <span className="grow" />
         {(['all', ...QUESTION_STATUS] as const).map((s) => <button key={s} className={filter === s ? 'mini on' : 'mini ghost'} onClick={() => setFilter(s)}>{s === 'all' ? t('Todas') : t(Q_LABEL[s])} ({s === 'all' ? planning.questions.length : planning.questions.filter((q) => q.status === s).length})</button>)}

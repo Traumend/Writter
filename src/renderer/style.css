@@ -354,6 +354,8 @@ main.page.bt { min-height: 0; }
 .menu-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); padding: 4px 10px 2px; }
 .menu-item.sel { color: var(--accent); font-weight: 600; }
 .menu-item .chk { display: inline-block; width: 14px; flex: none; }
+.menu-item .grow { flex: 1; min-width: 12px; }
+kbd { font: 12px "Courier New", monospace; background: var(--sink); padding: 2px 7px; border-radius: 5px; box-shadow: var(--inset); white-space: nowrap; }
 /* preferencias */
 .prefs { width: min(680px, 92vw); }
 .prefs-body { display: grid; grid-template-columns: 150px 1fr; gap: 18px; margin-top: 12px; }

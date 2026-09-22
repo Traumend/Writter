@@ -26,7 +26,7 @@ const PRESETS: Record<string, { acts?: [string, number, number][]; beats?: [stri
 }
 
 export function BeatTimeline() {
-  const { files, docs, openFile, setTab, createFile, writeOther } = useStore()
+  const { files, docs, openFile, setTab, setDevTab, createFile, writeOther } = useStore()
   const scripts = files.filter((f) => f.kind === 'script')
   const cards = useMemo(() => breakdown(files, docs).filter((c) => c.kind === 'character'), [files, docs])
 
@@ -214,7 +214,7 @@ export function BeatTimeline() {
               <div key={c.path} className="bt-entity">
                 <strong className="ell">{c.name}</strong>
                 <span className="muted tiny">{t('presente en')} {c.appearances.length} {t('escenas')}</span>
-                <div className="row"><button className="mini ghost" onClick={() => { void openFile(c.path); setTab('dev') }}>{t('Ficha')}</button><button className="mini ghost" onClick={() => setTab('breakdown')}>Breakdown</button></div>
+                <div className="row"><button className="mini ghost" onClick={() => { void openFile(c.path); setTab('dev'); setDevTab('characters') }}>{t('Ficha')}</button><button className="mini ghost" onClick={() => setTab('breakdown')}>Breakdown</button></div>
               </div>
             ))}
           </div>

@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron'
+import { buildMenu, type MenuSetup } from './menu'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, extname, join, resolve } from 'node:path'
 import { fdxToMd, fountainToMd } from '../core/convert'
@@ -14,6 +15,9 @@ const notify = (e: VaultChange) => {
   markStale()
   win?.webContents.send('vault.changed', e)
 }
+
+// Menú nativo: el renderer manda idioma, recientes y estado de los conmutadores; se reconstruye entero (barato).
+ipcMain.on('menu.setup', (_e, setup: MenuSetup) => { if (win) buildMenu(win, setup) })
 
 ipcMain.handle('vault.open', async (): Promise<OpenResult> => {
   const r = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] })
@@ -171,6 +175,7 @@ function createWindow() {
     ])
     menu.popup()
   })
+  buildMenu(win, { lang: 'en', recents: [] })
   const devUrl = process.env['ELECTRON_RENDERER_URL']
   if (devUrl) void win.loadURL(devUrl)
   else void win.loadFile(join(__dirname, '../renderer/index.html'))
@@ -189,6 +194,8 @@ function createWindow() {
         else win?.webContents.send('vault.opened', V.openVault(v, notify))
       }
     }
+    const menuId = process.env['WRITTER_MENU'] // simula un clic del menú nativo (misma ruta que buildMenu)
+    if (menuId) setTimeout(() => win?.webContents.send('menu', menuId), 1500)
     const shot = process.env['WRITTER_SHOT']
     if (shot) {
       setTimeout(async () => {

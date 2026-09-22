@@ -98,6 +98,9 @@ type State = {
   rename: { path: string; name: string; terms: string[] } | null
   paletteOpen: boolean
   quickNoteOpen: boolean
+  newEntity: Exclude<FileKind, 'other'> | null // modal "Nuevo…" (menú Historia / botón +)
+  shortcutsOpen: boolean
+  deskPanel: 'ai' | 'versions' | 'export' | null // petición para el panel derecho del Escritorio (menú Archivo → Exportar)
   recents: string[] // vaults recientes (localStorage)
   pomo: { mode: 'focus' | 'short' | 'long'; left: number; running: boolean; done: number } // Pomodoro (segundos restantes)
 }
@@ -148,6 +151,10 @@ type Actions = {
   openVaultPath(dir: string): Promise<void>
   setPaletteOpen(v: boolean): void
   setQuickNoteOpen(v: boolean): void
+  setNewEntity(k: Exclude<FileKind, 'other'> | null): void
+  setShortcutsOpen(v: boolean): void
+  setDeskPanel(p: 'ai' | 'versions' | 'export' | null): void
+  cycleTab(dir: 1 | -1): void
   pomoToggle(): void
   pomoReset(mode?: 'focus' | 'short' | 'long'): void
   pomoSkip(): void
@@ -222,6 +229,9 @@ export const useStore = create<State & Actions>((set, get) => ({
   searchOpen: false,
   paletteOpen: false,
   quickNoteOpen: false,
+  newEntity: null,
+  shortcutsOpen: false,
+  deskPanel: null,
   recents: loadRecents(),
   pomo: { mode: 'focus', left: 25 * 60, running: false, done: 0 },
   rename: null,
@@ -277,6 +287,15 @@ export const useStore = create<State & Actions>((set, get) => ({
   closeSearch: () => set({ searchOpen: false }),
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
   setQuickNoteOpen: (quickNoteOpen) => set({ quickNoteOpen }),
+  setNewEntity: (newEntity) => set({ newEntity }),
+  setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
+  setDeskPanel: (deskPanel) => set({ deskPanel }),
+  // Pestaña anterior/siguiente entre las visibles (Ventana → Pestaña anterior/siguiente).
+  cycleTab(dir) {
+    const tabs = get().prefs.tabs as Tab[]
+    const i = tabs.indexOf(get().tab)
+    set({ tab: tabs[(i + dir + tabs.length) % tabs.length] ?? tabs[0]! })
+  },
 
   // Abre un vault reciente por ruta (misma lógica que el diálogo: proyecto -> abrir; carpeta ajena -> vinculador).
   async openVaultPath(dir) {

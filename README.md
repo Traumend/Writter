@@ -36,6 +36,7 @@ Pestañas:
   - **Index**: navegador tabular de todo el proyecto con orden, búsqueda y CSV.
   - **Biblioteca**: técnicas, psicología y tropos (contenido original de Writter), con relacionadas, favoritos y "crear nota en el vault".
 - **Utilidades**: `Ctrl+K` búsqueda global y comandos (con `>`), `Ctrl+Shift+N` nota rápida a `knowledge/Inbox`, Pomodoro en la cabecera, meta de palabras en el pie, export/import del proyecto en JSON versionado y vaults recientes en el menú.
+- **Menú de la aplicación** (Archivo · Edición · Ver · Historia · Herramientas · Ventana · Ayuda, en el idioma de la interfaz) y botón **+ Nuevo** en la cabecera para crear episodios, fichas, preguntas, plants, ideas, tracks y notas desde cualquier vista. Atajos: `Ctrl+1…6` pestañas, `Ctrl+N` episodio, `Ctrl+O` vault, `Ctrl+H` buscar y reemplazar, `Ctrl+,` preferencias, `Ctrl+Shift+[ ]` pestaña anterior/siguiente; lista completa en Ayuda → Atajos de teclado. Plan: [docs/plan-menu.md](docs/plan-menu.md).
 - **Producción**: shot list por escena con storyboard adjunto, en `assets/shots/<episodio>.md`.
 - **Ajustes**: proveedor y modelo, clave, mapa de tags con validador, Graphify, portada del PDF, papel, prompts editables.
 

@@ -36,7 +36,7 @@ export function NoScripts() {
   )
 }
 
-function NewFile({ kind, onDone }: { kind: Exclude<FileKind, 'other'>; onDone: () => void }) {
+export function NewFile({ kind, onDone }: { kind: Exclude<FileKind, 'other'>; onDone: (created?: boolean) => void }) {
   const [name, setName] = useState('')
   const [season, setSeason] = useState('1')
   const [episode, setEpisode] = useState('1')
@@ -46,7 +46,7 @@ function NewFile({ kind, onDone }: { kind: Exclude<FileKind, 'other'>; onDone: (
     if (!name.trim()) return
     const n = name.trim()
     const file = kind === 'script' ? `S${season.padStart(2, '0')}E${episode.padStart(2, '0')} ${n}` : n
-    void createFile(`${roleDir(kind)}/${file}.md`, TEMPLATE[kind](n, { season: Number(season), episode: Number(episode) })).then(onDone)
+    void createFile(`${roleDir(kind)}/${file}.md`, TEMPLATE[kind](n, { season: Number(season), episode: Number(episode) })).then(() => onDone(true))
   }
   return (
     <div className="newfile">
@@ -281,6 +281,8 @@ function ScopeBar() {
 function RightPanel() {
   const s = useStore()
   const [tab, setTab] = useState<'ai' | 'versions' | 'export'>('ai')
+  // Petición externa (menú Archivo → Exportar): abrir un panel concreto.
+  useEffect(() => { if (s.deskPanel) { setTab(s.deskPanel); s.setDeskPanel(null) } }, [s.deskPanel]) // eslint-disable-line react-hooks/exhaustive-deps
   const [instruction, setInstruction] = useState('')
   const [allowLocked, setAllowLocked] = useState(false)
   const [label, setLabel] = useState('')

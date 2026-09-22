@@ -41,7 +41,7 @@ export function Ideas() {
       <div className="grid2">
         <div>
           <div className="toolbar wrap">
-            <input placeholder={t('Nueva idea de escena · Enter')} value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && title.trim()) { add(title.trim()); setTitle('') } }} style={{ width: 320 }} />
+            <input data-new placeholder={t('Nueva idea de escena · Enter')} value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && title.trim()) { add(title.trim()); setTitle('') } }} style={{ width: 320 }} />
             <span className="muted tiny">{planning.ideas.length} {t('ideas sin integrar')}</span>
           </div>
           {planning.ideas.length === 0 && <p className="muted">{t('Bandeja vacía. Captura ideas sin forzar un orden; intégralas al guion cuando encajen.')}</p>}

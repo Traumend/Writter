@@ -30,7 +30,7 @@ export function Planner() {
         <select value={script.path} onChange={(e) => setEp(e.target.value)}>{scripts.map((s) => <option key={s.path} value={s.path}>{s.name}</option>)}</select>
         <span className="muted tiny">{script.scenes.length} {t('escenas')} · {planning.tracks.length} tracks</span>
         <span className="grow" />
-        <input placeholder={t('Nuevo track · Enter')} value={newTrack} onChange={(e) => setNewTrack(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addTrack()} style={{ width: 200 }} />
+        <input data-new placeholder={t('Nuevo track · Enter')} value={newTrack} onChange={(e) => setNewTrack(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addTrack()} style={{ width: 200 }} />
         <button className="mini" onClick={addTrack}><Icon name="plus" size={12} />Track</button>
       </div>
 

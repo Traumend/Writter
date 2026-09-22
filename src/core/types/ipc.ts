@@ -79,6 +79,8 @@ export type GraphEdge = { source: string; target: string; kind: 'references' | '
 export type Graph = { nodes: GraphNode[]; edges: GraphEdge[] }
 
 export type Api = {
+  menuSetup(setup: { lang: 'es' | 'en'; recents: string[]; focus?: boolean; page?: boolean; tags?: boolean }): void // menú nativo
+  onMenu(cb: (id: string) => void): void // ids de comando del menú nativo ('openPath:<dir>' para Recientes)
   vaultOpen(): Promise<OpenResult>
   vaultOpenPath(dir: string): Promise<OpenResult>
   pickText(exts: string[]): Promise<string | null>

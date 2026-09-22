@@ -8,7 +8,7 @@ import { Rename } from './views/Rename'
 import { DevDocs } from './views/DevDocs'
 import { Breakdown } from './views/Breakdown'
 import { Characters } from './views/Characters'
-import { Desk } from './views/Desk'
+import { Desk, NewFile } from './views/Desk'
 import { NeuralMap } from './views/NeuralMap'
 import { Production } from './views/Production'
 import { Settings } from './views/Settings'
@@ -26,8 +26,10 @@ import { exportProjectJson, importProjectJson } from './portable'
 import { PLANNING_PATH, readPlanning } from '../core/planning'
 import { Icon } from './ui'
 import { estimateTokens } from '../core/safeguards'
+import { COMMANDS, QUICK_ADD, label, runCommand } from './commands'
 import { getLang, t } from './i18n'
 import { useStore, type DevTab, type PlanTab, type Tab } from './store'
+import type { FileKind } from '../core/types/ipc'
 
 const TABS: [Tab, string][] = [['desk', 'Escritorio'], ['breakdown', 'Breakdown'], ['dev', 'Desarrollo'], ['plan', 'Planificación'], ['production', 'Producción'], ['settings', 'Ajustes']]
 const DEV: [DevTab, string][] = [['characters', 'Personajes'], ['beats', 'Beat Timeline'], ['map', 'Mapa neural'], ['analysis', 'Análisis'], ['docs', 'Documentos']]
@@ -81,6 +83,72 @@ function AppMenu() {
   )
 }
 
+// Botón "+" de la cabecera (Quick Add): crear cualquier cosa desde cualquier vista.
+function QuickAdd() {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const close = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
+    window.addEventListener('mousedown', close)
+    return () => window.removeEventListener('mousedown', close)
+  }, [open])
+  return (
+    <div className="appmenu" ref={ref}>
+      <button className="ghost" title={t('Nuevo…')} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}><Icon name="plus" size={14} />{t('Nuevo')}</button>
+      {open && (
+        <div className="menu" role="menu">
+          {QUICK_ADD.map((id, i) => id === 'sep' ? <div key={i} className="menu-sep" /> : (
+            <button key={id} className="menu-item" onClick={() => { setOpen(false); runCommand(id) }}>{label(id)}<span className="grow" />{COMMANDS[id]?.shortcut && <span className="muted tiny">{COMMANDS[id]!.shortcut}</span>}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Modal "Nuevo…" (menú Historia / botón +): reutiliza el alta del Escritorio y salta a la vista del tipo creado.
+const AFTER_NEW: Record<Exclude<FileKind, 'other'>, () => void> = {
+  script: () => useStore.getState().setTab('desk'),
+  character: () => { useStore.getState().setTab('dev'); useStore.getState().setDevTab('characters') },
+  location: () => useStore.getState().setTab('breakdown'),
+  prop: () => useStore.getState().setTab('breakdown'),
+  outline: () => useStore.getState().setTab('desk'),
+  knowledge: () => useStore.getState().setTab('desk')
+}
+const NEW_TITLE: Record<Exclude<FileKind, 'other'>, string> = { script: 'Nuevo episodio', character: 'Nuevo personaje', location: 'Nueva locación', prop: 'Nuevo ítem', outline: 'Nueva escaleta', knowledge: 'Nuevo documento de conocimiento' }
+function NewEntity() {
+  const { newEntity, setNewEntity, vault } = useStore()
+  if (!newEntity || !vault) return null
+  return (
+    <div className="modal-backdrop" onClick={() => setNewEntity(null)}>
+      <div className="modal" style={{ width: 'min(460px, 92vw)' }} onClick={(e) => e.stopPropagation()}>
+        <div className="row"><h1>{t(NEW_TITLE[newEntity])}</h1><span className="grow" /><button className="mini ghost" onClick={() => setNewEntity(null)}>{t('Cerrar')}</button></div>
+        <p className="muted tiny">{t('Se crea en')} {vault.config.roles[newEntity]?.[0] ?? newEntity}/</p>
+        <NewFile kind={newEntity} onDone={(created) => { setNewEntity(null); if (created) AFTER_NEW[newEntity]() }} />
+      </div>
+    </div>
+  )
+}
+
+// Ayuda → Atajos de teclado.
+const EXTRA_SHORTCUTS: [string, string][] = [['Escape', 'Cierra el modal abierto'], ['Ctrl+Enter', 'Guarda la nota rápida'], ['Ctrl+clic en [[Nombre]]', 'Abre la ficha de la entidad'], ['Ctrl+S', 'Guarda el archivo abierto']]
+function Shortcuts() {
+  const { shortcutsOpen, setShortcutsOpen } = useStore()
+  if (!shortcutsOpen) return null
+  const rows = Object.entries(COMMANDS).filter(([, c]) => c.shortcut).map(([id, c]) => [c.shortcut!, label(id)] as [string, string])
+  return (
+    <div className="modal-backdrop" onClick={() => setShortcutsOpen(false)}>
+      <div className="modal" style={{ width: 'min(560px, 92vw)' }} onClick={(e) => e.stopPropagation()}>
+        <div className="row"><h1>{t('Atajos de teclado')}</h1><span className="grow" /><button className="mini ghost" onClick={() => setShortcutsOpen(false)}>{t('Cerrar')}</button></div>
+        <table className="table"><tbody>
+          {[...rows, ...EXTRA_SHORTCUTS.map(([k, l]) => [k, t(l)] as [string, string])].map(([k, l]) => <tr key={k + l}><td><kbd>{k}</kbd></td><td>{l}</td></tr>)}
+        </tbody></table>
+      </div>
+    </div>
+  )
+}
+
 function Pomodoro() {
   const { pomo, pomoToggle, pomoReset, pomoSkip } = useStore()
   const mm = String(Math.floor(pomo.left / 60)).padStart(2, '0'), ss = String(pomo.left % 60).padStart(2, '0')
@@ -106,19 +174,24 @@ export function App() {
       if (e.key === 'Escape') { // cierra el modal abierto (Escape dentro de un input ya lo gestiona cada vista)
         if (st.paletteOpen) st.setPaletteOpen(false)
         else if (st.quickNoteOpen) st.setQuickNoteOpen(false)
+        else if (st.newEntity) st.setNewEntity(null)
+        else if (st.shortcutsOpen) st.setShortcutsOpen(false)
         else if (st.prefsOpen) st.closePrefs()
         else if (st.searchOpen) st.closeSearch()
         else if (st.rename) st.closeRename()
         else if (st.linker && st.vault) st.cancelLink()
         return
       }
-      if (!st.vault || st.paletteOpen || st.quickNoteOpen || st.prefsOpen || st.searchOpen || st.rename || st.linker) return
+      if (!st.vault || st.paletteOpen || st.quickNoteOpen || st.prefsOpen || st.searchOpen || st.rename || st.linker || st.newEntity || st.shortcutsOpen) return
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); st.setPaletteOpen(true) }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'n') { e.preventDefault(); st.setQuickNoteOpen(true) }
     }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
   }, [])
+  // Menú nativo: ejecuta sus comandos y le manda idioma, recientes y estado de los conmutadores de Ver.
+  useEffect(() => { window.api.onMenu((id) => (id.startsWith('openPath:') ? void useStore.getState().openVaultPath(id.slice(9)) : runCommand(id))) }, [])
+  useEffect(() => { window.api.menuSetup({ lang: getLang(), recents: s.recents, focus: s.prefs.focus, page: s.prefs.page, tags: s.showTags }) }, [s.recents, s.prefs.focus, s.prefs.page, s.showTags])
   const scene = s.path ? s.projection.scenes.find((sc) => s.cursorLine >= sc.startLine && s.cursorLine < sc.endLine) : undefined
   const sceneText = scene ? s.text.split('\n').slice(scene.startLine, scene.endLine).join('\n') : ''
   return (
@@ -147,6 +220,7 @@ export function App() {
         <span className="grow" />
         <span className="muted crumb">{s.vault ? s.vault.root.split(/[\\/]/).pop() : t('Sin proyecto')}</span>
         {s.graph && <span className="pill" title={s.graph.reason}>{t('índice')} {s.graph.stale ? t('reindexando') : t('al día')}</span>}
+        {s.vault && <QuickAdd />}
         {s.vault && <Pomodoro />}
         <button className="ghost" onClick={() => void s.openVault()}>{t('Abrir vault')}</button>
         <AppMenu />
@@ -174,6 +248,8 @@ export function App() {
       <Rename />
       <Palette />
       <QuickNote />
+      <NewEntity />
+      <Shortcuts />
       <footer>
         <span>{s.status ? t(s.status) : '—'}</span>
         <span className="grow" />
