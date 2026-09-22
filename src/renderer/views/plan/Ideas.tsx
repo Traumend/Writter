@@ -62,7 +62,32 @@ export function Ideas() {
         </div>
 
         <div className="panelbox">
-          <h2>{t('Matriz de motivación')}</h2>
+          {/* Matriz completa (PRD §38): quién tiene qué dimensión rellena y con cuánta intensidad. */}
+          <h2>{t('Matriz de motivación')} <span className="muted tiny">{names.length} {t('personajes')} × 10</span></h2>
+          {names.length > 0 && (
+            <div className="scrollx">
+              <table className="table cmm">
+                <thead><tr><th>{t('Personaje')}</th>{MOT_DIMS.map(([k, l]) => <th key={k} title={t(l)}>{t(l).slice(0, 3)}</th>)}<th>{t('Total')}</th></tr></thead>
+                <tbody>
+                  {chars.map((c) => {
+                    const m = actor(c.name)?.motivation ?? {}
+                    return (
+                      <tr key={c.path}>
+                        <td className="link ell" onClick={() => { void openFile(c.path); setTab('dev'); setDevTab('characters') }}>{c.name}</td>
+                        {MOT_DIMS.map(([k, l]) => {
+                          const d = m[k]
+                          const on = !!d?.text.trim()
+                          return <td key={k} className="cmmcell" title={`${t(l)}: ${on ? `${d!.text} (${d!.level}/10)` : t('sin definir')}`}>{on ? <span className="lvl" style={{ opacity: 0.25 + (d!.level / 10) * 0.75 }}>{d!.level}</span> : <span className="muted">·</span>}</td>
+                        })}
+                        <td><b>{filled(c.name)}/10</b></td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <h2>{t('Premisas por cruce')}</h2>
           <p className="muted tiny">{t('Cruza las 10 dimensiones de dos personajes y genera premisas de escena por reglas (sin IA). Rellena el Motor de personaje en la ficha.')}</p>
           <div className="row">
             <select value={a} onChange={(e) => setA(e.target.value)}><option value="">{t('Personaje A')}</option>{names.map((n) => <option key={n} value={n}>{n} ({filled(n)}/10)</option>)}</select>

@@ -23,21 +23,21 @@ Pestañas:
 - **Escritorio**: episodios por temporada, escenas con búsqueda y reordenar, gutter con etiquetas de elemento, saltos de página estimados, subrayado de entidades, Script Assistant, versiones con snapshot y comparar, exportar.
 - **Breakdown**: tarjetas de personajes/locaciones/ítems con foto, grupo, actor, alias y apariciones por escena; extracción automática desde el guión; CSV.
 - **Desarrollo → Personajes**: ficha estructurada, sliders de rasgos, motor de personaje (10 dimensiones), **arco** con hitos anclados a escenas, relaciones con mapa, sugerencias de IA por campo (aceptar/rechazar).
-- **Desarrollo → Beat Timeline**: línea de tiempo plana con carriles Temporada · Episodio · Actos · Beats · Escenas (alcance episodio o serie), tarjetas de color, inspector para editar (acto, beat, nota, escena), cabezal reproducible, muro de notas con etiquetas y conexiones, exportación de marcadores CSV/JSON. Se guarda en `outline/<episodio>.md`.
-- **Desarrollo → Mapa neural**: grafo con capas, escenas como nodos, búsqueda, pan/zoom y arrastre.
+- **Desarrollo → Beat Timeline**: línea de tiempo plana con carriles Temporada · Episodio · Actos · Beats · Tensión · Escenas (alcance episodio o serie), tarjetas de color, inspector para editar (acto, beat con tensión y personajes, nota, y ficha narrativa de la escena: propósito, conflicto, resultado, lo que está en juego y cambio de valor), cabezal reproducible, muro de notas con etiquetas y conexiones, exportación de marcadores CSV/JSON. Se guarda en `outline/<episodio>.md`.
+- **Desarrollo → Mapa neural**: grafo con capas, escenas como nodos, búsqueda, enfoque por niveles (clic derecho en un nodo), pan/zoom y arrastre.
 - **Desarrollo → Análisis**: análisis IA por escena (estructura, trama, tema, tono, métricas, emociones) versionado en `.narrative/analysis/`; Script Doctor con heurísticas locales sin IA.
 - **Planificación**: capa de planificación y diagnóstico narrativo (plan: [docs/plan-planificacion-narrativa.md](docs/plan-planificacion-narrativa.md)). Todo vive en `outline/Planning.md` (frontmatter) y en `sceneMeta` de `outline/<episodio>.md`:
   - **Dashboard**: ficha del proyecto (estado, género, logline, sinopsis), progreso vs. meta de palabras, sesión de hoy (palabras, meta diaria, racha y gráfico de 14 días), estructura, personajes, preguntas, plants, hallazgos de la Clinic, actividad.
   - **Planner**: tracks (líneas narrativas) × escenas, estado/POV/track por escena.
   - **Preguntas**: preguntas dramáticas con escena de planteo, hitos intermedios y resolución, estado, importancia y línea de tiempo.
   - **Plant & Payoff**: siembras y pagos con distancia y alertas (sin pago, sin siembra, orden invertido).
-  - **Ideas**: escenas huérfanas (integrables al guion) + **Matriz de motivación**: premisas por reglas a partir del Motor de personaje (10 dimensiones en la ficha), sin IA.
-  - **Clinic**: diagnóstico local (estructura, personajes, arcos, locaciones, preguntas, plants, tracks, ritmo) con severidades no absolutas, enlaces a escenas y técnicas sugeridas.
-  - **Index**: navegador tabular de todo el proyecto con orden, búsqueda, filtros (estado, track, personaje), edición en línea de estado/POV/track/etiquetas y CSV.
+  - **Ideas**: escenas huérfanas (integrables al guion) + **Matriz de motivación**: rejilla personajes × 10 dimensiones y premisas por reglas a partir del Motor de personaje, sin IA.
+  - **Clinic**: diagnóstico local (estructura, personajes, arcos, motivación, continuidad, locaciones, preguntas, plants, tracks, ritmo y curva de tensión) con severidades no absolutas, enlaces a escenas y técnicas sugeridas.
+  - **Index**: navegador tabular de todo el proyecto (escenas, beats, fichas, preguntas, plants, etiquetas, notas) con orden, búsqueda, filtros, edición en línea de estado/POV/track/etiquetas, selector de columnas y CSV.
   - **Biblioteca**: técnicas, psicología y tropos (contenido original de Writter), con relacionadas, favoritos y "crear nota en el vault".
-- **Utilidades**: `Ctrl+K` búsqueda global y comandos (con `>`), `Ctrl+Shift+N` nota rápida a `knowledge/Inbox`, Pomodoro en la cabecera, meta de palabras en el pie, export/import del proyecto en JSON versionado y vaults recientes en el menú.
+- **Utilidades**: `Ctrl+K` búsqueda global y comandos (con `>`), `Ctrl+Shift+N` nota rápida con carpeta (Inbox, Historia, Personajes, Mundo, Investigación), Pomodoro en la cabecera, meta de palabras en el pie, export/import del proyecto en JSON versionado y vaults recientes en el menú.
 - **Menú de la aplicación** (Archivo · Edición · Ver · Historia · Herramientas · Ventana · Ayuda, en el idioma de la interfaz) y botón **+ Nuevo** en la cabecera para crear episodios, fichas, preguntas, plants, ideas, tracks y notas desde cualquier vista. Atajos: `Ctrl+1…6` pestañas, `Ctrl+N` episodio, `Ctrl+O` vault, `Ctrl+H` buscar y reemplazar, `Ctrl+,` preferencias, `Ctrl+Shift+[ ]` pestaña anterior/siguiente; lista completa en Ayuda → Atajos de teclado. Plan: [docs/plan-menu.md](docs/plan-menu.md).
-- **Locaciones (Breakdown)**: ficha de lugar con tipo, región, atmósfera, propósito narrativo, simbolismo y secretos, y jerarquía «dentro de» entre lugares.
+- **Locaciones (Breakdown)**: ficha de lugar con tipo, región, atmósfera, propósito narrativo, simbolismo y secretos, jerarquía «dentro de» entre lugares y orden por jerarquía.
 - **Producción**: shot list por escena con storyboard adjunto, en `assets/shots/<episodio>.md`.
 - **Ajustes**: proveedor y modelo, clave, mapa de tags con validador, Graphify, portada del PDF, papel, prompts editables.
 

@@ -3,11 +3,11 @@ import { readFrontmatter } from '../../../core/frontmatter'
 import { SCENE_STATUS, type SceneStatus } from '../../../core/planning'
 import { t } from '../../i18n'
 import { useStore } from '../../store'
-import { BlurInput } from '../../ui'
+import { BlurInput, Icon } from '../../ui'
 import { refLabel, useCards, usePlanning, useScripts, useSceneMetaWriter } from './data'
 import { useOpenScene } from './shared'
 
-type Cat = 'scenes' | 'characters' | 'locations' | 'props' | 'questions' | 'plants' | 'ideas' | 'notes'
+type Cat = 'scenes' | 'beats' | 'characters' | 'locations' | 'props' | 'questions' | 'plants' | 'ideas' | 'tags' | 'notes'
 // Una celda es su valor (orden, búsqueda y CSV) y, si es editable, el control que la pinta.
 type Cell = string | number | { v: string | number; node: ReactNode }
 type Row = { id: string; cells: Cell[]; open?: () => void }
@@ -31,6 +31,10 @@ export function Index() {
   const [fChar, setFChar] = useState('')
   const [sortCol, setSortCol] = useState(0)
   const [asc, setAsc] = useState(true)
+  const [colsOpen, setColsOpen] = useState(false)
+  const [hidden, setHidden] = useState<Record<string, string[]>>(() => { try { return JSON.parse(localStorage.getItem('writter.index.cols') || '{}') as Record<string, string[]> } catch { return {} } })
+  const isHidden = (c: string) => (hidden[cat] ?? []).includes(c)
+  const toggleCol = (c: string) => setHidden((h) => { const cur = h[cat] ?? []; const next = { ...h, [cat]: cur.includes(c) ? cur.filter((x) => x !== c) : [...cur, c] }; localStorage.setItem('writter.index.cols', JSON.stringify(next)); return next })
   const chars = cards.filter((c) => c.kind === 'character').map((c) => c.name)
 
   const open = (path: string) => () => { void openFile(path); setTab('desk') }
@@ -57,6 +61,12 @@ export function Index() {
           }
         })).filter((r) => (!fTrack || val(r.cells[5]!) === fTrack) && (!fStatus || val(r.cells[3]!) === fStatus) && (!fChar || String(val(r.cells[7]!)).includes(fChar)))
       }
+      case 'beats': return { cols: ['Beat', 'Tipo', 'Episodio', 'Escena', 'Tensión', 'Personajes', 'Nota'], rows: scripts.flatMap((s) => s.beats.map((b, i) => ({ id: `${s.path}#b${i}`, cells: [String(b.title ?? ''), String(b.kind ?? ''), s.name, b.scene + 1, b.tension ?? 0, (b.characters ?? []).join(', '), String((b as { note?: string }).note ?? '')], open: () => { const sc = s.scenes[b.scene]; if (sc) openScene(scripts, { script: s.path, heading: sc.heading }) } }))) }
+      case 'tags': {
+        const count = new Map<string, number>()
+        for (const s of scripts) for (const sc of s.scenes) for (const tg of s.sceneMeta[sc.heading]?.tags ?? []) count.set(tg, (count.get(tg) ?? 0) + 1)
+        return { cols: ['Etiqueta', 'Escenas'], rows: [...count].map(([tg, n]) => ({ id: tg, cells: [tg, n] })) }
+      }
       case 'characters': return { cols: ['Nombre', 'Grupo', 'Actor', 'Escenas', 'Alias', 'Palabras'], rows: cards.filter((c) => c.kind === 'character').map((c) => ({ id: c.path, cells: [c.name, c.group, c.actor, c.appearances.length, c.aliases.join(', '), c.words], open: open(c.path) })) }
       case 'locations': return { cols: ['Nombre', 'Escenas', 'Alias'], rows: cards.filter((c) => c.kind === 'location').map((c) => ({ id: c.path, cells: [c.name, c.appearances.length, c.aliases.join(', ')], open: open(c.path) })) }
       case 'props': return { cols: ['Nombre', 'Escenas', 'Alias'], rows: cards.filter((c) => c.kind === 'prop').map((c) => ({ id: c.path, cells: [c.name, c.appearances.length, c.aliases.join(', ')], open: open(c.path) })) }
@@ -69,8 +79,9 @@ export function Index() {
 
   const ql = q.toLowerCase()
   const list = rows.filter((r) => !ql || r.cells.some((c) => String(val(c)).toLowerCase().includes(ql))).sort((a, b) => { const x = val(a.cells[sortCol] ?? ''), y = val(b.cells[sortCol] ?? ''); const c = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y)); return asc ? c : -c })
-  const csv = () => { const esc = (s: string | number) => `"${String(s).replace(/"/g, '""')}"`; void window.api.exportText([cols.map(esc).join(','), ...list.map((r) => r.cells.map((c) => esc(val(c))).join(','))].join('\n'), `index-${cat}.csv`) }
-  const CATS: [Cat, string][] = [['scenes', 'Escenas'], ['characters', 'Personajes'], ['locations', 'Locaciones'], ['props', 'Ítems'], ['questions', 'Preguntas'], ['plants', 'Plants'], ['ideas', 'Ideas'], ['notes', 'Notas']]
+  const keep = cols.map((c, i) => [c, i] as const).filter(([c]) => !isHidden(c))
+  const csv = () => { const esc = (s: string | number) => `"${String(s).replace(/"/g, '""')}"`; void window.api.exportText([keep.map(([c]) => esc(c)).join(','), ...list.map((r) => keep.map(([, i]) => esc(val(r.cells[i] ?? ''))).join(','))].join('\n'), `index-${cat}.csv`) }
+  const CATS: [Cat, string][] = [['scenes', 'Escenas'], ['beats', 'Beats'], ['characters', 'Personajes'], ['locations', 'Locaciones'], ['props', 'Ítems'], ['questions', 'Preguntas'], ['plants', 'Plants'], ['ideas', 'Ideas'], ['tags', 'Etiquetas'], ['notes', 'Notas']]
 
   return (
     <main className="page scroll">
@@ -79,6 +90,14 @@ export function Index() {
         <input placeholder={t('Buscar…')} value={q} onChange={(e) => setQ(e.target.value)} />
         <span className="grow" />
         <span className="muted tiny">{list.length} {t('filas')}</span>
+        <div className="appmenu">
+          <button className="mini ghost" aria-haspopup="menu" aria-expanded={colsOpen} onClick={() => setColsOpen((v) => !v)}>{t('Columnas')}</button>
+          {colsOpen && (
+            <div className="menu" role="menu" onMouseLeave={() => setColsOpen(false)}>
+              {cols.map((c) => <button key={c} className="menu-item" onClick={() => toggleCol(c)}><span className="chk">{!isHidden(c) && <Icon name="check" size={12} />}</span>{t(c)}</button>)}
+            </div>
+          )}
+        </div>
         <button className="mini ghost" onClick={csv}>CSV</button>
       </div>
       {cat === 'scenes' && (
@@ -91,8 +110,8 @@ export function Index() {
         </div>
       )}
       <table className="table">
-        <thead><tr>{cols.map((c, i) => <th key={c} className="link" onClick={() => { if (sortCol === i) setAsc(!asc); else { setSortCol(i); setAsc(true) } }}>{t(c)}{sortCol === i ? (asc ? ' ▲' : ' ▼') : ''}</th>)}</tr></thead>
-        <tbody>{list.map((r) => <tr key={r.id} className={r.open ? 'link' : ''} onClick={r.open}>{r.cells.map((c, i) => <td key={i}>{typeof c === 'object' ? c.node : c}</td>)}</tr>)}</tbody>
+        <thead><tr>{keep.map(([c, i]) => <th key={c} className="link" onClick={() => { if (sortCol === i) setAsc(!asc); else { setSortCol(i); setAsc(true) } }}>{t(c)}{sortCol === i ? (asc ? ' ▲' : ' ▼') : ''}</th>)}</tr></thead>
+        <tbody>{list.map((r) => <tr key={r.id} className={r.open ? 'link' : ''} onClick={r.open}>{keep.map(([c, i]) => { const cell = r.cells[i] ?? ''; return <td key={c}>{typeof cell === 'object' ? cell.node : cell}</td> })}</tr>)}</tbody>
       </table>
       {list.length === 0 && <p className="muted center">{t('Nada que mostrar todavía en esta categoría.')}</p>}
     </main>
