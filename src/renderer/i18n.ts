@@ -12,7 +12,7 @@ export function getLang(): Lang {
 }
 
 // Diccionario Español -> Inglés. Clave = literal español tal cual aparece en el código.
-const EN: Record<string, string> = {
+export const EN: Record<string, string> = {
   // Cabecera / navegación / menú
   Writter: 'Writter',
   Escritorio: 'Writing Desk',
