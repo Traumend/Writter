@@ -20,6 +20,22 @@ export const TEMPLATE: Record<Exclude<FileKind, 'other'>, (name: string, extra?:
   knowledge: (n) => `---\ntype: knowledge\ntitle: "${n}"\n---\n\n`
 }
 
+// Sin guiones no hay nada que mostrar: se puede crear un episodio aquí mismo o vincular la carpeta donde ya vive la historia.
+export function NoScripts() {
+  const openLinker = useStore((s) => s.openLinker)
+  const [creating, setCreating] = useState(false)
+  return (
+    <div className="empty">
+      <p className="muted">{t('No hay guiones en el vault. Crea un episodio nuevo o vincula la carpeta donde ya vive tu historia (capítulos o episodios).')}</p>
+      <div className="row">
+        <button onClick={() => setCreating(true)}><Icon name="plus" size={12} />{t('Nuevo episodio')}</button>
+        <button className="ghost" onClick={openLinker}>{t('Vincular carpetas…')}</button>
+      </div>
+      {creating && <NewFile kind="script" onDone={() => setCreating(false)} />}
+    </div>
+  )
+}
+
 function NewFile({ kind, onDone }: { kind: Exclude<FileKind, 'other'>; onDone: () => void }) {
   const [name, setName] = useState('')
   const [season, setSeason] = useState('1')

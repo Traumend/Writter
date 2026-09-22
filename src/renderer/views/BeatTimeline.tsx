@@ -7,7 +7,7 @@ import { project } from '../../core/projection'
 import { t } from '../i18n'
 import { useStore } from '../store'
 import { Icon, BlurInput, useDoc } from '../ui'
-import { TEMPLATE } from './Desk'
+import { TEMPLATE, NoScripts } from './Desk'
 
 type Act = { title: string; summary: string; from: number; to: number }
 type Beat = { id: string; title: string; note: string; scene: number; kind: string }
@@ -26,7 +26,7 @@ const PRESETS: Record<string, { acts?: [string, number, number][]; beats?: [stri
 }
 
 export function BeatTimeline() {
-  const { files, docs, openFile, setTab, createFile, writeOther, openLinker } = useStore()
+  const { files, docs, openFile, setTab, createFile, writeOther } = useStore()
   const scripts = files.filter((f) => f.kind === 'script')
   const cards = useMemo(() => breakdown(files, docs).filter((c) => c.kind === 'character'), [files, docs])
 
@@ -120,12 +120,8 @@ export function BeatTimeline() {
   const ticks = useMemo(() => { const step = zoom > 1.6 ? 1 : zoom > 0.8 ? 2 : 5; const out: number[] = []; for (let m = 0; m <= total; m += step) out.push(m); return out }, [total, zoom])
   const noteById = new Map(notes.map((n) => [n.id, n]))
 
-  // Sin guiones no hay línea de tiempo: la carpeta de la historia debe estar vinculada como "Guiones".
-  if (!scripts.length) return (
-    <main className="page bt">
-      <p className="muted">{t('No hay guiones en el vault. Vincula la carpeta de tu historia (capítulos o episodios) como Guiones.')} <button className="mini ghost" onClick={openLinker}>{t('Vincular carpetas…')}</button></p>
-    </main>
-  )
+  // Sin guiones no hay línea de tiempo: crear un episodio o vincular la carpeta de la historia.
+  if (!scripts.length) return <main className="page bt"><NoScripts /></main>
 
   return (
     <main className="page bt">

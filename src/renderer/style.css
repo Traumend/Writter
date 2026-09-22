@@ -160,6 +160,8 @@ main.split.two { grid-template-columns: 256px 1fr; } /* vistas sin panel derecho
 .check { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
 .check input { width: auto; margin: 0; box-shadow: none; }
 .newfile { margin-bottom: 10px; }
+.empty { display: flex; flex-direction: column; gap: 12px; max-width: 560px; align-items: flex-start; }
+.empty .newfile { width: 320px; }
 .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
 .field > span { font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--dim); }
 .field input, .field textarea, .field select { margin-bottom: 0; width: 100%; }
