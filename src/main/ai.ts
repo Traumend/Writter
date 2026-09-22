@@ -127,6 +127,8 @@ export async function analyze(text: string, cfg: ProjectConfig): Promise<Omit<An
     theme: String(j.theme ?? ''),
     tone: String(j.tone ?? ''),
     notes: Array.isArray(j.notes) ? j.notes.map(String) : [],
+    writing: Array.isArray(j.writing) ? j.writing.map(String) : [],
+    format: Array.isArray(j.format) ? j.format.map(String) : [],
     scenes: (Array.isArray(j.scenes) ? j.scenes : []).map((s, i) => ({
       index: Number(s.index ?? i),
       summary: String(s.summary ?? ''),
@@ -134,6 +136,7 @@ export async function analyze(text: string, cfg: ProjectConfig): Promise<Omit<An
       intensity: num(s.intensity),
       tension: num(s.tension),
       attention: num(s.attention),
+      commercial: num(s.commercial),
       notes: Array.isArray(s.notes) ? s.notes.map(String) : []
     }))
   }

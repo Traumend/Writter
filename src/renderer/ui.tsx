@@ -38,7 +38,18 @@ const PATHS: Record<string, string> = {
   expand: 'M4 9V4h5M20 15v5h-5M15 4h5v5M9 20H4v-5',
   question: 'M9 9a3 3 0 1 1 4 2.8c-.8.4-1 1-1 2M12 17h.01',
   dice: 'M4 4h16v16H4zM8 8h.01M16 8h.01M8 16h.01M16 16h.01M12 12h.01',
-  actor: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM5 20a7 7 0 0 1 14 0'
+  actor: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM5 20a7 7 0 0 1 14 0',
+  book: 'M4 4h6a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H4zM20 4h-6a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h7z',
+  search: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14ZM20 20l-4-4',
+  timer: 'M12 8v5l3 2M12 21a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM9 2h6',
+  note: 'M5 3h10l4 4v14H5zM15 3v4h4M8 12h8M8 16h5',
+  minus: 'M5 12h14',
+  link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1.5 1.5M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1.5-1.5',
+  more: 'M5 12h.01M12 12h.01M19 12h.01',
+  check: 'M5 12l5 5L20 7',
+  play: 'M8 5v14l11-7z',
+  pause: 'M7 5v14M17 5v14',
+  panel: 'M3 5h18v14H3zM15 5v14'
 }
 export function Icon({ name, size = 16 }: { name: keyof typeof PATHS; size?: number }) {
   return (

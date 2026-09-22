@@ -3,7 +3,11 @@ import type { Api, VaultChange } from '../core/types/ipc'
 
 // Superficie mínima: el renderer solo ve estas funciones, nunca fs/claves/red.
 const api: Api = {
+  menuSetup: (setup) => ipcRenderer.send('menu.setup', setup),
+  onMenu: (cb) => { ipcRenderer.on('menu', (_e, id: string) => cb(id)); ipcRenderer.on('menu.openPath', (_e, dir: string) => cb('openPath:' + dir)) },
   vaultOpen: () => ipcRenderer.invoke('vault.open'),
+  vaultOpenPath: (dir) => ipcRenderer.invoke('vault.openPath', dir),
+  pickText: (exts) => ipcRenderer.invoke('pick.text', exts),
   vaultAdopt: (root, roles) => ipcRenderer.invoke('vault.adopt', root, roles),
   folderExists: (root, rel) => ipcRenderer.invoke('folder.exists', root, rel),
   folderMake: (root, rel) => ipcRenderer.invoke('folder.make', root, rel),
@@ -15,6 +19,7 @@ const api: Api = {
   fileWrite: (path, content, expectedHash, origin) => ipcRenderer.invoke('file.write', path, content, expectedHash, origin),
   fileCreate: (path, content) => ipcRenderer.invoke('file.create', path, content),
   fileRename: (oldPath, newPath) => ipcRenderer.invoke('file.rename', oldPath, newPath),
+  fileDelete: (path) => ipcRenderer.invoke('file.delete', path),
   onVaultChange: (cb) => {
     const h = (_e: unknown, e: VaultChange) => cb(e)
     ipcRenderer.on('vault.changed', h)
@@ -32,6 +37,7 @@ const api: Api = {
   aiAnalyze: (path, text) => ipcRenderer.invoke('ai.analyze', path, text),
   analysisList: (path) => ipcRenderer.invoke('analysis.list', path),
   analysisRead: (path, id) => ipcRenderer.invoke('analysis.read', path, id),
+  analysisSave: (path, id, data) => ipcRenderer.invoke('analysis.save', path, id, data),
   graphStatus: () => ipcRenderer.invoke('graph.status'),
   graphBuild: () => ipcRenderer.invoke('graph.build'),
   graphGet: () => ipcRenderer.invoke('graph.get'),

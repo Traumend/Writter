@@ -8,10 +8,10 @@ import { BlurInput, EpisodeSelect } from '../ui'
 const KINDS: [string, string][] = [['logline', 'Logline'], ['sinopsis', 'Sinopsis'], ['treatment', 'Treatment']]
 
 function DocBlock({ kind, label, scriptName, scriptText }: { kind: string; label: string; scriptName: string; scriptText: string }) {
-  const { files, docs, createFile, writeOther } = useStore()
+  const { files, docs, createFile, writeOther, roleDir } = useStore()
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
-  const path = `knowledge/${scriptName} - ${label}.md`
+  const path = `${roleDir('knowledge')}/${scriptName} - ${label}.md`
   const doc = docs.find((d) => d.path === path)
   const body = doc ? readFrontmatter(doc.content).body.replace(/^\n+/, '') : ''
   const write = async (text: string) => {

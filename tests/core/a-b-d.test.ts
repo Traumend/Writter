@@ -88,3 +88,15 @@ test('script doctor: parlamento largo y enlace sin ficha', () => {
   expect(findings.some((f) => f.message.includes('muy largo'))).toBe(true)
   expect(findings.some((f) => f.message.includes('[[Summer]]'))).toBe(false)
 })
+
+// Prosa (secciones como escenas): los títulos de sección no son locaciones; solo los encabezados Fountain lo son.
+test('extractMissing: en prosa no propone secciones como locaciones', () => {
+  const files = [{ path: 'scripts/cap.md', kind: 'script' as const, name: 'cap' }, { path: 'scripts/ep.md', kind: 'script' as const, name: 'ep' }]
+  const docs = [
+    { path: 'scripts/cap.md', content: '## Capítulo 1\n\n### El anciano\n\nTexto con [[Ana]].\n\n### El descenso\n\nMás texto.\n' },
+    { path: 'scripts/ep.md', content: 'INT. CATEDRAL - NOCHE\n\nANA\nHola.\n' }
+  ]
+  const m = extractMissing(files, docs)
+  expect(m.locations).toEqual(['CATEDRAL'])
+  expect(m.characters).toEqual(['ANA'])
+})

@@ -1,11 +1,15 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { breakdown } from '../../core/breakdown'
 import { readFrontmatter, writeFrontmatter } from '../../core/frontmatter'
 import { extractLinks, parseFountain } from '../../core/parser/fountain'
+import { MOT_DIMS, defaultArc, readArc, readMotivation, uid, type ArcPoint } from '../../core/planning'
+import { project } from '../../core/projection'
 import { joinSections, splitSections, type Section } from '../../core/sections'
 import { t } from '../i18n'
 import { useStore } from '../store'
 import { AiSuggest, BlurInput, Field, Icon, useAsset } from '../ui'
+import { useScripts } from './plan/data'
+import { SceneRefPicker, useOpenScene } from './plan/shared'
 
 const TRAITS: [string, string, string, string, string][] = [
   ['initiative', 'Iniciativa', 'Reactivo', 'Proactivo', '#ff5a1f'],
@@ -47,7 +51,9 @@ const SORTS: [string, string][] = [['scenes', 'Más escenas'], ['az', 'A-Z'], ['
 type Rel = { target: string; kind: string; note: string }
 
 export function Characters() {
-  const { files, docs, writeOther, openFile, setTab, vault, saveConfig } = useStore()
+  const { files, docs, writeOther, openFile, setTab, vault, saveConfig, path: openPath, lastRenamed } = useStore()
+  const scripts = useScripts()
+  const openScene = useOpenScene()
   const [sortBy, setSortBy] = useState('scenes')
   const cards = useMemo(() => {
     const list = breakdown(files, docs).filter((c) => c.kind === 'character')
@@ -61,14 +67,23 @@ export function Characters() {
   const [newSlider, setNewSlider] = useState('')
   const [showGuide, setShowGuide] = useState(false)
   const [mapBig, setMapBig] = useState(false)
-  const path = sel ?? cards[0]?.path ?? null
+  // Si el archivo abierto en el store es una ficha (botón "Ficha", "Nuevo personaje…"), se selecciona aquí.
+  useEffect(() => { if (openPath && cards.some((c) => c.path === openPath)) setSel(openPath) }, [openPath, cards])
+  // Tras renombrar, la selección sigue a la ficha; si la ruta seleccionada ya no existe, cae a la primera.
+  useEffect(() => { if (lastRenamed && sel === lastRenamed.from) setSel(lastRenamed.to) }, [lastRenamed, sel])
+  const path = sel && cards.some((c) => c.path === sel) ? sel : (cards[0]?.path ?? null)
   const card = cards.find((c) => c.path === path)
   const doc = docs.find((d) => d.path === path)
   const color = String((doc ? readFrontmatter(doc.content).data['color'] : '') || '') || '#4f8cff'
   const img = useAsset(card?.image ?? '')
   const { data, body } = doc ? readFrontmatter(doc.content) : { data: {}, body: '' }
   const traits = (data['traits'] as Record<string, number> | undefined) ?? {}
+  const mot = readMotivation(data)
+  const setMot = (k: string, v: { text?: string; level?: number }) => patch({ motivation: { ...mot, [k]: { text: mot[k as keyof typeof mot]?.text ?? '', level: mot[k as keyof typeof mot]?.level ?? 5, ...v } } })
   const rels = (Array.isArray(data['relationships']) ? data['relationships'] : []) as Rel[]
+  const arc = readArc(data)
+  const setArc = (next: ArcPoint[]) => patch({ arc_points: next })
+  const updArc = (i: number, p: Partial<ArcPoint>) => setArc(arc.map((x, j) => (j === i ? { ...x, ...p } : x)))
   const customSliders = vault?.config.characterSliders ?? []
   const { intro, sections } = useMemo(() => splitSections(body), [body])
 
@@ -105,13 +120,12 @@ export function Characters() {
     for (const a of card.appearances) {
       const d = docs.find((x) => x.path === a.script)
       if (!d) continue
-      const toks = parseFountain(d.content).tokens
-      const h = toks.find((t) => t.type === 'heading' && t.text.trim().toUpperCase() === a.heading.toUpperCase())
-      if (!h) continue
+      const doc = parseFountain(d.content)
+      const sc = project(doc).scenes[a.scene] // misma proyección que el breakdown (vale también para prosa con secciones)
+      if (!sc || sc.heading.toUpperCase() !== a.heading.toUpperCase()) continue
       let speaking = false
       const lines: string[] = [a.heading]
-      for (const t of toks.slice(h.line + 1)) {
-        if (t.type === 'heading') break
+      for (const t of doc.tokens.slice(sc.startLine + 1, sc.endLine)) {
         if (t.type === 'character') speaking = [card.name, ...card.aliases].some((n) => t.text.toUpperCase().includes(n.toUpperCase()))
         if ((t.type === 'dialogue' && speaking) || t.type === 'action') lines.push(t.text.trim())
       }
@@ -177,8 +191,8 @@ export function Characters() {
               </div>
             </div>
             <div className="col">
-              <button className="ghost mini" onClick={() => useStore.getState().openRename(card.path, card.name, [card.name, ...card.aliases])}>{t('Renombrar…')}</button>
-              <button className="ghost mini" onClick={() => { void openFile(card.path); setTab('desk') }}>{t('Abrir .md')}</button>
+              <button className="mini ghost" onClick={() => useStore.getState().openRename(card.path, card.name, [card.name, ...card.aliases])}>{t('Renombrar…')}</button>
+              <button className="mini ghost" onClick={() => { void openFile(card.path); setTab('desk') }}>{t('Abrir .md')}</button>
             </div>
           </div>
 
@@ -223,9 +237,44 @@ export function Characters() {
             patch({ want: w.trim(), need: n.trim() })
           }} />
 
+          <h2>{t('Motor de personaje')} <span className="muted tiny">{MOT_DIMS.filter(([k]) => mot[k]?.text.trim()).length}/10</span></h2>
+          <p className="muted tiny">{t('Diez dimensiones motivacionales. Se cruzan en la Matriz de motivación (Planificación → Ideas) para generar premisas de escena.')}</p>
+          <div className="grid2 engine">
+            {MOT_DIMS.map(([k, l, hint]) => (
+              <div className="engine-row" key={k}>
+                <div className="row tiny"><b>{t(l)}</b><span className="grow" /><span className="muted">{mot[k]?.level ?? 5}</span></div>
+                <BlurInput value={mot[k]?.text ?? ''} placeholder={t(hint)} onCommit={(v) => setMot(k, { text: v })} />
+                <input type="range" min={0} max={10} value={mot[k]?.level ?? 5} onChange={(e) => setMot(k, { level: Number(e.target.value) })} />
+              </div>
+            ))}
+          </div>
+
+          {/* Arco del personaje (PRD §39): hitos del cambio anclados a escenas del guion. */}
+          <h2>{t('Arco del personaje')} <span className="muted tiny">{arc.filter((p) => p.ref).length}/{arc.length}</span></h2>
+          <p className="muted tiny">{t('Hitos del cambio, cada uno anclado a la escena donde ocurre. La Clinic avisa si un personaje con presencia no tiene arco.')}</p>
+          {arc.length === 0 ? (
+            <button className="ghost" onClick={() => setArc(defaultArc())}><Icon name="plus" size={12} />{t('Crear arco (6 hitos)')}</button>
+          ) : (
+            <div className="arc">
+              {arc.map((p, i) => (
+                <div className={`arc-row ${p.ref ? 'linked' : ''}`} key={p.id}>
+                  <span className="dot" aria-hidden />
+                  <BlurInput value={p.stage} placeholder={t('Hito')} onCommit={(v) => updArc(i, { stage: v })} />
+                  <BlurInput value={p.note} placeholder={t('Qué cambia aquí')} onCommit={(v) => updArc(i, { note: v })} />
+                  <span className="row">
+                    <SceneRefPicker value={p.ref} onChange={(r) => updArc(i, { ref: r })} scripts={scripts} />
+                    {p.ref && <button className="mini ghost" title={t('Ir a la escena')} onClick={() => openScene(scripts, p.ref)}><Icon name="link" size={12} /></button>}
+                    <button className="mini ghost" title={t('Quitar')} onClick={() => setArc(arc.filter((_, j) => j !== i))}><Icon name="close" size={12} /></button>
+                  </span>
+                </div>
+              ))}
+              <button className="mini ghost" onClick={() => setArc([...arc, { id: uid(), stage: '', note: '' }])}><Icon name="plus" size={12} />{t('Hito')}</button>
+            </div>
+          )}
+
           <h2>{t('Profundización')}
-            <button className="mini ghost" onClick={() => setSections([...sections, { title: t('Nueva sección'), body: '' }])}><Icon name="plus" size={12} /> {t('Añadir sección')}</button>
-            <button className="mini ghost" onClick={() => setShowGuide((s) => !s)}><Icon name="question" size={12} /> {t('Preguntas guía')}</button>
+            <button className="mini ghost" onClick={() => setSections([...sections, { title: t('Nueva sección'), body: '' }])}><Icon name="plus" size={12} />{t('Añadir sección')}</button>
+            <button className="mini ghost" onClick={() => setShowGuide((s) => !s)}><Icon name="question" size={12} />{t('Preguntas guía')}</button>
           </h2>
           {showGuide && (
             <div className="panelbox" style={{ marginBottom: 10 }}>
@@ -273,7 +322,7 @@ export function Characters() {
           ))}
           <div className="row">
             <input placeholder={t('Nueva métrica del proyecto…')} value={newSlider} onChange={(e) => setNewSlider(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addSlider()} />
-            <button className="mini" onClick={addSlider}><Icon name="plus" size={12} /></button>
+            <button className="mini" title={t('Añadir métrica')} onClick={addSlider}><Icon name="plus" size={12} /></button>
           </div>
 
           <h2>{t('Relaciones')} · {rels.length + auto.length}
@@ -293,7 +342,7 @@ export function Characters() {
               <BlurInput textarea rows={2} value={r.note} placeholder={t('Nota')} onCommit={(v) => patch({ relationships: rels.map((x, j) => (j === i ? { ...x, note: v } : x)) })} />
             </div>
           ))}
-          <button className="ghost" disabled={cards.length < 2} onClick={() => patch({ relationships: [...rels, { target: cards.find((c) => c.path !== card.path)?.name ?? '', kind: '', note: '' }] })}><Icon name="plus" size={12} /> {t('Añadir relación')}</button>
+          <button className="ghost" disabled={cards.length < 2} onClick={() => patch({ relationships: [...rels, { target: cards.find((c) => c.path !== card.path)?.name ?? '', kind: '', note: '' }] })}><Icon name="plus" size={12} />{t('Añadir relación')}</button>
 
           {auto.length > 0 && (
             <>
@@ -302,7 +351,7 @@ export function Characters() {
               {auto.map((n) => (
                 <div className="relcard auto" key={n}>
                   <span className="link grow ell" onClick={() => openChar(n)}>[[{n}]]</span>
-                  <button className="mini" title={t('Añadir como relación')} onClick={() => patch({ relationships: [...rels, { target: n, kind: '', note: '' }] })}><Icon name="plus" size={12} /> {t('relación')}</button>
+                  <button className="mini" title={t('Añadir como relación')} onClick={() => patch({ relationships: [...rels, { target: n, kind: '', note: '' }] })}><Icon name="plus" size={12} />{t('relación')}</button>
                 </div>
               ))}
             </>
@@ -312,7 +361,7 @@ export function Characters() {
       {mapBig && card && (
         <div className="modal-backdrop" onClick={() => setMapBig(false)}>
           <div className="modal" style={{ width: 'min(760px,94vw)' }} onClick={(e) => e.stopPropagation()}>
-            <div className="row"><h1>{t('Mapa de relaciones')} · {card.name}</h1><span className="grow" /><button className="ghost mini" onClick={() => setMapBig(false)}>{t('Cerrar')}</button></div>
+            <div className="row"><h1>{t('Mapa de relaciones')} · {card.name}</h1><span className="grow" /><button className="mini ghost" onClick={() => setMapBig(false)}>{t('Cerrar')}</button></div>
             <RelMap name={card.name} color={color} rels={rels} auto={auto} onOpen={(n) => { setMapBig(false); openChar(n) }} big />
           </div>
         </div>

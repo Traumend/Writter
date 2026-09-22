@@ -6,7 +6,7 @@ import { useStore } from '../store'
 // Vinculador de carpetas del Vault (role-first): la raíz arriba y, por cada rol, su subcarpeta
 // con la ruta completa debajo, botón para crear si no existe y para examinar. Lo más intuitivo posible.
 const ROLES: [AdoptRole, string, string][] = [
-  ['script', 'Guiones', 'Episodios y escenas (.md con Fountain)'],
+  ['script', 'Guiones / Capítulos', 'Episodios o capítulos: Fountain o prosa con encabezados Markdown'],
   ['character', 'Personajes', 'Fichas de personaje'],
   ['location', 'Locaciones', 'Lugares y escenarios'],
   ['prop', 'Props / Utilería', 'Objetos y vestuario'],
@@ -55,11 +55,11 @@ export function Adoption() {
   return (
     <div className="modal-backdrop" onClick={cancelLink}>
       <div className="modal linker" onClick={(e) => e.stopPropagation()}>
-        <div className="row"><h1>{t('Vincular carpetas del Vault')}</h1><span className="grow" /><button className="ghost mini" onClick={cancelLink}>{t('Cerrar')}</button></div>
-        <p className="muted">{t('Indica dónde vive cada cosa. Si una carpeta no existe, créala con un botón. No se mueve ni se modifica contenido.')}</p>
+        <div className="row"><h1>{t('Vincular carpetas del Vault')}</h1><span className="grow" /><button className="mini ghost" onClick={cancelLink}>{t('Cerrar')}</button></div>
+        <p className="muted">{t('Indica dónde vive cada cosa: escribe la subcarpeta o usa Examinar. Si no existe, aparece el botón Crear. No se mueve ni se modifica contenido.')}</p>
 
         <div className="linkrow root">
-          <div className="linkrow-head"><strong>{t('Vault principal (raíz)')}</strong><span className="grow" /><button className="ghost mini" onClick={() => void repickRoot()}>{t('Cambiar…')}</button></div>
+          <div className="linkrow-head"><strong>{t('Vault principal (raíz)')}</strong><span className="grow" /><button className="mini ghost" onClick={() => void repickRoot()}>{t('Cambiar…')}</button></div>
           <div className="linkpath mono">{linker.root}</div>
         </div>
 

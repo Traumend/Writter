@@ -8,6 +8,7 @@ import { guessesToRoleMap } from '../core/adopt'
 import { renameEntity } from '../core/rename'
 import { writeFrontmatter } from '../core/frontmatter'
 import { roleDir as roleDirOf } from '../core/types/ipc'
+import { record as recordDay, type WriteLog } from '../core/stats'
 import { setLang, type Lang } from './i18n'
 import type { AdoptionProposal, AdoptRole, AiProposal, Doc, FileEntry, FileKind, GraphStatus, KeyStatus, ProjectConfig, Scope, VaultSummary, Version } from '../core/types/ipc'
 
@@ -16,7 +17,8 @@ export type Linker = { root: string; roles: Record<AdoptRole, string> }
 const ADOPT_ROLES: AdoptRole[] = ['script', 'character', 'location', 'prop', 'outline', 'knowledge', 'assets']
 
 export type Proposal = AiProposal & { from: number; to: number; target: string }
-export type Tab = 'desk' | 'breakdown' | 'dev' | 'production' | 'settings'
+export type Tab = 'desk' | 'breakdown' | 'dev' | 'plan' | 'production' | 'settings'
+export type PlanTab = 'dashboard' | 'planner' | 'questions' | 'plants' | 'ideas' | 'clinic' | 'index' | 'library'
 
 // Preferencias de interfaz (solo renderer, localStorage): no son datos del proyecto.
 export type AccentName = 'naranja' | 'ambar' | 'azul' | 'verde' | 'rosa'
@@ -24,8 +26,8 @@ export type Scale = 'compact' | 'normal' | 'large'
 export const DEFAULT_SECTIONS = ['script', 'character', 'location', 'prop', 'outline', 'knowledge']
 // deskLeft/deskRight: ancho de los paneles laterales del Escritorio (arrastrables).
 // sectionOrder/collapsed: orden y plegado de las secciones de biblioteca (arrastrables).
-export type Prefs = { accent: AccentName; scale: Scale; deskLeft: number; deskRight: number; sectionOrder: string[]; collapsed: string[]; tabs: string[]; focus: boolean; page: boolean; lang: Lang }
-export const ALL_TABS = ['desk', 'breakdown', 'dev', 'production', 'settings']
+export type Prefs = { accent: AccentName; scale: Scale; deskLeft: number; deskRight: number; sectionOrder: string[]; collapsed: string[]; tabs: string[]; focus: boolean; page: boolean; lang: Lang; migrated: number; pomodoro: { focus: number; short: number; long: number } }
+export const ALL_TABS = ['desk', 'breakdown', 'dev', 'plan', 'production', 'settings']
 export const ACCENTS: Record<AccentName, [string, string, string]> = {
   naranja: ['#ff5a1f', '#e64d13', '#1a1000'],
   ambar: ['#f5a623', '#e0930f', '#1a1200'],
@@ -34,12 +36,17 @@ export const ACCENTS: Record<AccentName, [string, string, string]> = {
   rosa: ['#ff5a8a', '#e64878', '#1a0410']
 }
 const SCALE_PX: Record<Scale, string> = { compact: '12.5px', normal: '13.5px', large: '15px' }
-const DEFAULT_PREFS: Prefs = { accent: 'naranja', scale: 'normal', deskLeft: 268, deskRight: 350, sectionOrder: DEFAULT_SECTIONS, collapsed: [], tabs: ALL_TABS, focus: false, page: false, lang: 'en' }
+const DEFAULT_PREFS: Prefs = { accent: 'naranja', scale: 'normal', deskLeft: 268, deskRight: 350, sectionOrder: DEFAULT_SECTIONS, collapsed: [], tabs: ALL_TABS, focus: false, page: false, lang: 'en', migrated: 1, pomodoro: { focus: 25, short: 5, long: 15 } }
 export const DEFAULT_LAYOUT = { deskLeft: 268, deskRight: 350, sectionOrder: DEFAULT_SECTIONS, collapsed: [] as string[] }
 
 function loadPrefs(): Prefs {
   try {
-    return { ...DEFAULT_PREFS, ...(JSON.parse(localStorage.getItem('writter.prefs') || '{}') as Partial<Prefs>) }
+    const saved = JSON.parse(localStorage.getItem('writter.prefs') || '{}') as Partial<Prefs>
+    const p = { ...DEFAULT_PREFS, ...saved, pomodoro: { ...DEFAULT_PREFS.pomodoro, ...(saved.pomodoro ?? {}) } }
+    // Migración 1: prefs guardadas antes de la pestaña Planificación -> mostrarla una vez.
+    if ((saved.migrated ?? 0) < 1 && !p.tabs.includes('plan')) p.tabs = [...p.tabs, 'plan']
+    p.migrated = 1
+    return p
   } catch {
     return DEFAULT_PREFS
   }
@@ -60,6 +67,7 @@ export type DevTab = 'characters' | 'beats' | 'map' | 'analysis' | 'docs'
 type State = {
   tab: Tab
   devTab: DevTab
+  planTab: PlanTab
   vault: VaultSummary | null
   files: FileEntry[]
   docs: Doc[] // todo el vault en memoria (breakdown, análisis, alias)
@@ -89,11 +97,21 @@ type State = {
   prefsOpen: boolean
   searchOpen: boolean
   rename: { path: string; name: string; terms: string[] } | null
+  lastRenamed: { from: string; to: string } | null // para que las vistas sigan a la ficha renombrada
+  paletteOpen: boolean
+  quickNoteOpen: boolean
+  newEntity: Exclude<FileKind, 'other'> | null // modal "Nuevo…" (menú Historia / botón +)
+  shortcutsOpen: boolean
+  deskPanel: 'ai' | 'versions' | 'export' | null // petición para el panel derecho del Escritorio (menú Archivo → Exportar)
+  recents: string[] // vaults recientes (localStorage)
+  pomo: { mode: 'focus' | 'short' | 'long'; left: number; running: boolean; done: number } // Pomodoro (segundos restantes)
+  stats: WriteLog // palabras por día del proyecto abierto (localStorage, sin contenido)
 }
 
 type Actions = {
   setTab(t: Tab): void
   setDevTab(t: DevTab): void
+  setPlanTab(t: PlanTab): void
   openVault(): Promise<void>
   applySummary(v: VaultSummary): Promise<void>
   openLinker(): void
@@ -111,6 +129,7 @@ type Actions = {
   reloadFromDisk(): Promise<void>
   createFile(path: string, content: string, open?: boolean): Promise<void>
   writeOther(path: string, content: string): Promise<void>
+  deleteEntity(path: string): Promise<void>
   setScope(s: Scope): void
   runAi(instruction: string, allowLocked: boolean): Promise<void>
   acceptProposal(): Promise<void>
@@ -132,12 +151,48 @@ type Actions = {
   closePrefs(): void
   openSearch(): void
   closeSearch(): void
+  openVaultPath(dir: string): Promise<void>
+  setPaletteOpen(v: boolean): void
+  setQuickNoteOpen(v: boolean): void
+  setNewEntity(k: Exclude<FileKind, 'other'> | null): void
+  setShortcutsOpen(v: boolean): void
+  setDeskPanel(p: 'ai' | 'versions' | 'export' | null): void
+  cycleTab(dir: 1 | -1): void
+  recordStats(): void
+  pomoToggle(): void
+  pomoReset(mode?: 'focus' | 'short' | 'long'): void
+  pomoSkip(): void
   openRename(path: string, name: string, terms: string[]): void
   closeRename(): void
   applyRename(to: string): Promise<void>
 }
 
 const EMPTY: Projection = { scenes: [], characters: [], links: [], wordCount: 0 }
+const RECENTS_KEY = 'writter.recents'
+function loadRecents(): string[] { try { return JSON.parse(localStorage.getItem(RECENTS_KEY) || '[]') as string[] } catch { return [] } }
+
+// Estado de trabajo por proyecto (PRD §186): última vista al reabrir el vault.
+const WS_KEY = 'writter.workspace'
+type Workspace = { tab: Tab; devTab: DevTab; planTab: PlanTab }
+const readJson = <T,>(key: string, fallback: T): T => { try { return JSON.parse(localStorage.getItem(key) || 'null') as T ?? fallback } catch { return fallback } }
+function saveWorkspace(root: string | undefined, ws: Partial<Workspace>) {
+  if (!root) return
+  const all = readJson<Record<string, Workspace>>(WS_KEY, {})
+  const next = { ...all, [root]: { tab: 'desk' as Tab, devTab: 'characters' as DevTab, planTab: 'dashboard' as PlanTab, ...all[root], ...ws } }
+  const keys = Object.keys(next).slice(-8)
+  localStorage.setItem(WS_KEY, JSON.stringify(Object.fromEntries(keys.map((k) => [k, next[k]!]))))
+}
+
+// Registro de escritura por día (PRD §98-100): solo totales de palabras, nunca contenido.
+const STATS_KEY = 'writter.stats'
+const loadStats = (root: string | undefined): WriteLog => (root ? readJson<Record<string, WriteLog>>(STATS_KEY, {})[root] ?? {} : {})
+function saveStats(root: string | undefined, log: WriteLog) {
+  if (!root) return
+  const all = readJson<Record<string, WriteLog>>(STATS_KEY, {})
+  localStorage.setItem(STATS_KEY, JSON.stringify({ ...all, [root]: log }))
+}
+const countWords = (s: string) => s.replace(/^---[\s\S]*?---/, '').split(/\s+/).filter(Boolean).length
+let pomoTimer: ReturnType<typeof setInterval> | null = null
 const NOPAG: Pagination = { pages: 1, pageStarts: [], lineToPage: [] }
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -169,6 +224,7 @@ export function entityNames(files: FileEntry[], docs: Doc[]): string[] {
 export const useStore = create<State & Actions>((set, get) => ({
   tab: 'desk',
   devTab: 'characters',
+  planTab: 'dashboard',
   vault: null,
   files: [],
   docs: [],
@@ -197,7 +253,16 @@ export const useStore = create<State & Actions>((set, get) => ({
   prefs: loadPrefs(),
   prefsOpen: false,
   searchOpen: false,
+  paletteOpen: false,
+  quickNoteOpen: false,
+  newEntity: null,
+  shortcutsOpen: false,
+  deskPanel: null,
+  recents: loadRecents(),
+  pomo: { mode: 'focus', left: 25 * 60, running: false, done: 0 },
+  stats: {},
   rename: null,
+  lastRenamed: null,
 
   openRename: (path, name, terms) => set({ rename: { path, name, terms } }),
   closeRename: () => set({ rename: null }),
@@ -222,6 +287,7 @@ export const useStore = create<State & Actions>((set, get) => ({
     set({ rename: null, status: `Renombrado a "${to}"` })
     await get().refreshFiles()
     await get().refreshDocs()
+    set({ lastRenamed: { from: r.path, to: newPath } })
     if (get().path === r.path) await get().openFile(newPath)
   },
 
@@ -231,10 +297,12 @@ export const useStore = create<State & Actions>((set, get) => ({
     applyPrefs(prefs)
     set({ prefs })
   },
-  // Cambia el idioma y recarga para re-renderizar toda la interfaz en el nuevo idioma.
+  // Cambia el idioma y recarga para re-renderizar toda la interfaz en el nuevo idioma; el vault abierto se reabre tras la recarga.
   setLanguage(l) {
     const prefs = { ...get().prefs, lang: l }
     localStorage.setItem('writter.prefs', JSON.stringify(prefs))
+    const root = get().vault?.root
+    if (root) sessionStorage.setItem('writter.reopen', root)
     location.reload()
   },
   resetLayout() {
@@ -246,9 +314,66 @@ export const useStore = create<State & Actions>((set, get) => ({
   closePrefs: () => set({ prefsOpen: false }),
   openSearch: () => set({ searchOpen: true }),
   closeSearch: () => set({ searchOpen: false }),
+  setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
+  setQuickNoteOpen: (quickNoteOpen) => set({ quickNoteOpen }),
+  setNewEntity: (newEntity) => set({ newEntity }),
+  setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
+  setDeskPanel: (deskPanel) => set({ deskPanel }),
+  // Pestaña anterior/siguiente entre las visibles (Ventana → Pestaña anterior/siguiente).
+  cycleTab(dir) {
+    const tabs = get().prefs.tabs as Tab[]
+    const i = tabs.indexOf(get().tab)
+    set({ tab: tabs[(i + dir + tabs.length) % tabs.length] ?? tabs[0]! })
+  },
 
-  setTab: (tab) => set({ tab }),
-  setDevTab: (devTab) => set({ devTab }),
+  // Abre un vault reciente por ruta (misma lógica que el diálogo: proyecto -> abrir; carpeta ajena -> vinculador).
+  async openVaultPath(dir) {
+    const r = await window.api.vaultOpenPath(dir)
+    if (!r) { set({ recents: get().recents.filter((x) => x !== dir), status: 'La carpeta ya no existe' }); localStorage.setItem(RECENTS_KEY, JSON.stringify(get().recents)); return }
+    if (r.kind === 'adopt') set({ linker: { root: r.root, roles: guessesToRoleMap(r.folders) } })
+    else await get().applySummary(r.summary)
+  },
+
+  // Pomodoro: un solo temporizador global; al terminar alterna foco/descanso (largo cada 4 focos).
+  pomoToggle() {
+    const p = get().pomo
+    if (p.running) { if (pomoTimer) clearInterval(pomoTimer); pomoTimer = null; set({ pomo: { ...p, running: false } }); return }
+    set({ pomo: { ...p, running: true } })
+    pomoTimer = setInterval(() => {
+      const q = get().pomo
+      if (q.left > 1) { set({ pomo: { ...q, left: q.left - 1 } }); return }
+      const done = q.mode === 'focus' ? q.done + 1 : q.done
+      const mode: 'focus' | 'short' | 'long' = q.mode === 'focus' ? (done % 4 === 0 ? 'long' : 'short') : 'focus'
+      const mins = get().prefs.pomodoro[mode]
+      set({ pomo: { mode, left: mins * 60, running: true, done }, status: mode === 'focus' ? 'Pomodoro: foco' : 'Pomodoro: descanso' })
+    }, 1000)
+  },
+  pomoReset(mode) {
+    if (pomoTimer) clearInterval(pomoTimer)
+    pomoTimer = null
+    const m = mode ?? get().pomo.mode
+    set({ pomo: { mode: m, left: get().prefs.pomodoro[m] * 60, running: false, done: mode === 'focus' ? 0 : get().pomo.done } })
+  },
+  pomoSkip() {
+    const q = get().pomo
+    const mode: 'focus' | 'short' | 'long' = q.mode === 'focus' ? 'short' : 'focus'
+    get().pomoReset(mode)
+  },
+
+  setTab: (tab) => { saveWorkspace(get().vault?.root, { tab }); set({ tab }) },
+  setDevTab: (devTab) => { saveWorkspace(get().vault?.root, { devTab }); set({ devTab }) },
+  setPlanTab: (planTab) => { saveWorkspace(get().vault?.root, { planTab }); set({ planTab }) },
+
+  // Anota el total de palabras del proyecto en el registro del día (al abrir y tras cada guardado).
+  recordStats() {
+    const { vault, files, docs } = get()
+    if (!vault) return
+    const scripts = new Set(files.filter((f) => f.kind === 'script').map((f) => f.path))
+    const total = docs.filter((d) => scripts.has(d.path)).reduce((a, d) => a + countWords(d.content), 0)
+    const stats = recordDay(get().stats, total)
+    saveStats(vault.root, stats)
+    set({ stats })
+  },
 
   async openVault() {
     const r = await window.api.vaultOpen()
@@ -293,9 +418,13 @@ export const useStore = create<State & Actions>((set, get) => ({
   },
 
   async applySummary(v) {
-    set({ vault: v, files: v.files, path: null, text: '', diskHash: null, dirty: false, proposal: null, projection: EMPTY, pagination: NOPAG })
+    const recents = [v.root, ...get().recents.filter((x) => x !== v.root)].slice(0, 8)
+    localStorage.setItem(RECENTS_KEY, JSON.stringify(recents))
+    const ws = readJson<Record<string, Workspace>>(WS_KEY, {})[v.root]
+    set({ vault: v, files: v.files, path: null, text: '', diskHash: null, dirty: false, proposal: null, projection: EMPTY, pagination: NOPAG, recents, stats: loadStats(v.root), ...(ws ?? {}) })
     set({ keyStatus: await window.api.keysStatus(v.config.byok.provider) })
     await get().refreshDocs()
+    get().recordStats()
     void get().refreshGraph()
     const first = v.files.find((f) => f.kind === 'script')
     if (first) void get().openFile(first.path)
@@ -303,6 +432,14 @@ export const useStore = create<State & Actions>((set, get) => ({
 
   async refreshFiles() {
     if (get().vault) set({ files: await window.api.vaultList() })
+  },
+
+  // Borra una ficha (.md). Recuperable desde el historial de versiones. Cierra el editor si estaba abierta.
+  async deleteEntity(path) {
+    await window.api.fileDelete(path)
+    if (get().path === path) set({ path: null, text: '', diskHash: null, dirty: false, projection: EMPTY, pagination: NOPAG })
+    await get().refreshFiles()
+    await get().refreshDocs()
   },
 
   async refreshDocs() {
@@ -337,7 +474,8 @@ export const useStore = create<State & Actions>((set, get) => ({
       const { hash } = await window.api.fileWrite(path, text, force ? undefined : (diskHash ?? undefined), 'user')
       set({ diskHash: hash, dirty: false, conflict: false, status: 'Guardado' })
       set({ versions: await window.api.versionList(path) })
-      void get().refreshDocs()
+      await get().refreshDocs()
+      get().recordStats()
     } catch (e) {
       if (String(e).includes('conflict')) set({ conflict: true, status: 'Conflicto: el archivo cambió en disco' })
       else set({ status: `Error al guardar: ${String(e)}` })
@@ -514,6 +652,11 @@ export const cleanErr = (e: unknown) => String(e).replace(/^Error: (Error invoki
 applyPrefs(useStore.getState().prefs) // aplica acento y tamaño al cargar
 
 window.addEventListener('vault.opened', (e) => void useStore.getState().applySummary((e as CustomEvent<VaultSummary>).detail))
+// Recarga del renderer (cambio de idioma): reabre el vault que estaba abierto.
+{
+  const reopen = sessionStorage.getItem('writter.reopen')
+  if (reopen) { sessionStorage.removeItem('writter.reopen'); void useStore.getState().openVaultPath(reopen) }
+}
 window.addEventListener('vault.adopt', (e) => {
   const p = (e as CustomEvent<AdoptionProposal>).detail
   useStore.setState({ linker: { root: p.root, roles: guessesToRoleMap(p.folders) } })

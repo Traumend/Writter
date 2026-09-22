@@ -54,3 +54,26 @@ test('validador de tags', () => {
   expect(validateTags({ entity_link: '[[ ]]', note: '[[ ]]' }).some((i) => i.level === 'error')).toBe(true)
   expect(validateTags({ entity_link: '[[ ]]', note: '# #' }).some((i) => i.level === 'warn')).toBe(true)
 })
+
+// Prosa (novela/capítulo) sin encabezados Fountain: las secciones Markdown más profundas actúan como escenas.
+const PROSE = `## Preludio 0.1 — Los diez
+
+### La profecía
+
+En 1512 la vidente [[Alessandra]] dictó el decálogo.
+
+### El rey
+
+[[Aetios]] abandonó su corona.
+`
+
+test('proyección: prosa con secciones # como escenas de respaldo', () => {
+  const p = project(parseFountain(PROSE))
+  expect(p.scenes.map((s) => [s.heading, s.group])).toEqual([['La profecía', 'Preludio 0.1 — Los diez'], ['El rey', 'Preludio 0.1 — Los diez']])
+  expect(p.scenes[1]?.links).toEqual(['Aetios'])
+  expect(p.scenes[0]?.wordCount).toBe(8)
+  // Un solo nivel: cada sección es una escena, sin grupo.
+  expect(project(parseFountain('## A\n\nx\n\n## B\n\ny\n')).scenes.map((s) => [s.heading, s.group])).toEqual([['A', ''], ['B', '']])
+  // Con encabezados Fountain las secciones siguen siendo grupos (sin cambios).
+  expect(project(parseFountain(SAMPLE)).scenes).toHaveLength(2)
+})

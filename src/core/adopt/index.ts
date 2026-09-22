@@ -53,7 +53,8 @@ export function foldersToRoles(folders: FolderGuess[]): Record<AdoptRole, string
 export function guessesToRoleMap(folders: FolderGuess[]): Record<AdoptRole, string> {
   const map = {} as Record<AdoptRole, string>
   for (const k of Object.keys(DEFAULT_CONFIG.roles) as AdoptRole[]) map[k] = ''
-  for (const f of folders) if (f.role !== 'ignore' && !map[f.role]) map[f.role] = f.path
+  const covered = (p: string) => Object.values(map).some((m) => m && (p === m || p.startsWith(m + '/')))
+  for (const f of folders) if (f.role !== 'ignore' && !map[f.role] && !covered(f.path)) map[f.role] = f.path
   for (const k of Object.keys(map) as AdoptRole[]) if (!map[k]) map[k] = DEFAULT_CONFIG.roles[k][0] ?? k
   return map
 }

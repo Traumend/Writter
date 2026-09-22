@@ -20,7 +20,23 @@ export const TEMPLATE: Record<Exclude<FileKind, 'other'>, (name: string, extra?:
   knowledge: (n) => `---\ntype: knowledge\ntitle: "${n}"\n---\n\n`
 }
 
-function NewFile({ kind, onDone }: { kind: Exclude<FileKind, 'other'>; onDone: () => void }) {
+// Sin guiones no hay nada que mostrar: se puede crear un episodio aquí mismo o vincular la carpeta donde ya vive la historia.
+export function NoScripts() {
+  const openLinker = useStore((s) => s.openLinker)
+  const [creating, setCreating] = useState(false)
+  return (
+    <div className="empty">
+      <p className="muted">{t('No hay guiones en el vault. Crea un episodio nuevo o vincula la carpeta donde ya vive tu historia (capítulos o episodios).')}</p>
+      <div className="row">
+        <button onClick={() => setCreating(true)}><Icon name="plus" size={12} />{t('Nuevo episodio')}</button>
+        <button className="ghost" onClick={openLinker}>{t('Vincular carpetas…')}</button>
+      </div>
+      {creating && <NewFile kind="script" onDone={() => setCreating(false)} />}
+    </div>
+  )
+}
+
+export function NewFile({ kind, onDone }: { kind: Exclude<FileKind, 'other'>; onDone: (created?: boolean) => void }) {
   const [name, setName] = useState('')
   const [season, setSeason] = useState('1')
   const [episode, setEpisode] = useState('1')
@@ -30,7 +46,7 @@ function NewFile({ kind, onDone }: { kind: Exclude<FileKind, 'other'>; onDone: (
     if (!name.trim()) return
     const n = name.trim()
     const file = kind === 'script' ? `S${season.padStart(2, '0')}E${episode.padStart(2, '0')} ${n}` : n
-    void createFile(`${roleDir(kind)}/${file}.md`, TEMPLATE[kind](n, { season: Number(season), episode: Number(episode) })).then(onDone)
+    void createFile(`${roleDir(kind)}/${file}.md`, TEMPLATE[kind](n, { season: Number(season), episode: Number(episode) })).then(() => onDone(true))
   }
   return (
     <div className="newfile">
@@ -67,7 +83,7 @@ function LibrarySection({ id, label, onAdd, children }: { id: string; label: str
       <h2 draggable onDragStart={() => (dragId = id)} onDragEnd={() => (dragId = null)} title={t('Arrastra para reordenar · clic para plegar')}>
         <span className="drag" aria-hidden>⠿</span>
         <span className="grow link" onClick={toggle}>{collapsed ? '▸' : '▾'} {label}</span>
-        <button className="mini" onClick={(e) => { e.stopPropagation(); onAdd() }}>+</button>
+        <button className="mini" title={t('Nuevo…')} onClick={(e) => { e.stopPropagation(); onAdd() }}><Icon name="plus" size={12} /></button>
       </h2>
       {!collapsed && children}
     </div>
@@ -119,7 +135,7 @@ function LeftPanel() {
           {[...seasons.entries()].sort().map(([season, list]) => (
             <div key={season || 'none'}>
               <div className="muted tiny">{season ? `${t('Temporada')} ${season}` : t('Sin temporada')}</div>
-              <ul>{list.map((f) => <li key={f.path} className={f.path === path ? 'active' : ''} onClick={() => void openFile(f.path)}>{f.name}</li>)}</ul>
+              <ul>{list.map((f) => <li key={f.path} className={f.path === path ? 'active' : ''} onClick={() => void openFile(f.path)}><span className="ell">{f.name}</span></li>)}</ul>
             </div>
           ))}
         </>
@@ -129,7 +145,7 @@ function LeftPanel() {
     return (
       <>
         {adding === k && <NewFile kind={k} onDone={() => setAdding(null)} />}
-        <ul>{files.filter((f) => f.kind === k).map((f) => <li key={f.path} className={f.path === path ? 'active' : ''} onClick={() => void openFile(f.path)}>{f.name}</li>)}</ul>
+        <ul>{files.filter((f) => f.kind === k).map((f) => <li key={f.path} className={f.path === path ? 'active' : ''} onClick={() => void openFile(f.path)}><span className="ell">{f.name}</span></li>)}</ul>
       </>
     )
   }
@@ -143,10 +159,10 @@ function LeftPanel() {
             {t('Escenas')} · {projection.scenes.length}
             <span className="grow" />
             <button className={multi ? 'mini on' : 'mini ghost'} title={t('Selección múltiple')} onClick={() => { setMulti((m) => !m); setSel(new Set()) }}>{t('Multi')}</button>
-            {sceneTrash.length > 0 && <button className="mini ghost" title={t('Papelera de escenas')} onClick={() => setShowTrash((v) => !v)}><Icon name="trash" size={13} /> {sceneTrash.length}</button>}
+            {sceneTrash.length > 0 && <button className="mini ghost" title={t('Papelera de escenas')} onClick={() => setShowTrash((v) => !v)}><Icon name="trash" size={13} />{sceneTrash.length}</button>}
           </h2>
           <input placeholder={t('Buscar escena…')} value={q} onChange={(e) => setQ(e.target.value)} />
-          <div className="row tiny">
+          <div className="row tiny wrap">
             <label className="check tiny grow"><input type="checkbox" checked={inContent} onChange={(e) => setInContent(e.target.checked)} /> {t('también en contenido')}</label>
             {groups.length > 0 && (
               <select value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)} title={t('Filtrar por grupo')}>
@@ -181,7 +197,7 @@ function LeftPanel() {
               const newGroupHere = s.group !== (scenes[i - 1]?.group ?? (i === 0 ? null : ''))
               return (
                 <div key={s.index}>
-                  {!groupFilter && newGroupHere && s.group && <li className="grouphead muted tiny">{s.group}</li>}
+                  {!groupFilter && newGroupHere && s.group && <li className="grouphead muted tiny"><span className="ell">{s.group}</span></li>}
                   <li className={s === scene ? 'active' : ''} onClick={() => (multi ? toggleSel(s.index) : setCursor(s.startLine, null))} title={`${s.wordCount} ${t('palabras')} · ≈${estimateTokens(lines.slice(s.startLine, s.endLine).join('\n'))} ${t('tokens')} · ${t('pág.')} ${pagination.lineToPage[s.startLine] ?? 1}\n${s.characters.join(', ')}`}>
                     {multi && <input type="checkbox" checked={sel.has(s.index)} onChange={() => toggleSel(s.index)} onClick={(e) => e.stopPropagation()} />}
                     <span className="muted">{s.index + 1}.</span> <span className="grow ell">{s.heading}</span>
@@ -250,13 +266,13 @@ function ScopeBar() {
         <button key={s} className={s === scope ? 'on' : 'ghost'} disabled={s === 'range' && !selection} onClick={() => setScope(s)}>{t(l)}</button>
       ))}
       <span className="grow" />
-      <button className={prefs.focus ? 'on mini' : 'ghost mini'} onClick={() => setPref('focus', !prefs.focus)} title={t('Modo enfoque: atenúa lo demás')}>{t('Enfoque')}</button>
-      <button className={prefs.page ? 'on mini' : 'ghost mini'} onClick={() => setPref('page', !prefs.page)} title={t('Modo página: aspecto de hoja de guion')}>{t('Página')}</button>
-      <button className={showTags ? 'on mini' : 'ghost mini'} onClick={toggleTags} title={t('Etiquetas de elemento')}>ABC</button>
+      <button className={prefs.focus ? 'on mini' : 'mini ghost'} onClick={() => setPref('focus', !prefs.focus)} title={t('Modo enfoque: atenúa lo demás')}>{t('Enfoque')}</button>
+      <button className={prefs.page ? 'on mini' : 'mini ghost'} onClick={() => setPref('page', !prefs.page)} title={t('Modo página: aspecto de hoja de guion')}>{t('Página')}</button>
+      <button className={showTags ? 'on mini' : 'mini ghost'} onClick={toggleTags} title={t('Etiquetas de elemento')}>ABC</button>
       <span className="sep" />
-      <button className="ghost mini" onClick={() => { setTab('dev'); setDevTab('beats') }} title="Beat Timeline">Beats</button>
-      <button className="ghost mini" onClick={() => { setTab('dev'); setDevTab('map') }} title={t('Mapa neural')}>{t('Mapa')}</button>
-      <button className="ghost mini" onClick={() => { setTab('dev'); setDevTab('analysis') }} title={t('Análisis')}>{t('Análisis')}</button>
+      <button className="mini ghost" onClick={() => { setTab('dev'); setDevTab('beats') }} title="Beat Timeline">Beats</button>
+      <button className="mini ghost" onClick={() => { setTab('dev'); setDevTab('map') }} title={t('Mapa neural')}>{t('Mapa')}</button>
+      <button className="mini ghost" onClick={() => { setTab('dev'); setDevTab('analysis') }} title={t('Análisis')}>{t('Análisis')}</button>
       <span className="muted">≈ {Math.ceil(est / 4)} {t('tokens')}</span>
     </div>
   )
@@ -265,6 +281,8 @@ function ScopeBar() {
 function RightPanel() {
   const s = useStore()
   const [tab, setTab] = useState<'ai' | 'versions' | 'export'>('ai')
+  // Petición externa (menú Archivo → Exportar): abrir un panel concreto.
+  useEffect(() => { if (s.deskPanel) { setTab(s.deskPanel); s.setDeskPanel(null) } }, [s.deskPanel]) // eslint-disable-line react-hooks/exhaustive-deps
   const [instruction, setInstruction] = useState('')
   const [allowLocked, setAllowLocked] = useState(false)
   const [label, setLabel] = useState('')
@@ -373,9 +391,21 @@ export function Desk() {
   const s = useStore()
   const { prefs, setPref } = s
   const mainRef = useRef<HTMLElement>(null)
-  const cols = (l: number, r: number) => `${l}px 6px minmax(360px, 1fr) 6px ${r}px`
+  // Ventana estrecha: el panel derecho cede primero y se pliega si queda por debajo de 240px; luego cede el izquierdo.
+  // El editor conserva 360px.
+  const cols = (l: number, r: number) => {
+    const over = l + r + 372 - window.innerWidth
+    if (over > 0) r = r - over < 240 ? 0 : r - over
+    const over2 = l + r + 372 - window.innerWidth
+    if (over2 > 0) l = Math.max(200, l - over2)
+    mainRef.current?.classList.toggle('narrow', r === 0)
+    return `${l}px 6px minmax(360px, 1fr) 6px ${r}px`
+  }
   useEffect(() => {
-    if (mainRef.current) mainRef.current.style.gridTemplateColumns = cols(prefs.deskLeft, prefs.deskRight)
+    const apply = () => { if (mainRef.current) mainRef.current.style.gridTemplateColumns = cols(prefs.deskLeft, prefs.deskRight) }
+    apply()
+    window.addEventListener('resize', apply)
+    return () => window.removeEventListener('resize', apply)
   }, [prefs.deskLeft, prefs.deskRight])
 
   // Divisor arrastrable: mueve el DOM en vivo, persiste al soltar (una escritura, sin re-render por frame).

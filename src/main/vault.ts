@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { appendFileSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, watch, writeFileSync, type FSWatcher } from 'node:fs'
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, watch, writeFileSync, type FSWatcher } from 'node:fs'
 import { basename, extname, join, relative, resolve } from 'node:path'
 import { parse, stringify } from 'yaml'
 import { guessRole, roleOf } from '../core/adopt'
@@ -69,8 +69,8 @@ export function listFiles(): FileEntry[] {
       if (e.isDirectory()) walk(abs)
       else if (e.name.endsWith('.md')) {
         const rel = toRel(abs)
-        const role = roleOf(rel, roles) // null (fuera del mapa) o 'assets' -> se ignora en la lista de contenido
-        if (role && role !== 'assets') out.push({ path: rel, kind: role, name: basename(e.name, '.md') })
+        const role = roleOf(rel, roles) // null (fuera del mapa) -> se ignora; assets/*.md (shot lists) entran como 'other'
+        if (role) out.push({ path: rel, kind: role === 'assets' ? 'other' : role, name: basename(e.name, '.md') })
       }
     }
   }
@@ -129,16 +129,41 @@ export function readAll(): Doc[] {
 
 export const hasProject = (dir: string) => existsSync(join(resolve(dir), '.narrative/project.yaml'))
 
+// Ruta relativa de contenido que vale la pena notificar: .md fuera de cualquier carpeta oculta.
+// Ojo: un vault anidado (Obsidian abierto antes en una subcarpeta) tiene `<sub>/.narrative/versions/<archivo>.md`,
+// que son DIRECTORIOS terminados en .md; leerlos como archivo reventaba el proceso principal con EISDIR.
+export function watchRel(file: string): string | null {
+  const rel = file.split('\\').join('/')
+  if (!rel.endsWith('.md')) return null
+  if (rel.split('/').some((seg) => seg.startsWith('.'))) return null
+  return rel
+}
+
+export function closeWatcher(): void {
+  try { watcher?.close() } catch { /* ya cerrado */ }
+  watcher = null
+}
+
+export const watcherForTest = (): FSWatcher | null => watcher
+
 function startWatcher(onChange: (e: VaultChange) => void) {
-  watcher?.close()
+  closeWatcher()
   // ponytail: fs.watch recursivo nativo (Win/mac/Linux>=20); chokidar solo si falla en algún FS.
   watcher = watch(root!, { recursive: true }, (_ev, file) => {
-    if (!file || !file.toString().endsWith('.md') || file.toString().startsWith('.narrative')) return
-    const rel = file.toString().split('\\').join('/')
+    const rel = file ? watchRel(file.toString()) : null
+    if (!rel) return
     const abs = join(root!, rel)
-    onChange({ path: rel, hash: existsSync(abs) ? sha(readFileSync(abs, 'utf8')) : null })
+    try {
+      const st = existsSync(abs) ? statSync(abs) : null
+      onChange({ path: rel, hash: st?.isFile() ? sha(readFileSync(abs, 'utf8')) : null })
+    } catch {
+      /* archivo en tránsito (borrado, bloqueado o sincronizando en iCloud/OneDrive): el siguiente evento lo recoge */
+    }
   })
+  // Sin este listener, un EPERM del observador (carpeta movida, borrada o bloqueada) tumba el proceso principal.
+  watcher.on('error', () => closeWatcher())
 }
+
 
 // Abre un proyecto existente, o inicializa el layout por defecto si la carpeta no es un proyecto Writter.
 export function openVault(dir: string, onChange: (e: VaultChange) => void): VaultSummary {
@@ -239,6 +264,15 @@ export function renameFile(oldRel: string, newRel: string) {
   return { path: newRel }
 }
 
+// Borra un .md del vault. Guarda un snapshot antes, así queda recuperable desde el historial de versiones.
+export function deleteFile(rel: string) {
+  const abs = inVault(rel)
+  if (!existsSync(abs)) throw new Error('no existe')
+  saveVersion(rel, readFileSync(abs, 'utf8'), 'user', 'antes de borrar')
+  rmSync(abs)
+  return { path: rel }
+}
+
 export function listVersions(rel: string): Version[] {
   const dir = versionsDir(rel)
   if (!existsSync(dir)) return []
@@ -321,4 +355,8 @@ export function listAnalyses(rel: string): { id: string; ts: number }[] {
 }
 export function readAnalysis(rel: string, id: string): unknown {
   return JSON.parse(readFileSync(resolveInside(analysisDir(rel), id), 'utf8'))
+}
+// Sobrescribe un análisis existente (ediciones del usuario a notas/estructura; autoguardado).
+export function overwriteAnalysis(rel: string, id: string, data: object): void {
+  writeFileSync(resolveInside(analysisDir(rel), id), JSON.stringify(data, null, 1))
 }

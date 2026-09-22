@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { buildMenu, type MenuSetup } from './menu'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, extname, join, resolve } from 'node:path'
 import { fdxToMd, fountainToMd } from '../core/convert'
 import type { AdoptRole, AiRequest, Analysis, FileEntry, OpenResult, ProjectConfig, VaultChange, Version } from '../core/types/ipc'
@@ -10,10 +11,18 @@ import * as V from './vault'
 
 let win: BrowserWindow | null = null
 
+// La ventana puede estar destruida cuando llega un evento del watcher o del menú: enviarle algo
+// lanza "Object has been destroyed" como excepción no capturada del proceso principal.
+const alive = () => !!win && !win.isDestroyed()
+const send = (channel: string, payload?: unknown) => { if (alive()) win!.webContents.send(channel, payload) }
+
 const notify = (e: VaultChange) => {
   markStale()
-  win?.webContents.send('vault.changed', e)
+  send('vault.changed', e)
 }
+
+// Menú nativo: el renderer manda idioma, recientes y estado de los conmutadores; se reconstruye entero (barato).
+ipcMain.on('menu.setup', (_e, setup: MenuSetup) => { if (alive()) buildMenu(win!, setup) })
 
 ipcMain.handle('vault.open', async (): Promise<OpenResult> => {
   const r = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] })
@@ -25,6 +34,21 @@ ipcMain.handle('vault.open', async (): Promise<OpenResult> => {
   // Carpeta con contenido y sin proyecto -> proponer adopción; vacía -> crear layout por defecto directo.
   if (folders.length > 0) return { kind: 'adopt', root: dir, folders }
   return { kind: 'opened', summary: V.openVault(dir, notify) }
+})
+// Abre un vault por ruta (Recientes) con la misma lógica que el diálogo.
+ipcMain.handle('vault.openPath', (_e, dir: string): OpenResult => {
+  if (!existsSync(dir)) return null
+  markStale()
+  if (V.hasProject(dir)) return { kind: 'opened', summary: V.openVault(dir, notify) }
+  const folders = V.scanFolder(dir)
+  if (folders.length > 0) return { kind: 'adopt', root: dir, folders }
+  return { kind: 'opened', summary: V.openVault(dir, notify) }
+})
+// Elige y lee un archivo de texto (import JSON del proyecto).
+ipcMain.handle('pick.text', async (_e, exts: string[]): Promise<string | null> => {
+  const r = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: exts.join('/'), extensions: exts }] })
+  const f = r.filePaths[0]
+  return f ? readFileSync(f, 'utf8') : null
 })
 ipcMain.handle('vault.adopt', (_e, root: string, roles: Record<AdoptRole, string[]>) => {
   markStale()
@@ -65,6 +89,11 @@ ipcMain.handle('file.rename', (_e, oldPath: string, newPath: string) => {
   markStale()
   return r
 })
+ipcMain.handle('file.delete', (_e, rel: string) => {
+  const r = V.deleteFile(rel)
+  markStale()
+  return r
+})
 ipcMain.handle('ai.analyze', async (_e, rel: string, text: string): Promise<Analysis> => {
   const a = await analyze(text, V.readConfig())
   const ts = Date.now()
@@ -73,6 +102,7 @@ ipcMain.handle('ai.analyze', async (_e, rel: string, text: string): Promise<Anal
 })
 ipcMain.handle('analysis.list', (_e, rel: string) => V.listAnalyses(rel))
 ipcMain.handle('analysis.read', (_e, rel: string, id: string) => ({ ...(V.readAnalysis(rel, id) as Omit<Analysis, 'id'>), id }))
+ipcMain.handle('analysis.save', (_e, rel: string, id: string, data: Analysis) => V.overwriteAnalysis(rel, id, data))
 ipcMain.handle('graph.status', () => graphStatus())
 ipcMain.handle('graph.build', () => graphBuild())
 ipcMain.handle('graph.get', () => getGraph())
@@ -150,33 +180,46 @@ function createWindow() {
     ])
     menu.popup()
   })
+  buildMenu(win, { lang: 'en', recents: [] })
+  win.on('closed', () => { win = null; V.closeWatcher() })
   const devUrl = process.env['ELECTRON_RENDERER_URL']
   if (devUrl) void win.loadURL(devUrl)
   else void win.loadFile(join(__dirname, '../renderer/index.html'))
   // Ganchos de desarrollo: WRITTER_VAULT abre un vault al arrancar; WRITTER_EVAL ejecuta JS en el renderer; WRITTER_SHOT captura y sale.
   win.webContents.on('console-message', (_e, level, msg) => level >= 2 && console.log('[renderer]', msg))
   win.webContents.once('did-finish-load', () => {
+    const ws = /^(\d+)x(\d+)$/.exec(process.env['WRITTER_WIN'] ?? '') // tamaño de ventana para pruebas de anchura
+    if (ws) win?.setSize(Number(ws[1]), Number(ws[2]))
     const v = process.env['WRITTER_VAULT']
     if (v) {
       // Igual que el diálogo: proyecto existente -> abrir; carpeta ajena con contenido -> proponer adopción.
-      if (V.hasProject(v)) win?.webContents.send('vault.opened', V.openVault(v, notify))
+      if (V.hasProject(v)) send('vault.opened', V.openVault(v, notify))
       else {
         const folders = V.scanFolder(v)
-        if (folders.length > 0) win?.webContents.send('vault.adopt', { kind: 'adopt', root: resolve(v), folders })
-        else win?.webContents.send('vault.opened', V.openVault(v, notify))
+        if (folders.length > 0) send('vault.adopt', { kind: 'adopt', root: resolve(v), folders })
+        else send('vault.opened', V.openVault(v, notify))
       }
     }
+    const menuId = process.env['WRITTER_MENU'] // simula un clic del menú nativo (misma ruta que buildMenu)
+    if (menuId) setTimeout(() => send('menu', menuId), 1500)
     const shot = process.env['WRITTER_SHOT']
     if (shot) {
       setTimeout(async () => {
         win?.show()
         win?.focus()
         const ev = process.env['WRITTER_EVAL']
-        if (ev) console.log('[eval]', await win?.webContents.executeJavaScript(readFileSync(ev, 'utf8')))
-        console.log('[dom]', await win?.webContents.executeJavaScript('document.body.innerText'))
-        const img = await win?.webContents.capturePage()
-        if (img && !img.isEmpty()) writeFileSync(shot, img.toPNG())
-        else console.log('[shot] captura vacía')
+        // El eval se repite mientras devuelva '__more__' (una captura por paso: shot.png, shot-1.png, …);
+        // '__reload__' indica que va a recargar la página: esperar la nueva carga antes de capturar.
+        for (let n = 0; ; n++) {
+          const r: unknown = ev ? await win?.webContents.executeJavaScript(readFileSync(ev, 'utf8')) : undefined
+          if (ev) console.log('[eval]', r)
+          if (r === '__reload__') await new Promise((res) => win?.webContents.once('did-finish-load', () => setTimeout(res, 2500)))
+          if (n === 0) console.log('[dom]', await win?.webContents.executeJavaScript('document.body.innerText'))
+          const img = await win?.webContents.capturePage()
+          if (img && !img.isEmpty()) writeFileSync(n ? shot.replace(/\.png$/i, `-${n}.png`) : shot, img.toPNG())
+          else console.log('[shot] captura vacía')
+          if (r !== '__more__') break
+        }
         app.quit()
       }, 3500)
     }
@@ -184,4 +227,4 @@ function createWindow() {
 }
 
 void app.whenReady().then(createWindow)
-app.on('window-all-closed', () => app.quit())
+app.on('window-all-closed', () => { V.closeWatcher(); app.quit() })

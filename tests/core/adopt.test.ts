@@ -51,3 +51,16 @@ test('roleOf: gana el prefijo de carpeta más profundo', () => {
   expect(roleOf('Cast/viejos/x.md', roles)).toBe('character')
   expect(roleOf('otra/x.md', roles)).toBe(null)
 })
+
+// Una subcarpeta de una carpeta ya asignada a otro rol no puede proponerse: roleOf daría prioridad al prefijo más profundo
+// y sus archivos cambiarían de tipo (capítulos de 'Capitulos/Preludio NEW' dejarían de ser guiones).
+test('guessesToRoleMap: ignora candidatas dentro de una carpeta ya asignada', () => {
+  const folders = [
+    { path: 'Capitulos', role: 'script' as const, mdCount: 2, imageCount: 0, hint: '' },
+    { path: 'Capitulos/Preludio NEW', role: 'knowledge' as const, mdCount: 9, imageCount: 0, hint: '' },
+    { path: 'Bases', role: 'knowledge' as const, mdCount: 1, imageCount: 0, hint: '' }
+  ]
+  const map = guessesToRoleMap(folders)
+  expect(map.script).toBe('Capitulos')
+  expect(map.knowledge).toBe('Bases')
+})

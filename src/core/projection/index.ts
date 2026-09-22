@@ -23,6 +23,10 @@ export function project(doc: ParsedDoc, linkOpen = '[[', linkClose = ']]'): Proj
   let section = '' // grupo actual (última sección `#` vista)
   const chars = new Set<string>()
   const links = new Set<string>()
+  // Prosa (novela/capítulo) sin encabezados Fountain: las secciones Markdown más profundas actúan como escenas
+  // y las menos profundas como grupo. Con al menos un encabezado Fountain, las secciones siguen siendo solo grupos.
+  const depth = (t: string) => /^#+/.exec(t.trim())?.[0].length ?? 0
+  const sceneLevel = doc.tokens.some((tk) => tk.type === 'heading') ? 0 : Math.max(0, ...doc.tokens.filter((tk) => tk.type === 'section').map((tk) => depth(tk.text)))
 
   const flush = (endLine: number) => {
     if (!cur) return
@@ -36,10 +40,11 @@ export function project(doc: ParsedDoc, linkOpen = '[[', linkClose = ']]'): Proj
 
   for (const tk of doc.tokens) {
     if (tk.type === 'frontmatter' || tk.type === 'blank') continue
-    if (tk.type === 'section') section = tk.text.replace(/^#+\s*/, '').trim()
-    if (tk.type === 'heading') {
+    const asScene = tk.type === 'heading' || (tk.type === 'section' && depth(tk.text) === sceneLevel)
+    if (tk.type === 'section' && !asScene) section = tk.text.replace(/^#+\s*/, '').trim()
+    if (asScene) {
       flush(tk.line)
-      cur = { index: scenes.length, heading: tk.text.trim().replace(/^\./, ''), startLine: tk.line, endLine: tk.line, characters: [], links: [], wordCount: 0, group: section }
+      cur = { index: scenes.length, heading: tk.text.trim().replace(/^(\.|#+\s*)/, ''), startLine: tk.line, endLine: tk.line, characters: [], links: [], wordCount: 0, group: section }
     }
     if (tk.type === 'character') {
       const n = characterName(tk.text)

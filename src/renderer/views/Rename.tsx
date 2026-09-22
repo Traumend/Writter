@@ -16,7 +16,7 @@ export function Rename() {
   return (
     <div className="modal-backdrop" onClick={closeRename}>
       <div className="modal" style={{ width: 'min(520px,92vw)' }} onClick={(e) => e.stopPropagation()}>
-        <div className="row"><h1>{t('Renombrar entidad')}</h1><span className="grow" /><button className="ghost mini" onClick={closeRename}>{t('Cerrar')}</button></div>
+        <div className="row"><h1>{t('Renombrar entidad')}</h1><span className="grow" /><button className="mini ghost" onClick={closeRename}>{t('Cerrar')}</button></div>
         <p className="muted">{t('Cambia')} <strong>{rename.name}</strong>{rename.terms.length > 1 ? ` ${t('y sus alias')} (${rename.terms.slice(1).join(', ')})` : ''} {t('en todo el vault. Conserva mayúsculas de los cues y actualiza los enlaces [[ ]] y la ficha.')}</p>
         <label className="field"><span>{t('Nuevo nombre')}</span><input autoFocus value={to} onChange={(e) => setTo(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && to.trim() && void go()} /></label>
         <p className="muted tiny">{total} {t('aparición(es) en')} {counts.length} {t('archivo(s).')}</p>
