@@ -119,6 +119,7 @@ export type Api = {
   exportText(content: string, suggestedName: string): Promise<string | null>
   exportBytes(base64: string, suggestedName: string): Promise<string | null>
   importScript(): Promise<FileEntry | null>
+  importSwx(): Promise<{ name: string; json: string; media: number } | { error: 'encrypted' | 'invalid' } | null>
   usageGet(): Promise<UsageStats>
   usageReset(): Promise<void>
 }

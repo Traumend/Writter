@@ -4,8 +4,9 @@ import { readFrontmatter, writeFrontmatter } from '../../core/frontmatter'
 import { sceneMinutes } from '../../core/paginate'
 import { parseFountain } from '../../core/parser/fountain'
 import { project, type Scene } from '../../core/projection'
-import { SCENE_FIELDS, readSceneMeta, type SceneMeta } from '../../core/planning'
+import { PRESENCE, SCENE_FIELDS, readSceneMeta, type Presence, type SceneMeta } from '../../core/planning'
 import { nextActRange, pack } from '../../core/timeline'
+import { toFcpxml } from '../../core/timeline/fcpxml'
 import { t } from '../i18n'
 import { useStore } from '../store'
 import { Icon, BlurInput } from '../ui'
@@ -35,6 +36,10 @@ const BEAT_W = 150, NOTE_W = 210, NOTE_H = 140
 const PRESETS: Record<string, { acts?: [string, number, number][]; beats?: [string, string, number][] }> = {
   '3 actos': { acts: [['Acto 1', 0, 0.25], ['Acto 2', 0.25, 0.75], ['Acto 3', 0.75, 1]] },
   'Save the Cat': { beats: [['Opening Image', 'setup', 0], ['Theme Stated', 'setup', 0.05], ['Set-Up', 'setup', 0.1], ['Catalyst', 'twist', 0.12], ['Debate', 'other', 0.18], ['Break into Two', 'twist', 0.25], ['B Story', 'romance', 0.3], ['Fun and Games', 'other', 0.35], ['Midpoint', 'climax', 0.5], ['Bad Guys Close In', 'twist', 0.6], ['All Is Lost', 'climax', 0.75], ['Dark Night of the Soul', 'other', 0.8], ['Break into Three', 'twist', 0.85], ['Finale', 'climax', 0.92], ['Final Image', 'payoff', 1] ] },
+  'Cinco actos': { acts: [['Exposición', 0, 0.15], ['Complicación', 0.15, 0.45], ['Clímax', 0.45, 0.6], ['Caída', 0.6, 0.85], ['Desenlace', 0.85, 1]] },
+  'Story Circle': { beats: [['Zona de confort', 'setup', 0], ['Necesidad', 'twist', 0.12], ['Cruzar el umbral', 'twist', 0.25], ['Adaptarse', 'other', 0.4], ['Conseguirlo', 'climax', 0.55], ['Pagar el precio', 'climax', 0.7], ['Regreso', 'twist', 0.85], ['Cambio', 'payoff', 1] ] },
+  'Kishotenketsu': { acts: [['Ki · presentación', 0, 0.25], ['Sho · desarrollo', 0.25, 0.5], ['Ten · giro', 0.5, 0.75], ['Ketsu · conclusión', 0.75, 1]] },
+  Sitcom: { acts: [['Teaser', 0, 0.1], ['Acto A', 0.1, 0.55], ['Acto B', 0.55, 0.95], ['Tag', 0.95, 1]] },
   'Viaje del héroe': { beats: [['Mundo ordinario', 'setup', 0], ['Llamada', 'twist', 0.1], ['Rechazo', 'other', 0.15], ['Mentor', 'setup', 0.2], ['Cruce del umbral', 'twist', 0.25], ['Pruebas y aliados', 'other', 0.4], ['Acercamiento', 'other', 0.55], ['Prueba suprema', 'climax', 0.65], ['Recompensa', 'payoff', 0.75], ['Camino de vuelta', 'twist', 0.85], ['Resurrección', 'climax', 0.92], ['Regreso con el elixir', 'payoff', 1] ] }
 }
 
@@ -168,6 +173,17 @@ export function BeatTimeline() {
     const csv = 'type,timecode,name\n' + rows.map((r) => r.map((c) => `"${c!.replace(/"/g, '""')}"`).join(',')).join('\n')
     void window.api.exportText(csv, `${scope === 'series' ? 'serie' : active?.name ?? 'timeline'}-markers.csv`)
   }
+  // FCPXML de marcadores (paquete de edición, equivalente al DaVinci Pack de ScriptWriterX).
+  const exportFcpxml = () => {
+    const markers = [
+      ...eps.flatMap((ep) => ep.acts.map((a) => ({ name: `${ep.code} ${a.title}`.trim(), start: ep.offset + (ep.starts[a.from] ?? 0), duration: Math.max(0.1, (ep.starts[Math.min(a.to + 1, ep.starts.length - 1)] ?? ep.runtime) - (ep.starts[a.from] ?? 0)) }))),
+      ...eps.flatMap((ep) => ep.beats.map((b) => ({ name: b.title, start: ep.offset + (ep.starts[b.scene] ?? 0) }))),
+      ...flat.map((f) => ({ name: `#${f.i + 1} ${f.s.heading}`, start: f.start, duration: f.dur }))
+    ]
+    const title = scope === 'series' ? 'Serie' : active?.name ?? 'Timeline'
+    void window.api.exportText(toFcpxml(title, markers, total), `${title}.fcpxml`)
+  }
+
   const exportJson = () => {
     const data = eps.map((ep) => ({ episode: ep.name, code: ep.code, runtimeMinutes: ep.runtime, acts: ep.acts, beats: ep.beats, notes: ep.notes, scenes: ep.scenes.map((s, i) => ({ index: i + 1, heading: s.heading, start: ep.starts[i], minutes: ep.mins[i], characters: s.characters, words: s.wordCount })) }))
     void window.api.exportText(JSON.stringify({ app: 'writter', kind: 'beat-timeline', exportedAt: new Date().toISOString(), episodes: data }, null, 2), `${scope === 'series' ? 'serie' : active?.name ?? 'timeline'}-timeline.json`)
@@ -235,6 +251,7 @@ export function BeatTimeline() {
             <div className="menu" role="menu" onMouseLeave={() => setExportOpen(false)}>
               <button className="menu-item" onClick={() => { setExportOpen(false); exportMarkers() }}>{t('Marcadores (CSV)')}</button>
               <button className="menu-item" onClick={() => { setExportOpen(false); exportJson() }}>{t('Línea de tiempo (JSON)')}</button>
+              <button className="menu-item" onClick={() => { setExportOpen(false); exportFcpxml() }}>{t('Marcadores para montaje (FCPXML)')}</button>
             </div>
           )}
         </div>
@@ -423,6 +440,7 @@ function Inspector({ sel, eps, active, save, setSel, versions, openScene, chars 
   }
   const i = Number(sel.key); const s = ep.scenes[i]; if (!s) return null
   const meta = ep.sceneMeta[s.heading] ?? {}
+  const setMeta = (p: Partial<SceneMeta>) => save(ep, { sceneMeta: { ...ep.sceneMeta, [s.heading]: { ...meta, ...p } } })
   const lines = ep.content.split('\n').slice(s.startLine, s.endLine)
   const written = ep.scenes.filter((z) => z.wordCount > 15).length
   return (
@@ -431,6 +449,29 @@ function Inspector({ sel, eps, active, save, setSel, versions, openScene, chars 
       <div className="bt-prog"><div style={{ width: `${Math.round((written / Math.max(1, ep.scenes.length)) * 100)}%` }} /></div>
       <div className="muted tiny">{s.characters.join(', ') || s.links.join(', ')} · {s.wordCount} {t('palabras')} · {(ep.mins[i] ?? 0).toFixed(1)} min</div>
       {/* Ficha de la escena (PRD §16): el texto vive en el guion; propósito, conflicto y resultado, en el outline. */}
+      {/* Industria (compatibilidad ScriptWriterX): número de escena, OMITIDA y presencia manual por entidad. */}
+      <div className="row tiny">
+        <label className="field"><span>{t('Número')}</span><BlurInput value={meta.numero ?? String(i + 1)} onCommit={(v) => setMeta({ numero: v.trim() || undefined })} /></label>
+        <label className="row tiny" title={t('La escena conserva su número pero no se rueda')}><input type="checkbox" checked={meta.omitida === true} onChange={(e) => setMeta({ omitida: e.target.checked || undefined })} />{t('Omitida')}</label>
+      </div>
+      <div className="field"><span>{t('Presencia')}</span>
+        <div className="chips">
+          {[...new Set([...s.characters, ...chars])].slice(0, 16).map((c) => {
+            const cur = meta.presencia?.[c]
+            const next = cur === 'habla' ? 'presente' : cur === 'presente' ? 'mencion' : cur === 'mencion' ? undefined : 'habla'
+            const label = PRESENCE.find(([k]) => k === cur)?.[1]
+            const toggle = () => {
+              const map: Record<string, Presence> = { ...(meta.presencia ?? {}) }
+              if (next) map[c] = next as Presence
+              else delete map[c]
+              setMeta({ presencia: Object.keys(map).length ? map : undefined })
+            }
+            return <button key={c} className={cur ? 'mini on' : 'mini ghost'} title={`${c}: ${label ? t(label) : t('sin marcar')}`} onClick={toggle}>
+              <span className="ell">{c}</span>{label ? ` · ${t(label)}` : ''}
+            </button>
+          })}
+        </div>
+      </div>
       {SCENE_FIELDS.map(([k, label, hint]) => (
         <label className="field" key={k}><span>{t(label)}</span>
           <BlurInput textarea={k !== 'summary'} rows={2} value={String(meta[k] ?? '')} placeholder={t(hint)} onCommit={(v) => save(ep, { sceneMeta: { ...ep.sceneMeta, [s.heading]: { ...meta, [k]: v } } })} />

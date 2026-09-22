@@ -48,7 +48,8 @@ export function Index() {
           return {
             id: `${s.path}#${i}`,
             cells: [
-              i + 1, sc.heading, s.name,
+              // Número de industria si lo hay (5A, 34B); OMITIDA se marca junto al encabezado.
+              m.numero ?? i + 1, `${m.omitida ? 'OMITIDA · ' : ''}${sc.heading}`, s.name,
               // Edición en línea: escribe en outline/<guion>.md sin abrir el Planner.
               { v: m.status ? t(STATUS_LABEL[m.status]) : '', node: <select value={m.status ?? ''} onClick={(e) => e.stopPropagation()} onChange={(e) => void writeMeta(s, sc.heading, { status: (e.target.value || undefined) as SceneStatus | undefined })}><option value="">—</option>{SCENE_STATUS.map((st) => <option key={st} value={st}>{t(STATUS_LABEL[st])}</option>)}</select> },
               { v: m.pov ?? '', node: <select value={m.pov ?? ''} onClick={(e) => e.stopPropagation()} onChange={(e) => void writeMeta(s, sc.heading, { pov: e.target.value })}><option value="">—</option>{[...new Set([...sc.characters, ...chars])].map((c) => <option key={c} value={c}>{c}</option>)}</select> },
