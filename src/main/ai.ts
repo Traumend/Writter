@@ -1,11 +1,25 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { checkSafeguards, estimateTokens } from '../core/safeguards'
-import type { AiProposal, AiRequest, AiText, Analysis, ProjectConfig, Provider } from '../core/types/ipc'
+import type { AiProposal, AiRequest, AiText, Analysis, BreakdownItem, BreakdownProposal, ProjectConfig, Provider } from '../core/types/ipc'
 import { getKey } from './keys'
 import { logUsage } from './vault'
 
 // Motor de IA. Solo main: aquí viven las claves y la red (I3). Nunca escribe al vault por su cuenta (I2).
 type Raw = { text: string; tokensIn: number; tokensOut: number; model: string }
+
+// Cancelación y progreso en vivo (ScriptWriterX §30): una llamada a la vez, cancelable desde la interfaz.
+let current: AbortController | null = null
+let progress: ((chars: number, done?: boolean) => void) | null = null
+export const setAiProgress = (fn: ((chars: number, done?: boolean) => void) | null) => { progress = fn }
+export function cancelAi(): void { current?.abort(); current = null }
+const tick = (chars: number) => progress?.(chars)
+
+// Ajustes del usuario con valores por defecto sensatos.
+const limits = (cfg: ProjectConfig) => ({
+  maxTokens: Math.max(256, Math.min(200000, Number(cfg.byok.maxTokens) || 32000)),
+  reasoning: cfg.byok.reasoning && cfg.byok.reasoning !== 'off' ? cfg.byok.reasoning : undefined,
+  headers: Object.fromEntries((cfg.byok.headers ?? []).filter((h) => h.name.trim()).map((h) => [h.name.trim(), h.value]))
+})
 
 // Endpoints compatibles con la API de OpenAI (chat/completions). Gemini y los demás caben aquí con su baseUrl.
 const OPENAI_COMPAT: Partial<Record<Provider, string>> = {
@@ -26,13 +40,18 @@ const DEFAULT_MODEL: Record<Provider, string> = {
   custom: 'default'
 }
 
-async function callAnthropic(system: string, prompt: string, model: string): Promise<Raw> {
+async function callAnthropic(cfg: ProjectConfig, system: string, prompt: string, model: string): Promise<Raw> {
   const apiKey = getKey('anthropic')
   if (!apiKey) throw new Error('Sin clave BYOK para anthropic')
+  const { maxTokens, reasoning } = limits(cfg)
   const client = new Anthropic({ apiKey })
-  const msg = await client.messages
-    .stream({ model, max_tokens: 32000, system, output_config: { effort: 'medium' }, messages: [{ role: 'user', content: prompt }] })
-    .finalMessage()
+  const stream = client.messages.stream(
+    { model, max_tokens: maxTokens, system, output_config: { effort: reasoning ?? 'medium' }, messages: [{ role: 'user', content: prompt }] },
+    { signal: current?.signal }
+  )
+  let chars = 0
+  stream.on('text', (t) => tick((chars += t.length)))
+  const msg = await stream.finalMessage()
   if (msg.stop_reason === 'refusal') throw new Error(`El modelo rechazó la petición${msg.stop_details?.explanation ? ': ' + msg.stop_details.explanation : ''}`)
   const text = msg.content.filter((b) => b.type === 'text').map((b) => b.text).join('')
   return { text, tokensIn: msg.usage.input_tokens, tokensOut: msg.usage.output_tokens, model: msg.model }
@@ -52,30 +71,74 @@ async function callOpenAICompat(provider: Provider, cfg: ProjectConfig, system: 
   if (!base) throw new Error(`Sin URL base para ${provider}`)
   const apiKey = getKey(provider)
   if (!apiKey && provider !== 'custom') throw new Error(`Sin clave BYOK para ${provider}`)
+  const { maxTokens, reasoning, headers } = limits(cfg)
   const r = await fetch(`${base}/chat/completions`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) },
-    body: JSON.stringify({ model, max_tokens: 32000, messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }] })
+    signal: current?.signal,
+    headers: { 'Content-Type': 'application/json', ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}), ...headers },
+    body: JSON.stringify({
+      model, max_tokens: maxTokens, stream: true, stream_options: { include_usage: true },
+      ...(reasoning ? { reasoning_effort: reasoning } : {}),
+      messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }]
+    })
   })
   if (!r.ok) throw new Error(`${provider} respondió ${r.status}: ${(await r.text()).slice(0, 200)}`)
-  const j = (await r.json()) as { choices?: { message?: { content?: string } }[]; usage?: { prompt_tokens?: number; completion_tokens?: number } }
-  const text = j.choices?.[0]?.message?.content ?? ''
+  if (!r.body) throw new Error(`${provider} no devolvió contenido`)
+  // SSE: cada línea "data: {json}" trae un trozo; "[DONE]" cierra.
+  const reader = r.body.getReader()
+  const dec = new TextDecoder()
+  let buf = ''
+  let text = ''
+  let usage: { prompt_tokens?: number; completion_tokens?: number } | undefined
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buf += dec.decode(value, { stream: true })
+    const lines = buf.split('\n')
+    buf = lines.pop() ?? ''
+    for (const line of lines) {
+      const data = line.replace(/^data:\s*/, '').trim()
+      if (!line.startsWith('data:') || !data || data === '[DONE]') continue
+      try {
+        const j = JSON.parse(data) as { choices?: { delta?: { content?: string } }[]; usage?: typeof usage }
+        const piece = j.choices?.[0]?.delta?.content ?? ''
+        if (piece) { text += piece; tick(text.length) }
+        if (j.usage) usage = j.usage
+      } catch { /* trozo partido entre lecturas: el siguiente bucle lo completa */ }
+    }
+  }
   if (!text) throw new Error(`${provider} no devolvió texto`)
-  return { text, tokensIn: j.usage?.prompt_tokens ?? estimateTokens(prompt), tokensOut: j.usage?.completion_tokens ?? estimateTokens(text), model }
+  return { text, tokensIn: usage?.prompt_tokens ?? estimateTokens(prompt), tokensOut: usage?.completion_tokens ?? estimateTokens(text), model }
 }
 
 async function call(cfg: ProjectConfig, system: string, prompt: string): Promise<Raw> {
   const provider = cfg.byok.provider
   const model = cfg.byok.model || DEFAULT_MODEL[provider] || 'default'
+  const t0 = Date.now()
+  current = new AbortController()
   try {
-    const r = provider === 'anthropic' ? await callAnthropic(system, prompt, model)
+    const r = provider === 'anthropic' ? await callAnthropic(cfg, system, prompt, model)
       : provider === 'ollama' ? await callOllama(system, prompt, model)
       : await callOpenAICompat(provider, cfg, system, prompt, model)
-    logUsage({ provider, model: r.model, tokensIn: r.tokensIn, tokensOut: r.tokensOut, ok: true })
+    logUsage({ provider, model: r.model, tokensIn: r.tokensIn, tokensOut: r.tokensOut, ok: true, ms: Date.now() - t0 })
     return r
   } catch (e) {
-    logUsage({ provider, model, tokensIn: 0, tokensOut: 0, ok: false })
-    throw e
+    logUsage({ provider, model, tokensIn: 0, tokensOut: 0, ok: false, ms: Date.now() - t0 })
+    throw current?.signal.aborted ? new Error('Llamada cancelada') : e
+  } finally {
+    current = null
+    progress?.(0, true)
+  }
+}
+
+// Prueba de conexión (§30): una llamada mínima que confirma clave, URL y modelo.
+export async function testAi(cfg: ProjectConfig): Promise<{ ok: boolean; model?: string; ms?: number; error?: string }> {
+  const t0 = Date.now()
+  try {
+    const r = await call(cfg, 'Responde exactamente: OK', 'OK')
+    return { ok: true, model: r.model, ms: Date.now() - t0 }
+  } catch (e) {
+    return { ok: false, ms: Date.now() - t0, error: String(e instanceof Error ? e.message : e).slice(0, 300) }
   }
 }
 
@@ -140,4 +203,30 @@ export async function analyze(text: string, cfg: ProjectConfig): Promise<Omit<An
       notes: Array.isArray(s.notes) ? s.notes.map(String) : []
     }))
   }
+}
+
+// Desglose con IA (ScriptWriterX §22): propone entidades y descripciones; el usuario aprueba una a una.
+export async function breakdownAi(text: string, known: string[], cfg: ProjectConfig): Promise<BreakdownProposal> {
+  const system = 'Eres un asistente de desglose de producción. Devuelve SOLO un objeto JSON con las claves characters, locations y props. '
+    + 'Cada elemento: { "name": string en MAYÚSCULAS, "aliases": string[], "description": frase breve, "group": string opcional }. '
+    + 'No inventes entidades que no aparezcan en el texto. Sin comentarios ni markdown.'
+  const prompt = `GUION:
+${text}
+
+YA EXISTEN (no los repitas salvo para mejorar su descripción): ${known.join(', ') || '—'}`
+  const r = await call(cfg, system, prompt)
+  const m = /\{[\s\S]*\}/.exec(r.text)
+  if (!m) throw new Error('El modelo no devolvió JSON')
+  const j = JSON.parse(m[0]) as Record<string, unknown>
+  const lower = new Set(known.map((k) => k.toLowerCase()))
+  const take = (key: string, kind: BreakdownItem['kind']): BreakdownItem[] =>
+    (Array.isArray(j[key]) ? (j[key] as Record<string, unknown>[]) : []).map((x) => ({
+      kind,
+      name: String(x['name'] ?? '').trim(),
+      aliases: Array.isArray(x['aliases']) ? (x['aliases'] as unknown[]).map(String) : [],
+      description: String(x['description'] ?? '').trim(),
+      group: x['group'] ? String(x['group']) : undefined,
+      exists: lower.has(String(x['name'] ?? '').trim().toLowerCase())
+    })).filter((x) => x.name)
+  return { items: [...take('characters', 'character'), ...take('locations', 'location'), ...take('props', 'prop')], model: r.model, tokensIn: r.tokensIn, tokensOut: r.tokensOut }
 }

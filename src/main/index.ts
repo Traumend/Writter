@@ -5,7 +5,7 @@ import { basename, extname, join, resolve } from 'node:path'
 import { readSwx } from './swx'
 import { fdxToMd, fountainToMd } from '../core/convert'
 import type { AdoptRole, AiRequest, Analysis, FileEntry, OpenResult, ProjectConfig, VaultChange, Version } from '../core/types/ipc'
-import { aiText, analyze, devDoc, doctorAi, runAi } from './ai'
+import { aiText, analyze, breakdownAi, cancelAi, devDoc, doctorAi, runAi, setAiProgress, testAi } from './ai'
 import { getGraph, graphBuild, graphStatus, markStale } from './graph'
 import { keyStatus, setKey } from './keys'
 import * as V from './vault'
@@ -144,6 +144,9 @@ ipcMain.handle('export.bytes', async (_e, base64: string, suggested: string) => 
   writeFileSync(r.filePath, Buffer.from(base64, 'base64'))
   return r.filePath
 })
+ipcMain.on('ai.cancel', () => cancelAi())
+ipcMain.handle('ai.test', () => testAi(V.readConfig()))
+ipcMain.handle('ai.breakdown', (_e, text: string, known: string[]) => breakdownAi(text, known, V.readConfig()))
 ipcMain.handle('usage.get', () => V.usageStats())
 ipcMain.handle('usage.reset', () => V.usageReset())
 // Importar un proyecto de ScriptWriterX: devuelve el project.json crudo; el renderer lo traduce con core/swx.
@@ -192,7 +195,8 @@ function createWindow() {
     menu.popup()
   })
   buildMenu(win, { lang: 'en', recents: [] })
-  win.on('closed', () => { win = null; V.closeWatcher() })
+  win.on('closed', () => { win = null; V.closeWatcher(); setAiProgress(null) })
+  setAiProgress((chars, done) => send('ai.progress', { chars, done }))
   const devUrl = process.env['ELECTRON_RENDERER_URL']
   if (devUrl) void win.loadURL(devUrl)
   else void win.loadFile(join(__dirname, '../renderer/index.html'))

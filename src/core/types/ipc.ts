@@ -7,7 +7,7 @@ export type ProjectConfig = {
   format: { default: 'md' | 'fountain'; live_format: boolean }
   tags: { entity_link: string; note: string }
   graphify: { enabled: boolean; semantic_pass: 'off' | 'opt-in' | 'on'; backend: string }
-  byok: { provider: Provider; model?: string; baseUrl?: string }
+  byok: { provider: Provider; model?: string; baseUrl?: string; maxTokens?: number; reasoning?: 'off' | 'low' | 'medium' | 'high'; headers?: { name: string; value: string }[] }
   prompts: { assistant: string; analysis: string }
   cover: { title: string; author: string; contact: string; draft: string; image: string }
   pdf: {
@@ -71,7 +71,13 @@ export type Analysis = {
   scenes: SceneAnalysis[]
 }
 
-export type UsageStats = { calls: number; fails: number; tokensIn: number; tokensOut: number; byModel: { model: string; calls: number; tokensIn: number; tokensOut: number }[] }
+export type UsageStats = { calls: number; fails: number; tokensIn: number; tokensOut: number; byModel: { model: string; calls: number; tokensIn: number; tokensOut: number }[]; recent: UsageRowPublic[] }
+// Últimas llamadas para el historial de IA (sin prompts ni respuestas: solo metadatos).
+export type UsageRowPublic = { ts: number; provider: string; model: string; tokensIn: number; tokensOut: number; ok: boolean; ms?: number }
+export type AiTest = { ok: boolean; model?: string; ms?: number; error?: string }
+// Desglose con IA (propuestas: nada se escribe sin aceptación explícita, I2).
+export type BreakdownItem = { kind: 'character' | 'location' | 'prop'; name: string; aliases: string[]; description: string; group?: string; exists: boolean }
+export type BreakdownProposal = { items: BreakdownItem[]; model: string; tokensIn: number; tokensOut: number }
 
 export type GraphStatus = { available: boolean; reason?: string; nodes?: number; edges?: number; stale?: boolean }
 export type GraphNode = { id: string; kind: FileKind | 'scene'; label: string }
@@ -121,6 +127,10 @@ export type Api = {
   importScript(): Promise<FileEntry | null>
   importSwx(): Promise<{ name: string; json: string; media: number } | { error: 'encrypted' | 'invalid' } | null>
   usageGet(): Promise<UsageStats>
+  aiCancel(): void
+  aiTest(): Promise<AiTest>
+  aiBreakdown(text: string, known: string[]): Promise<BreakdownProposal>
+  onAiProgress(fn: (p: { chars: number; done?: boolean }) => void): void
   usageReset(): Promise<void>
 }
 

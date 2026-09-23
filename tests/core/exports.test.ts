@@ -2,6 +2,7 @@ import { expect, test } from 'vitest'
 import { mdToFdx, mdToFountain, mdToTxt } from '../../src/core/convert'
 import { mdToDocx, zipStore } from '../../src/core/docx'
 import { searchReplace } from '../../src/core/searchreplace'
+import { estimateCost, fmtCost } from '../../src/core/ai/prices'
 
 const EP = `---
 type: script
@@ -55,4 +56,15 @@ test('searchReplace: por bloque, palabra completa, conteo', () => {
   expect(all[0]!.count).toBeGreaterThanOrEqual(3)
   // fuera de scope -> nada
   expect(searchReplace(docs, new Set(['otro.md']), { query: 'bar', replace: 'x', caseSensitive: false, wholeWord: false, regex: false, blockTypes: null }).length).toBe(0)
+})
+
+test('estimateCost usa precios por millón y no inventa cifras de modelos desconocidos', () => {
+  expect(estimateCost('claude-opus-5', 1_000_000, 0)).toBeCloseTo(15, 5)
+  expect(estimateCost('claude-sonnet-5', 0, 1_000_000)).toBeCloseTo(15, 5)
+  expect(estimateCost('meta-llama/llama-3.1-70b-instruct:free', 500_000, 500_000)).toBe(0)
+  expect(estimateCost('modelo-que-no-existe', 1000, 1000)).toBeNull()
+  expect(fmtCost(null)).toBe('—')
+  expect(fmtCost(0)).toBe('0')
+  expect(fmtCost(0.004)).toBe('<$0.01')
+  expect(fmtCost(1.5)).toBe('$1.50')
 })

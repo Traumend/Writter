@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { validateTags } from '../../core/tags'
-import { DEFAULT_PROMPTS, type ProjectConfig, type Provider, type UsageStats } from '../../core/types/ipc'
+import { estimateCost, fmtCost } from '../../core/ai/prices'
+import { DEFAULT_PROMPTS, type AiTest, type ProjectConfig, type Provider, type UsageStats } from '../../core/types/ipc'
 import { t } from '../i18n'
 import { useStore } from '../store'
 import { Field, useAsset } from '../ui'
@@ -10,12 +11,15 @@ const PROVIDERS: [Provider, string][] = [
   ['gemini', 'Google (Gemini)'], ['deepseek', 'DeepSeek'], ['grok', 'Grok (xAI)'], ['ollama', 'Ollama (local)'], ['custom', 'Custom (compatible OpenAI)']
 ]
 const NEEDS_KEY = (p: Provider) => p !== 'ollama'
+const REASONING: Record<string, string> = { off: 'Apagado', low: 'Bajo', medium: 'Medio', high: 'Alto' }
 
 export function Settings() {
   const { vault, keyStatus, saveKey, saveConfig } = useStore()
   const [c, setC] = useState<ProjectConfig | null>(vault?.config ?? null)
   const [key, setKey] = useState('')
   const [usage, setUsage] = useState<UsageStats | null>(null)
+  const [test, setTest] = useState<AiTest | null>(null)
+  const [testing, setTesting] = useState(false)
   useEffect(() => setC(vault?.config ?? null), [vault])
   useEffect(() => { void window.api.usageGet().then(setUsage) }, [vault])
   const cover = useAsset(c?.cover.image ?? '')
@@ -43,6 +47,29 @@ export function Settings() {
               <input type="password" placeholder={t('Pegar clave y Enter')} value={key} onChange={(e) => setKey(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { void saveKey(key); setKey('') } }} />
             </Field>
           )}
+          <div className="row">
+            <Field label={t('Máx. tokens')}><input type="number" min={256} max={200000} step={1024} value={c.byok.maxTokens ?? 32000} onChange={(e) => set('byok', { maxTokens: Number(e.target.value) || undefined })} /></Field>
+            <Field label={t('Razonamiento')}>
+              <select value={c.byok.reasoning ?? ''} onChange={(e) => set('byok', { reasoning: (e.target.value || undefined) as ProjectConfig['byok']['reasoning'] })}>
+                <option value="">{t('por defecto del proveedor')}</option>
+                {(['off', 'low', 'medium', 'high'] as const).map((r) => <option key={r} value={r}>{t(REASONING[r] ?? r)}</option>)}
+              </select>
+            </Field>
+          </div>
+          <div className="row">
+            <button className="ghost" onClick={() => { setTesting(true); void window.api.aiTest().then((r) => { setTest(r); setTesting(false) }) }} disabled={testing}>{testing ? t('Probando…') : t('Probar conexión')}</button>
+            {test && <span className={test.ok ? 'muted tiny' : 'err tiny'}>{test.ok ? `${t('Conectado')} · ${test.model} · ${test.ms} ms` : test.error}</span>}
+          </div>
+          <h2>{t('Cabeceras personalizadas')}</h2>
+          <p className="muted tiny">{t('Para puertas de enlace o servidores propios. Nunca guardes aquí la clave si compartes el proyecto.')}</p>
+          {(c.byok.headers ?? []).map((h, i) => (
+            <div className="row" key={i}>
+              <input value={h.name} placeholder="x-api-key" onChange={(e) => set('byok', { headers: (c.byok.headers ?? []).map((x, j) => (j === i ? { ...x, name: e.target.value } : x)) })} />
+              <input value={h.value} placeholder="valor" onChange={(e) => set('byok', { headers: (c.byok.headers ?? []).map((x, j) => (j === i ? { ...x, value: e.target.value } : x)) })} />
+              <button className="mini ghost" onClick={() => set('byok', { headers: (c.byok.headers ?? []).filter((_, j) => j !== i) })}>×</button>
+            </div>
+          ))}
+          <button className="mini ghost" onClick={() => set('byok', { headers: [...(c.byok.headers ?? []), { name: '', value: '' }] })}>+ {t('cabecera')}</button>
           <p className="muted tiny">{t('La clave se guarda en el keychain del SO por proveedor; nunca en el vault ni en el renderer.')} {c.byok.provider === 'openrouter' && t('OpenRouter da modelos gratis (usa uno que termine en :free).')}</p>
         </div>
         <div className="panelbox">
@@ -54,7 +81,19 @@ export function Settings() {
               <table className="table"><thead><tr><th>{t('Modelo')}</th><th>{t('Llamadas')}</th><th>{t('Tokens')}</th></tr></thead>
                 <tbody>{usage.byModel.slice(0, 8).map((m) => <tr key={m.model}><td>{m.model}</td><td>{m.calls}</td><td>{(m.tokensIn + m.tokensOut).toLocaleString()}</td></tr>)}</tbody>
               </table>
-              <p className="muted tiny">{t('Local, en .narrative/usage.log. Nunca incluye la clave.')}</p>
+              <h2>{t('Historial de llamadas')}</h2>
+              <table className="table"><thead><tr><th>{t('Fecha')}</th><th>{t('Modelo')}</th><th>{t('Tokens')}</th><th>{t('Duración')}</th><th>{t('Coste aprox.')}</th></tr></thead>
+                <tbody>{usage.recent.slice(0, 12).map((r, i) => (
+                  <tr key={i} className={r.ok ? '' : 'err'}>
+                    <td className="tiny">{new Date(r.ts).toLocaleString()}</td>
+                    <td className="tiny ell">{r.model}</td>
+                    <td className="tiny">{(r.tokensIn + r.tokensOut).toLocaleString()}</td>
+                    <td className="tiny">{r.ms ? `${(r.ms / 1000).toFixed(1)} s` : '—'}</td>
+                    <td className="tiny">{fmtCost(estimateCost(r.model, r.tokensIn, r.tokensOut))}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+              <p className="muted tiny">{t('Local, en .narrative/usage.log. Nunca incluye la clave.')} {t('El coste es una estimación con precios públicos aproximados.')}</p>
             </>
           )}
         </div>

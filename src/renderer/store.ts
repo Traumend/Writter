@@ -87,6 +87,7 @@ type State = {
   scope: Scope
   proposal: Proposal | null
   aiBusy: boolean
+  aiChars: number // caracteres recibidos en la llamada en curso (streaming)
   aiError: string | null
   versions: Version[]
   status: string
@@ -134,6 +135,7 @@ type Actions = {
   mergeEntity(fromPath: string, toPath: string): Promise<void>
   setScope(s: Scope): void
   runAi(instruction: string, allowLocked: boolean): Promise<void>
+  cancelAi(): void
   acceptProposal(): Promise<void>
   rejectProposal(): void
   restoreVersion(id: string): Promise<void>
@@ -248,6 +250,7 @@ export const useStore = create<State & Actions>((set, get) => ({
   scope: 'scene',
   proposal: null,
   aiBusy: false,
+  aiChars: 0,
   aiError: null,
   versions: [],
   status: '',
@@ -610,6 +613,7 @@ export const useStore = create<State & Actions>((set, get) => ({
   },
 
   rejectProposal: () => set({ proposal: null }),
+  cancelAi: () => { window.api.aiCancel(); set({ status: 'Llamada de IA cancelada' }) },
 
   async restoreVersion(id) {
     const { path } = get()

@@ -49,7 +49,11 @@ const api: Api = {
   importScript: () => ipcRenderer.invoke('import.script'),
   importSwx: () => ipcRenderer.invoke('import.swx'),
   usageGet: () => ipcRenderer.invoke('usage.get'),
-  usageReset: () => ipcRenderer.invoke('usage.reset')
+  usageReset: () => ipcRenderer.invoke('usage.reset'),
+  aiCancel: () => ipcRenderer.send('ai.cancel'),
+  aiTest: () => ipcRenderer.invoke('ai.test'),
+  aiBreakdown: (text, known) => ipcRenderer.invoke('ai.breakdown', text, known),
+  onAiProgress: (fn) => ipcRenderer.on('ai.progress', (_e, p) => fn(p as { chars: number; done?: boolean }))
 }
 
 contextBridge.exposeInMainWorld('api', api)

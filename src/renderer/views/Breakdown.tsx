@@ -4,7 +4,7 @@ import { readFrontmatter, writeFrontmatter } from '../../core/frontmatter'
 import { extractLinks, parseFountain } from '../../core/parser/fountain'
 import { project } from '../../core/projection'
 import { mdToHtml } from '../../core/convert'
-import type { FileKind } from '../../core/types/ipc'
+import type { BreakdownProposal, FileKind } from '../../core/types/ipc'
 import { t } from '../i18n'
 import { useStore } from '../store'
 import { Icon, BlurInput, useAsset } from '../ui'
@@ -172,6 +172,11 @@ export function Breakdown() {
   const [listView, setListView] = useState(false)
   const [over, setOver] = useState<string | null>(null)
   const [status, setStatus] = useState('')
+  // Desglose con IA (ScriptWriterX §22): propuestas que el usuario aprueba una a una; nada se escribe antes.
+  const [aiProps, setAiProps] = useState<BreakdownProposal | null>(null)
+  const [aiSel, setAiSel] = useState<Set<string>>(new Set())
+  const [aiBusy, setAiBusy] = useState(false)
+  const [aiErr, setAiErr] = useState('')
   const cards = useMemo(() => breakdown(files, docs), [files, docs])
   const missing = useMemo(() => extractMissing(files, docs), [files, docs])
   const places = useMemo(() => cards.filter((c) => c.kind === 'location').map((c) => c.name), [cards])
@@ -226,6 +231,38 @@ export function Breakdown() {
     else if (sortBy === 'tree' && kind === 'location') return tree(l)
     return l.map((c) => ({ c, depth: 0 }))
   }, [ofKind, group, orphansOnly, season, episode, q, sortBy, kind, docs])
+
+  const runAiBreakdown = async () => {
+    setAiBusy(true); setAiErr('')
+    try {
+      const scripts = files.filter((f) => f.kind === 'script')
+      const text = scripts.map((f) => docs.find((d) => d.path === f.path)?.content ?? '').join('\n\n').slice(0, 60000)
+      const known = cards.map((c) => c.name)
+      const p = await window.api.aiBreakdown(text, known)
+      setAiProps(p)
+      setAiSel(new Set(p.items.filter((i) => !i.exists).map((i) => `${i.kind}:${i.name}`)))
+    } catch (e) {
+      setAiErr(String(e instanceof Error ? e.message : e).slice(0, 300))
+    } finally { setAiBusy(false) }
+  }
+  const applyAi = async () => {
+    const chosen = (aiProps?.items ?? []).filter((i) => aiSel.has(`${i.kind}:${i.name}`))
+    for (const it of chosen) {
+      const existing = cards.find((c) => c.kind === it.kind && c.name.toLowerCase() === it.name.toLowerCase())
+      if (existing) {
+        const d = docs.find((x) => x.path === existing.path)
+        if (d) await writeOther(existing.path, writeFrontmatter(d.content, {
+          description: it.description || existing.description,
+          aliases: [...new Set([...existing.aliases, ...it.aliases])],
+          ...(it.group ? { group: it.group } : {})
+        }))
+      } else {
+        await createFile(`${roleDir(it.kind)}/${it.name}.md`, writeFrontmatter(TEMPLATE[it.kind](it.name), { description: it.description, aliases: it.aliases, ...(it.group ? { group: it.group } : {}) }), false)
+      }
+    }
+    setStatus(`${chosen.length} ${t('ficha(s) actualizadas desde la propuesta')}`)
+    setAiProps(null)
+  }
 
   const patchGroup = (path: string, g: string) => { const d = docs.find((x) => x.path === path); if (d) void writeOther(path, writeFrontmatter(d.content, { group: g })) }
   const extract = async () => {
@@ -315,12 +352,40 @@ export function Breakdown() {
         </div>
         <div className="toolbar wrap tiny">
           {kind === 'character' && <button className="ghost" onClick={() => void autoClassify()}>{t('Auto-clasificar')}</button>}
+          <button className="ghost" disabled={aiBusy} onClick={() => void runAiBreakdown()}>{aiBusy ? t('Analizando…') : t('Desglosar con IA')}</button>
           <button className="ghost" disabled={!missing.characters.length && !missing.locations.length} onClick={() => void extract()} title={[...missing.characters, ...missing.locations].join(', ')}>{t('Extraer del guión')} ({missing.characters.length + missing.locations.length})</button>
           <input placeholder={t('Nuevo…')} value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
           <span className="grow" />
           {status && <span className="muted tiny">{status}</span>}
           <Menu items={[{ label: t('Exportar Excel'), run: toXls }, { label: t('Exportar CSV'), run: () => void window.api.exportText(toCsv(cards), 'breakdown.csv') }, 'sep', { label: t('Eliminar todo'), run: () => void deleteAll(), danger: true, disabled: !list.length }]} />
         </div>
+        {aiErr && <p className="err tiny">{aiErr}</p>}
+        {aiProps && (
+          <div className="modal-backdrop" onClick={() => setAiProps(null)}>
+            <div className="modal" style={{ width: 'min(680px, 94vw)' }} onClick={(e) => e.stopPropagation()}>
+              <div className="row"><h1>{t('Propuesta de desglose')}</h1><span className="grow" /><span className="muted tiny">{aiProps.model} · {aiProps.tokensIn + aiProps.tokensOut} tok</span><button className="mini ghost" onClick={() => setAiProps(null)}>{t('Cerrar')}</button></div>
+              <p className="muted tiny">{t('Marca lo que quieras aplicar. Nada se escribe hasta que pulses aplicar.')}</p>
+              <div className="scroll" style={{ maxHeight: '50vh' }}>
+                {aiProps.items.map((it) => {
+                  const key = `${it.kind}:${it.name}`
+                  return (
+                    <label className="check" key={key}>
+                      <input type="checkbox" checked={aiSel.has(key)} onChange={() => setAiSel((prev) => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n })} />
+                      <b>{it.name}</b> <span className="muted tiny">{t({ character: 'Personaje', location: 'Locación', prop: 'Ítem' }[it.kind])}{it.exists ? ` · ${t('actualiza la ficha existente')}` : ` · ${t('ficha nueva')}`}</span>
+                      {it.description && <span className="tiny"> — {it.description}</span>}
+                      {it.aliases.length > 0 && <span className="muted tiny"> ({it.aliases.join(', ')})</span>}
+                    </label>
+                  )
+                })}
+                {aiProps.items.length === 0 && <p className="muted tiny">{t('La IA no propuso entidades nuevas.')}</p>}
+              </div>
+              <div className="row" style={{ justifyContent: 'flex-end' }}>
+                <button className="ghost" onClick={() => setAiProps(null)}>{t('Cancelar')}</button>
+                <button disabled={!aiSel.size} onClick={() => void applyAi()}>{t('Aplicar')} ({aiSel.size})</button>
+              </div>
+            </div>
+          </div>
+        )}
         <div className={listView ? 'bd-list' : 'cards'}>
           {list.map(({ c, depth }) => <div key={c.path} style={depth ? { marginLeft: depth * 18 } : undefined}><Card c={c} groups={allGroups} epOf={epOf} places={places} refs={refsOf(c)} siblings={ofKind.filter((x) => x.path !== c.path).map((x) => ({ path: x.path, name: x.name }))} /></div>)}
           {list.length === 0 && <p className="muted">{t('Sin fichas. Usa "Extraer del guión" o crea una.')}</p>}

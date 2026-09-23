@@ -307,7 +307,7 @@ export function readAsset(rel: string): string {
 // --- Análisis IA (D): derivado, en .narrative/analysis/<script>/<ts>.json
 // --- Medidor de uso de IA (JSONL en .narrative/usage.log, agregado local; nunca guarda la clave).
 const usageFile = () => join(vaultRoot(), '.narrative/usage.log')
-type UsageRow = { ts: number; provider: string; model: string; tokensIn: number; tokensOut: number; ok: boolean }
+type UsageRow = { ts: number; provider: string; model: string; tokensIn: number; tokensOut: number; ok: boolean; ms?: number }
 export function logUsage(r: Omit<UsageRow, 'ts'>) {
   if (!root) return
   try {
@@ -317,7 +317,7 @@ export function logUsage(r: Omit<UsageRow, 'ts'>) {
   }
 }
 export function usageStats() {
-  const empty = { calls: 0, fails: 0, tokensIn: 0, tokensOut: 0, byModel: [] as { model: string; calls: number; tokensIn: number; tokensOut: number }[] }
+  const empty = { calls: 0, fails: 0, tokensIn: 0, tokensOut: 0, byModel: [] as { model: string; calls: number; tokensIn: number; tokensOut: number }[], recent: [] as UsageRow[] }
   if (!existsSync(usageFile())) return empty
   const per = new Map<string, { model: string; calls: number; tokensIn: number; tokensOut: number }>()
   for (const line of readFileSync(usageFile(), 'utf8').split('\n')) {
@@ -332,8 +332,10 @@ export function usageStats() {
     const m = per.get(key) ?? { model: key, calls: 0, tokensIn: 0, tokensOut: 0 }
     m.calls++; m.tokensIn += r.tokensIn || 0; m.tokensOut += r.tokensOut || 0
     per.set(key, m)
+    empty.recent.push(r)
   }
   empty.byModel = [...per.values()].sort((a, b) => b.calls - a.calls)
+  empty.recent = empty.recent.slice(-25).reverse() // historial de llamadas (solo metadatos)
   return empty
 }
 export function usageReset() {

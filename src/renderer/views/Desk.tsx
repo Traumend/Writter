@@ -382,7 +382,13 @@ function RightPanel() {
             {locked && (
               <label className="check"><input type="checkbox" checked={allowLocked} onChange={(e) => setAllowLocked(e.target.checked)} /> {t('Autorizo editar este archivo')} <code>locked</code></label>
             )}
-            <button disabled={!s.path || s.aiBusy || !instruction.trim()} onClick={() => void s.runAi(instruction, allowLocked)}>{s.aiBusy ? t('Pensando…') : t('Proponer diff')}</button>
+            <div className="row">
+              <button disabled={!s.path || s.aiBusy || !instruction.trim()} onClick={() => void s.runAi(instruction, allowLocked)}>{s.aiBusy ? t('Pensando…') : t('Proponer diff')}</button>
+              {s.aiBusy && <button className="ghost" onClick={() => s.cancelAi()}>{t('Cancelar')}</button>}
+              {s.aiBusy && <span className="muted tiny">{s.aiChars} {t('car. recibidos')}</span>}
+            </div>
+            {/* Alcance explícito (ScriptWriterX §33): qué lee la IA y qué puede cambiar. */}
+            <p className="muted tiny">{t('Lee')}: {t(SCOPES.find(([k]) => k === s.scope)?.[1] ?? '')} · {t('Modifica')}: {t('solo lo que aceptes en la propuesta')}</p>
             {s.aiError && <p className="err">{s.aiError}</p>}
             {!s.keyStatus?.present && cfg?.byok.provider !== 'ollama' && <p className="muted tiny">{t('Sin clave BYOK: configúrala en Ajustes.')}</p>}
           </div>
