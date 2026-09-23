@@ -1,14 +1,16 @@
 import { diffLines } from 'diff'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { mdToFdx, mdToFountain, mdToHtml, mdToTxt, pdfVars } from '../../core/convert'
+import { SCENE_STATUS, SCENE_STATUS_ES, readSceneMeta, type SceneMeta } from '../../core/planning'
 import { mdToDocx } from '../../core/docx'
-import { readFrontmatter } from '../../core/frontmatter'
+import { readFrontmatter, writeFrontmatter } from '../../core/frontmatter'
 import { estimateTokens } from '../../core/safeguards'
 import { type FileKind, type Scope } from '../../core/types/ipc'
 import { Editor } from '../editor/Editor'
 import { t } from '../i18n'
 import { DEFAULT_SECTIONS, useStore } from '../store'
 import { Icon, useAsset } from '../ui'
+import { SceneSheet } from './SceneSheet'
 
 const KIND_LABEL: Record<FileKind, string> = { script: 'Episodios', character: 'Personajes', location: 'Locaciones', prop: 'Props', outline: 'Escaleta', knowledge: 'Conocimiento', other: 'Otros' }
 export const TEMPLATE: Record<Exclude<FileKind, 'other'>, (name: string, extra?: Record<string, unknown>) => string> = {
@@ -97,7 +99,7 @@ function orderedSections(order: string[]): string[] {
 }
 
 function LeftPanel() {
-  const { vault, files, docs, path, projection, pagination, cursorLine, openFile, createFile, setCursor, moveScene, roleDir, prefs, addGroup, deleteScenes, restoreScene, sceneTrash } = useStore()
+  const { vault, files, docs, path, projection, pagination, cursorLine, openFile, createFile, setCursor, moveScene, duplicateScene, insertScene, roleDir, prefs, addGroup, deleteScenes, restoreScene, sceneTrash } = useStore()
   const [adding, setAdding] = useState<Exclude<FileKind, 'other'> | null>(null)
   const [q, setQ] = useState('')
   const [inContent, setInContent] = useState(false)
@@ -106,6 +108,10 @@ function LeftPanel() {
   const [sel, setSel] = useState<Set<number>>(new Set())
   const [newGroup, setNewGroup] = useState<string | null>(null)
   const [showTrash, setShowTrash] = useState(false)
+  const [fInt, setFInt] = useState('') // INT / EXT
+  const [fTime, setFTime] = useState('') // día / noche
+  const [fChar, setFChar] = useState('')
+  const [fStatus, setFStatus] = useState('')
   const lines = useMemo(() => useStore.getState().text.split('\n'), [projection])
   if (!vault) return <p className="muted">{t('Abre una carpeta como vault.')}</p>
   const scene = projection.scenes.find((s) => cursorLine >= s.startLine && cursorLine < s.endLine)
@@ -118,11 +124,20 @@ function LeftPanel() {
   }
   const ql = q.toLowerCase()
   const groups = [...new Set(projection.scenes.map((s) => s.group).filter(Boolean))]
-  const scenes = projection.scenes.filter(
-    (s) =>
-      (!groupFilter || s.group === groupFilter) &&
+  // Filtros del navegador de escenas (ScriptWriterX §11): INT/EXT, día/noche, personaje y estado.
+  const outline = docs.find((d) => d.path === `${roleDir('outline')}/${(path ?? '').split('/').pop()}`)
+  const sceneMeta = readSceneMeta(outline?.content)
+  const allChars = [...new Set(projection.scenes.flatMap((s) => s.characters))].sort()
+  const scenes = projection.scenes.filter((s) => {
+    const h = s.heading.toUpperCase()
+    return (!groupFilter || s.group === groupFilter) &&
+      (!fInt || (fInt === 'INT' ? /^(INT|I\/E)/.test(h) : /^EXT/.test(h))) &&
+      (!fTime || (fTime === 'DIA' ? /(DÍA|DIA|MAÑANA|TARDE|AMANECER)/.test(h) : /(NOCHE|MADRUGADA|ANOCHECER)/.test(h))) &&
+      (!fChar || s.characters.includes(fChar)) &&
+      (!fStatus || (sceneMeta[s.heading]?.status ?? '') === fStatus) &&
       (!ql || s.heading.toLowerCase().includes(ql) || (inContent && lines.slice(s.startLine, s.endLine).join('\n').toLowerCase().includes(ql)))
-  )
+  })
+  const filtered = !!(fInt || fTime || fChar || fStatus)
   const toggleSel = (i: number) => setSel((prev) => { const n = new Set(prev); n.has(i) ? n.delete(i) : n.add(i); return n })
   const runDelete = () => { deleteScenes([...sel]); setSel(new Set()) }
 
@@ -192,6 +207,14 @@ function LeftPanel() {
             </div>
           )}
 
+          <div className="row tiny wrap scenefilters">
+            <select value={fInt} onChange={(e) => setFInt(e.target.value)} title={t('Interior / Exterior')}><option value="">INT/EXT</option><option value="INT">INT</option><option value="EXT">EXT</option></select>
+            <select value={fTime} onChange={(e) => setFTime(e.target.value)} title={t('Día / Noche')}><option value="">{t('Día/Noche')}</option><option value="DIA">{t('Día')}</option><option value="NOCHE">{t('Noche')}</option></select>
+            <select value={fChar} onChange={(e) => setFChar(e.target.value)} title={t('Personaje')}><option value="">{t('Personaje')}</option>{allChars.map((c) => <option key={c} value={c}>{c}</option>)}</select>
+            <select value={fStatus} onChange={(e) => setFStatus(e.target.value)} title={t('Estado')}><option value="">{t('Estado')}</option>{SCENE_STATUS.map((st) => <option key={st} value={st}>{t(SCENE_STATUS_ES[st])}</option>)}</select>
+            {filtered && <button className="mini ghost" onClick={() => { setFInt(''); setFTime(''); setFChar(''); setFStatus('') }}>{t('Limpiar')}</button>}
+          </div>
+
           <ul className="scenes">
             {scenes.map((s, i) => {
               const newGroupHere = s.group !== (scenes[i - 1]?.group ?? (i === 0 ? null : ''))
@@ -204,6 +227,8 @@ function LeftPanel() {
                     {!multi && <>
                       <span className="mv" onClick={(e) => { e.stopPropagation(); moveScene(s.index, s.index - 1) }}>▲</span>
                       <span className="mv" onClick={(e) => { e.stopPropagation(); moveScene(s.index, s.index + 1) }}>▼</span>
+                      <span className="mv" title={t('Duplicar escena')} onClick={(e) => { e.stopPropagation(); duplicateScene(s.index) }}>⧉</span>
+                      <span className="mv" title={t('Insertar escena debajo')} onClick={(e) => { e.stopPropagation(); insertScene(s.index, 'after') }}>+</span>
                     </>}
                   </li>
                 </div>
@@ -280,7 +305,7 @@ function ScopeBar() {
 
 function RightPanel() {
   const s = useStore()
-  const [tab, setTab] = useState<'ai' | 'versions' | 'export'>('ai')
+  const [tab, setTab] = useState<'scene' | 'ai' | 'versions' | 'export'>('ai')
   // Petición externa (menú Archivo → Exportar): abrir un panel concreto.
   useEffect(() => { if (s.deskPanel) { setTab(s.deskPanel); s.setDeskPanel(null) } }, [s.deskPanel]) // eslint-disable-line react-hooks/exhaustive-deps
   const [instruction, setInstruction] = useState('')
@@ -289,17 +314,43 @@ function RightPanel() {
   const [compare, setCompare] = useState<{ id: string; content: string } | null>(null)
   const cfg = s.vault?.config
   const coverImg = useAsset(cfg?.cover.image ?? '')
+  // Ficha de la escena bajo el cursor: vive en sceneMeta de la escaleta del episodio abierto.
+  const sceneNow = s.projection.scenes.find((sc) => s.cursorLine >= sc.startLine && s.cursorLine < sc.endLine) ?? s.projection.scenes[0]
+  const outlinePath = s.path ? `${s.roleDir('outline')}/${s.path.split('/').pop()!}` : null
+  const outlineDoc = s.docs.find((d) => d.path === outlinePath)
+  const sceneMetaAll = readSceneMeta(outlineDoc?.content)
+  const sceneMetaNow = (sceneNow && sceneMetaAll[sceneNow.heading]) || {}
+  const vaultChars = s.files.filter((f) => f.kind === 'character').map((f) => f.name)
+  const patchSceneMeta = (patch: Partial<SceneMeta>) => {
+    if (!sceneNow || !outlinePath) return
+    const next = { ...sceneMetaAll, [sceneNow.heading]: { ...sceneMetaNow, ...patch } }
+    if (outlineDoc) void s.writeOther(outlinePath, writeFrontmatter(outlineDoc.content, { sceneMeta: next }))
+    else void s.createFile(outlinePath, writeFrontmatter(TEMPLATE.outline(name), { sceneMeta: next }), false)
+  }
+
   const locked = s.frontmatter['locked'] === true
   const name = s.path ? s.path.split('/').pop()!.replace(/\.md$/, '') : 'guion'
-  const TAB_LABEL = { ai: t('Script Assistant'), versions: t('Versiones'), export: t('Exportar') }
+  const TAB_LABEL = { scene: t('Escena'), ai: t('Script Assistant'), versions: t('Versiones'), export: t('Exportar') }
 
   return (
     <>
       <div className="tabs">
-        {(['ai', 'versions', 'export'] as const).map((tb) => (
+        {(['scene', 'ai', 'versions', 'export'] as const).map((tb) => (
           <button key={tb} className={tab === tb ? 'on' : 'ghost'} onClick={() => setTab(tb)}>{TAB_LABEL[tb]}</button>
         ))}
       </div>
+
+      {tab === 'scene' && (
+        <div className="block">
+          {sceneNow ? (
+            <>
+              <h2 className="ell">#{sceneNow.index + 1} {sceneNow.heading}</h2>
+              <p className="muted tiny">{sceneNow.wordCount} {t('palabras')} · {t('pág.')} {s.pagination.lineToPage[sceneNow.startLine] ?? 1} · {sceneNow.characters.join(', ') || '—'}</p>
+              <SceneSheet meta={sceneMetaNow} index={sceneNow.index} chars={[...new Set([...sceneNow.characters, ...vaultChars])]} onChange={patchSceneMeta} />
+            </>
+          ) : <p className="muted tiny">{t('Coloca el cursor en una escena para ver su ficha.')}</p>}
+        </div>
+      )}
 
       {tab === 'ai' && (
         <>

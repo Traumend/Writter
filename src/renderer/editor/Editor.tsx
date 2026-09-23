@@ -4,6 +4,7 @@ import { EditorView, keymap } from '@codemirror/view'
 import { useEffect, useMemo, useRef } from 'react'
 import { cycleBlock, lineType, smartEnter, type Block } from '../../core/editor/blocks'
 import { delims, entityNames, useStore } from '../store'
+import { scriptCompletion } from './complete'
 import { fountainExtension, landingField, setLanding, setNames } from './fountain'
 
 
@@ -69,6 +70,7 @@ export function Editor() {
         doc: s.text,
         extensions: [
           history(),
+          scriptCompletion(),
           scriptKeymap,
           keymap.of([...defaultKeymap, ...historyKeymap, { key: 'Mod-s', run: () => (void useStore.getState().save(), true) }]),
           EditorView.lineWrapping,

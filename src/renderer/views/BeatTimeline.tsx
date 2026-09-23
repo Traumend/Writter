@@ -4,13 +4,14 @@ import { readFrontmatter, writeFrontmatter } from '../../core/frontmatter'
 import { sceneMinutes } from '../../core/paginate'
 import { parseFountain } from '../../core/parser/fountain'
 import { project, type Scene } from '../../core/projection'
-import { PRESENCE, SCENE_FIELDS, readSceneMeta, type Presence, type SceneMeta } from '../../core/planning'
+import { readSceneMeta, type SceneMeta } from '../../core/planning'
 import { nextActRange, pack } from '../../core/timeline'
 import { toFcpxml } from '../../core/timeline/fcpxml'
 import { t } from '../i18n'
 import { useStore } from '../store'
 import { Icon, BlurInput } from '../ui'
 import { TEMPLATE, NoScripts } from './Desk'
+import { SceneSheet } from './SceneSheet'
 
 // Beat Timeline v2: línea de tiempo plana (temporada · episodio · actos · beats · escenas) con tarjetas de solo lectura,
 // empaquetado en subfilas cuando dos tarjetas comparten tiempo, inspector persistente para editar y muro de notas.
@@ -449,34 +450,7 @@ function Inspector({ sel, eps, active, save, setSel, versions, openScene, chars 
       <div className="bt-prog"><div style={{ width: `${Math.round((written / Math.max(1, ep.scenes.length)) * 100)}%` }} /></div>
       <div className="muted tiny">{s.characters.join(', ') || s.links.join(', ')} · {s.wordCount} {t('palabras')} · {(ep.mins[i] ?? 0).toFixed(1)} min</div>
       {/* Ficha de la escena (PRD §16): el texto vive en el guion; propósito, conflicto y resultado, en el outline. */}
-      {/* Industria (compatibilidad ScriptWriterX): número de escena, OMITIDA y presencia manual por entidad. */}
-      <div className="row tiny">
-        <label className="field"><span>{t('Número')}</span><BlurInput value={meta.numero ?? String(i + 1)} onCommit={(v) => setMeta({ numero: v.trim() || undefined })} /></label>
-        <label className="row tiny" title={t('La escena conserva su número pero no se rueda')}><input type="checkbox" checked={meta.omitida === true} onChange={(e) => setMeta({ omitida: e.target.checked || undefined })} />{t('Omitida')}</label>
-      </div>
-      <div className="field"><span>{t('Presencia')}</span>
-        <div className="chips">
-          {[...new Set([...s.characters, ...chars])].slice(0, 16).map((c) => {
-            const cur = meta.presencia?.[c]
-            const next = cur === 'habla' ? 'presente' : cur === 'presente' ? 'mencion' : cur === 'mencion' ? undefined : 'habla'
-            const label = PRESENCE.find(([k]) => k === cur)?.[1]
-            const toggle = () => {
-              const map: Record<string, Presence> = { ...(meta.presencia ?? {}) }
-              if (next) map[c] = next as Presence
-              else delete map[c]
-              setMeta({ presencia: Object.keys(map).length ? map : undefined })
-            }
-            return <button key={c} className={cur ? 'mini on' : 'mini ghost'} title={`${c}: ${label ? t(label) : t('sin marcar')}`} onClick={toggle}>
-              <span className="ell">{c}</span>{label ? ` · ${t(label)}` : ''}
-            </button>
-          })}
-        </div>
-      </div>
-      {SCENE_FIELDS.map(([k, label, hint]) => (
-        <label className="field" key={k}><span>{t(label)}</span>
-          <BlurInput textarea={k !== 'summary'} rows={2} value={String(meta[k] ?? '')} placeholder={t(hint)} onCommit={(v) => save(ep, { sceneMeta: { ...ep.sceneMeta, [s.heading]: { ...meta, [k]: v } } })} />
-        </label>
-      ))}
+      <SceneSheet meta={meta} index={i} chars={[...new Set([...s.characters, ...chars])]} onChange={setMeta} />
       <pre className="scenetext">{lines.join('\n')}</pre>
       <button onClick={() => openScene(ep, i)}>{t('Abrir en Escritorio')}</button>
     </aside>

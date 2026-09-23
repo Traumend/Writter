@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { readFrontmatter } from '../../../core/frontmatter'
-import { SCENE_STATUS, type SceneStatus } from '../../../core/planning'
+import { SCENE_STATUS, SCENE_STATUS_ES as STATUS_LABEL, type SceneStatus } from '../../../core/planning'
 import { t } from '../../i18n'
 import { useStore } from '../../store'
 import { BlurInput, Icon } from '../../ui'
@@ -13,7 +13,6 @@ type Cell = string | number | { v: string | number; node: ReactNode }
 type Row = { id: string; cells: Cell[]; open?: () => void }
 const val = (c: Cell): string | number => (typeof c === 'object' ? c.v : c)
 
-const STATUS_LABEL: Record<SceneStatus, string> = { idea: 'Idea', outline: 'Escaleta', planned: 'Planeada', draft: 'Borrador', revision: 'Necesita revisión', revised: 'Revisada', final: 'Final', cut: 'Cortada' }
 
 // Index: navegador tabular de toda la información del proyecto (una historia, muchas vistas),
 // con edición en línea de los campos simples de escena (PRD §71) y filtros (PRD §96).

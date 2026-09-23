@@ -17,6 +17,7 @@ export type Planning = { goal: number; dailyGoal: number; logline: string; synop
 
 export type SceneStatus = 'idea' | 'outline' | 'planned' | 'draft' | 'revision' | 'revised' | 'final' | 'cut'
 export const SCENE_STATUS: SceneStatus[] = ['idea', 'outline', 'planned', 'draft', 'revision', 'revised', 'final', 'cut']
+export const SCENE_STATUS_ES: Record<SceneStatus, string> = { idea: 'Idea', outline: 'Escaleta', planned: 'Planeada', draft: 'Borrador', revision: 'Necesita revisión', revised: 'Revisada', final: 'Final', cut: 'Cortada' }
 export const QUESTION_STATUS: QuestionStatus[] = ['open', 'developing', 'partial', 'answered', 'abandoned']
 // Campos narrativos de la escena (PRD §16): el texto sigue en el guion; esto es la ficha de planificación.
 // `numero`/`omitida`/`presencia` son la parte de industria (compatibilidad con ScriptWriterX): número de escena

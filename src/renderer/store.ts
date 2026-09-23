@@ -3,7 +3,7 @@ import { readFrontmatter } from '../core/frontmatter'
 import { paginate, type Pagination } from '../core/paginate'
 import { parseFountain } from '../core/parser/fountain'
 import { project, type Projection } from '../core/projection'
-import { moveScene as moveSceneText } from '../core/scenes'
+import { duplicateScene as duplicateSceneText, insertScene as insertSceneText, moveScene as moveSceneText } from '../core/scenes'
 import { guessesToRoleMap } from '../core/adopt'
 import { renameEntity } from '../core/rename'
 import { writeFrontmatter } from '../core/frontmatter'
@@ -130,6 +130,8 @@ type Actions = {
   createFile(path: string, content: string, open?: boolean): Promise<void>
   writeOther(path: string, content: string): Promise<void>
   deleteEntity(path: string): Promise<void>
+  duplicateEntity(path: string): Promise<void>
+  mergeEntity(fromPath: string, toPath: string): Promise<void>
   setScope(s: Scope): void
   runAi(instruction: string, allowLocked: boolean): Promise<void>
   acceptProposal(): Promise<void>
@@ -137,6 +139,8 @@ type Actions = {
   restoreVersion(id: string): Promise<void>
   snapshot(label: string): Promise<void>
   moveScene(from: number, to: number): void
+  duplicateScene(i: number): void
+  insertScene(i: number, where: 'before' | 'after' | 'end'): void
   addGroup(name: string): void
   deleteScenes(indexes: number[]): void
   restoreScene(i: number): void
@@ -442,6 +446,43 @@ export const useStore = create<State & Actions>((set, get) => ({
     await get().refreshDocs()
   },
 
+  // Duplicar ficha (ScriptWriterX §16): copia independiente con el nombre libre.
+  async duplicateEntity(path) {
+    const s = get()
+    const doc = s.docs.find((d) => d.path === path)
+    if (!doc) return
+    const dir = path.slice(0, path.lastIndexOf('/'))
+    const base = path.split('/').pop()!.replace(/\.md$/, '')
+    let name = `${base} (copia)`
+    for (let n = 2; s.files.some((f) => f.path === `${dir}/${name}.md`); n++) name = `${base} (copia ${n})`
+    await get().createFile(`${dir}/${name}.md`, writeFrontmatter(doc.content, { name }), false)
+    set({ status: `Ficha duplicada: ${name}` })
+  },
+
+  // Fusionar dos fichas: la origen aporta sus alias y sus menciones, y desaparece.
+  async mergeEntity(fromPath, toPath) {
+    const s = get()
+    const from = s.docs.find((d) => d.path === fromPath)
+    const to = s.docs.find((d) => d.path === toPath)
+    if (!from || !to || fromPath === toPath) return
+    const nameOf = (p: string) => p.split('/').pop()!.replace(/\.md$/, '')
+    const fromName = nameOf(fromPath)
+    const toName = nameOf(toPath)
+    const aliasesOf = (content: string) => { const a = readFrontmatter(content).data['aliases']; return Array.isArray(a) ? a.map(String) : [] }
+    const terms = [fromName, ...aliasesOf(from.content)]
+    const aliases = [...new Set([...aliasesOf(to.content), ...terms])].filter((a) => a.toLowerCase() !== toName.toLowerCase())
+    // Reescribe menciones en todo el vault menos en la ficha que se va a borrar.
+    const results = renameEntity(s.docs.filter((d) => d.path !== fromPath), terms, toName)
+    for (const r of results) if (r.path !== toPath) await window.api.fileWrite(r.path, r.content, undefined, 'user')
+    const target = results.find((r) => r.path === toPath)?.content ?? to.content
+    await window.api.fileWrite(toPath, writeFrontmatter(target, { aliases }), undefined, 'user')
+    await window.api.fileDelete(fromPath)
+    if (get().path === fromPath) set({ path: null, text: '', diskHash: null, dirty: false })
+    await get().refreshFiles()
+    await get().refreshDocs()
+    set({ status: `Fusionadas: ${fromName} -> ${toName}`, lastRenamed: { from: fromPath, to: toPath } })
+  },
+
   async refreshDocs() {
     if (get().vault) set({ docs: await window.api.vaultReadAll() })
   },
@@ -589,6 +630,18 @@ export const useStore = create<State & Actions>((set, get) => ({
     const s = get()
     const next = moveSceneText(s.text, s.projection.scenes, from, to)
     if (next !== s.text) get().setTextExternal(next)
+  },
+
+  // Duplicar e insertar escena (ScriptWriterX §11): operan sobre el texto vivo del guion abierto.
+  duplicateScene(i) {
+    const s = get()
+    const next = duplicateSceneText(s.text, s.projection.scenes, i)
+    if (next !== s.text) { get().setTextExternal(next); set({ status: 'Escena duplicada' }) }
+  },
+  insertScene(i, where) {
+    const s = get()
+    const next = insertSceneText(s.text, s.projection.scenes, i, where, `INT. ${'NUEVA ESCENA'} - DÍA`)
+    if (next !== s.text) { get().setTextExternal(next); set({ status: 'Escena insertada' }) }
   },
 
   // Inserta una sección Fountain (`# name`) antes de la escena bajo el cursor -> nuevo grupo (nativo del .md).

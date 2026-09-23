@@ -53,11 +53,12 @@ const LOC_FIELDS: [string, string][] = [
   ['secrets', 'Secretos del lugar']
 ]
 
-function Card({ c, groups, epOf, places = [], refs = 0 }: { c: EntityCard; groups: string[]; epOf: (s: string) => string; places?: string[]; refs?: number }) {
-  const { docs, writeOther, openFile, setTab, files, deleteEntity, openRename } = useStore()
+function Card({ c, groups, epOf, places = [], refs = 0, siblings = [] }: { c: EntityCard; groups: string[]; epOf: (s: string) => string; places?: string[]; refs?: number; siblings?: { path: string; name: string }[] }) {
+  const { docs, writeOther, openFile, setTab, files, deleteEntity, openRename, duplicateEntity, mergeEntity } = useStore()
   const img = useAsset(c.image)
   const [expand, setExpand] = useState(false)
   const [sheet, setSheet] = useState(false)
+  const [merging, setMerging] = useState(false)
   const doc = docs.find((d) => d.path === c.path)
   const data = doc ? readFrontmatter(doc.content).data : {}
   const patch = (p: Record<string, unknown>) => doc && void writeOther(c.path, writeFrontmatter(doc.content, p))
@@ -97,7 +98,7 @@ function Card({ c, groups, epOf, places = [], refs = 0 }: { c: EntityCard; group
           <div className="tiny muted ell">{c.kind}{data['parent'] ? ` · ${t('en')} ${String(data['parent'])}` : ''}</div>
           <strong className="link" onClick={() => { void openFile(c.path); setTab('desk') }}>{c.name}</strong>
         </div>
-        <Menu items={[{ label: t('Abrir .md'), run: () => { void openFile(c.path); setTab('desk') } }, { label: t('Renombrar…'), run: () => openRename(c.path, c.name, [c.name, ...c.aliases]) }, { label: t('Sides (PDF)…'), run: sides, disabled: !c.appearances.length }, 'sep', { label: t('Eliminar'), run: del, danger: true }]} />
+        <Menu items={[{ label: t('Abrir .md'), run: () => { void openFile(c.path); setTab('desk') } }, { label: t('Renombrar…'), run: () => openRename(c.path, c.name, [c.name, ...c.aliases]) }, { label: t('Sides (PDF)…'), run: sides, disabled: !c.appearances.length }, { label: t('Duplicar ficha'), run: () => void duplicateEntity(c.path) }, { label: t('Fusionar con…'), run: () => setMerging(true), disabled: !siblings.length }, 'sep', { label: t('Eliminar'), run: del, danger: true }]} />
       </div>
       {c.kind === 'character' && (
         <div className="row">
@@ -106,6 +107,22 @@ function Card({ c, groups, epOf, places = [], refs = 0 }: { c: EntityCard; group
             <option value="none">{t('Sin grupo')}</option>
             {groups.map((g) => <option key={g} value={g}>{groupLabel(g)}</option>)}
           </select>
+        </div>
+      )}
+      {merging && (
+        <div className="row tiny" onClick={(e) => e.stopPropagation()}>
+          <span className="muted">{t('Fusionar en')}</span>
+          <select defaultValue="" onChange={(e) => {
+            const to = e.target.value
+            if (!to) return
+            const name = siblings.find((x) => x.path === to)?.name ?? ''
+            if (window.confirm(`${t('Se fusionará')} "${c.name}" ${t('en')} "${name}": ${t('sus alias y menciones pasan a la otra ficha y esta se elimina (recuperable en Versiones). ¿Continuar?')}`)) void mergeEntity(c.path, to)
+            setMerging(false)
+          }}>
+            <option value="">{t('— ficha destino —')}</option>
+            {siblings.map((x) => <option key={x.path} value={x.path}>{x.name}</option>)}
+          </select>
+          <button className="mini ghost" onClick={() => setMerging(false)}>{t('Cancelar')}</button>
         </div>
       )}
       <BlurInput textarea rows={2} value={c.description} placeholder={t('Descripción')} onCommit={(v) => patch({ description: v })} />
@@ -305,7 +322,7 @@ export function Breakdown() {
           <Menu items={[{ label: t('Exportar Excel'), run: toXls }, { label: t('Exportar CSV'), run: () => void window.api.exportText(toCsv(cards), 'breakdown.csv') }, 'sep', { label: t('Eliminar todo'), run: () => void deleteAll(), danger: true, disabled: !list.length }]} />
         </div>
         <div className={listView ? 'bd-list' : 'cards'}>
-          {list.map(({ c, depth }) => <div key={c.path} style={depth ? { marginLeft: depth * 18 } : undefined}><Card c={c} groups={allGroups} epOf={epOf} places={places} refs={refsOf(c)} /></div>)}
+          {list.map(({ c, depth }) => <div key={c.path} style={depth ? { marginLeft: depth * 18 } : undefined}><Card c={c} groups={allGroups} epOf={epOf} places={places} refs={refsOf(c)} siblings={ofKind.filter((x) => x.path !== c.path).map((x) => ({ path: x.path, name: x.name }))} /></div>)}
           {list.length === 0 && <p className="muted">{t('Sin fichas. Usa "Extraer del guión" o crea una.')}</p>}
         </div>
       </section>
