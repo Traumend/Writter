@@ -12,6 +12,7 @@ import { DEFAULT_SECTIONS, useStore } from '../store'
 import { Icon, useAsset } from '../ui'
 import { SceneSheet } from './SceneSheet'
 import { Revisions, changedOnly, useRevisionMarks } from './Revisions'
+import { PdfView } from './PdfView'
 
 const KIND_LABEL: Record<FileKind, string> = { script: 'Episodios', character: 'Personajes', location: 'Locaciones', prop: 'Props', outline: 'Escaleta', knowledge: 'Conocimiento', other: 'Otros' }
 export const TEMPLATE: Record<Exclude<FileKind, 'other'>, (name: string, extra?: Record<string, unknown>) => string> = {
@@ -294,7 +295,7 @@ const toB64 = (u8: Uint8Array) => {
 
 const SCOPES: [Scope, string][] = [['cursor', 'Cursor'], ['node', 'Nodo'], ['scene', 'Escena'], ['range', 'Rango'], ['outline', 'Escaleta'], ['full', 'Guión completo']]
 
-function ScopeBar() {
+function ScopeBar({ pdfView, setPdfView }: { pdfView: boolean; setPdfView: (v: boolean) => void }) {
   const { scope, setScope, selection, text, cursorLine, projection, showTags, toggleTags, prefs, setPref, setTab, setDevTab } = useStore()
   const lines = text.split('\n')
   const scene = projection.scenes.find((s) => cursorLine >= s.startLine && cursorLine < s.endLine)
@@ -310,6 +311,7 @@ function ScopeBar() {
       <span className="grow" />
       <button className={prefs.focus ? 'on mini' : 'mini ghost'} onClick={() => setPref('focus', !prefs.focus)} title={t('Modo enfoque: atenúa lo demás')}>{t('Enfoque')}</button>
       <button className={prefs.page ? 'on mini' : 'mini ghost'} onClick={() => setPref('page', !prefs.page)} title={t('Modo página: aspecto de hoja de guion')}>{t('Página')}</button>
+      <button className={pdfView ? 'on mini' : 'mini ghost'} onClick={() => setPdfView(!pdfView)} title={t('Vista PDF: el guion tal y como se imprimirá, con sus quiebres de página')}>{t('Vista PDF')}</button>
       <button className={showTags ? 'on mini' : 'mini ghost'} onClick={toggleTags} title={t('Etiquetas de elemento')}>ABC</button>
       <span className="sep" />
       <button className="mini ghost" onClick={() => { setTab('dev'); setDevTab('beats') }} title="Beat Timeline">Beats</button>
@@ -467,6 +469,7 @@ const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v))
 export function Desk() {
   const s = useStore()
   const { prefs, setPref } = s
+  const [pdfView, setPdfView] = useState(false)
   const mainRef = useRef<HTMLElement>(null)
   // Ventana estrecha: el panel derecho cede primero y se pliega si queda por debajo de 240px; luego cede el izquierdo.
   // El editor conserva 360px.
@@ -522,8 +525,8 @@ export function Desk() {
         )}
         {s.path ? (
           <>
-            <ScopeBar />
-            <Editor />
+            <ScopeBar pdfView={pdfView} setPdfView={setPdfView} />
+            {pdfView ? <PdfView /> : <Editor />}
           </>
         ) : (
           <p className="muted center">{t('Selecciona o crea un archivo. Ctrl+clic en un [[enlace]] abre la ficha.')}</p>

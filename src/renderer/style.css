@@ -289,6 +289,19 @@ main.page.bt { min-height: 0; gap: 8px; }
 .table.planner .cell { cursor: pointer; }
 .pip { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%; color: #0c0c0c; }
 .bt-tension svg { display: block; overflow: visible; }
+/* visor paginado (Vista PDF) */
+.pdfview { display: flex; flex-direction: column; min-height: 0; flex: 1; gap: 8px; }
+.pdfpages { flex: 1; min-height: 0; padding: 8px 0 40px; display: flex; flex-direction: column; align-items: center; gap: 22px; }
+.pdfpage { position: relative; width: 640px; max-width: 100%; min-height: 860px; background: #f7f6f3; color: #16181c; box-shadow: 0 8px 40px rgba(0,0,0,.45); border-radius: 2px; padding: 56px 64px 56px 88px; font-family: 'Courier Prime', 'Courier New', Courier, monospace; font-size: 13px; line-height: 1.32; cursor: default; }
+.pdfpage .pv-num { position: absolute; top: 24px; right: 40px; color: #6b6b6b; font-size: 12px; }
+.pv-heading { font-weight: 700; text-transform: uppercase; margin: 14px 0 6px; }
+.pv-action { margin: 0 0 6px; }
+.pv-character { text-transform: uppercase; margin: 10px 0 0 200px; }
+.pv-dialogue { margin: 0 120px 0 120px; }
+.pv-paren { margin: 0 140px 0 160px; }
+.pv-transition { text-align: right; text-transform: uppercase; margin: 10px 0; }
+.pv-section { font-weight: 700; color: #7a4b1a; margin: 16px 0 8px; }
+.pv-blank { height: 10px; }
 /* revisiones: marca de escena cambiada y escena omitida */
 .revdot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
 .scenes .omitida { text-decoration: line-through; opacity: .65; }

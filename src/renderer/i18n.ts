@@ -702,6 +702,13 @@ export const EN: Record<string, string> = {
   Payoffs: 'Payoffs',
   Sinopsis: 'Synopsis',
   etiquetas: 'tags',
+  // Visor paginado
+  'Doble clic: llevar el cursor a esta página': 'Double-click: move the cursor to this page',
+  'Página anterior': 'Previous page',
+  'Página siguiente': 'Next page',
+  'Vista PDF': 'PDF view',
+  'Vista PDF: el guion tal y como se imprimirá, con sus quiebres de página': 'PDF view: the script as it will print, with its real page breaks',
+  de: 'of',
   // Revisiones por colores
   'Abre un guion para emitir revisiones.': 'Open a script to issue revisions.',
   'Emite solo las escenas modificadas o nuevas desde la revisión activa': 'Issues only the scenes changed or added since the active revision',
