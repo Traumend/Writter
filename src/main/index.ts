@@ -3,6 +3,7 @@ import { buildMenu, type MenuSetup } from './menu'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, extname, join, resolve } from 'node:path'
 import { backupName, createBackup, readBackup, restoreBackup, rotate, scheduleAuto } from './backup'
+import { pdfToScript } from './pdfimport'
 import { readSwx } from './swx'
 import { fdxToMd, fountainToMd } from '../core/convert'
 import type { AdoptRole, AiRequest, Analysis, FileEntry, OpenResult, ProjectConfig, VaultChange, Version } from '../core/types/ipc'
@@ -214,12 +215,15 @@ ipcMain.handle('import.swx', async (): Promise<{ name: string; json: string; med
 })
 
 ipcMain.handle('import.script', async (): Promise<FileEntry | null> => {
-  const r = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: 'Guión', extensions: ['fountain', 'fdx', 'txt'] }] })
+  const r = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: 'Guión', extensions: ['fountain', 'fdx', 'txt', 'pdf'] }] })
   const src = r.filePaths[0]
   if (!src) return null
   const name = basename(src, extname(src))
-  const raw = readFileSync(src, 'utf8')
-  const md = extname(src).toLowerCase() === '.fdx' ? fdxToMd(raw, name) : fountainToMd(raw, name)
+  const ext = extname(src).toLowerCase()
+  // PDF: texto con geometría (sin OCR); el resto se lee como texto plano.
+  const md = ext === '.pdf'
+    ? fountainToMd((await pdfToScript(src)).text, name)
+    : ext === '.fdx' ? fdxToMd(readFileSync(src, 'utf8'), name) : fountainToMd(readFileSync(src, 'utf8'), name)
   const rel = `scripts/${name}.md`
   V.createFile(rel, md)
   markStale()

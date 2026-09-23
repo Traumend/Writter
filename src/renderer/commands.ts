@@ -22,7 +22,7 @@ export const COMMANDS: Record<string, Command> = {
   'file.quickNote': { label: 'Nueva nota rápida…', shortcut: 'Ctrl+Shift+N', run: () => S().setQuickNoteOpen(true) },
   'file.openVault': { label: 'Abrir vault…', shortcut: 'Ctrl+O', free: true, run: () => void S().openVault() },
   'file.link': { label: 'Vincular carpetas…', run: () => S().openLinker() },
-  'file.importScript': { label: 'Importar .fountain / .fdx…', run: () => void window.api.importScript().then((f) => f && S().refreshFiles().then(() => { void S().openFile(f.path); S().setTab('desk') })) },
+  'file.importScript': { label: 'Importar guion (.fountain, .fdx, .txt, .pdf)…', run: () => void window.api.importScript().then((f) => f && S().refreshFiles().then(() => { void S().openFile(f.path); S().setTab('desk') })) },
   'file.importJson': { label: 'Importar proyecto (JSON)…', run: () => void importProjectJson() },
   'file.importSwx': { label: 'Importar proyecto de ScriptWriterX (.swx)…', run: () => void importSwxProject() },
   'file.exportCurrent': { label: 'Exportar episodio actual…', run: () => { S().setTab('desk'); S().setDeskPanel('export') } },
