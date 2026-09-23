@@ -27,6 +27,8 @@ const api: Api = {
   },
   keysSet: (provider, key) => ipcRenderer.invoke('keys.set', provider, key),
   keysStatus: (provider) => ipcRenderer.invoke('keys.status', provider),
+  keysClear: () => ipcRenderer.invoke('keys.clear'),
+  appVersion: () => ipcRenderer.invoke('app.version'),
   versionList: (path) => ipcRenderer.invoke('version.list', path),
   versionRead: (path, id) => ipcRenderer.invoke('version.read', path, id),
   versionSnapshot: (path, label) => ipcRenderer.invoke('version.snapshot', path, label),
@@ -53,6 +55,9 @@ const api: Api = {
   aiCancel: () => ipcRenderer.send('ai.cancel'),
   aiTest: () => ipcRenderer.invoke('ai.test'),
   aiBreakdown: (text, known) => ipcRenderer.invoke('ai.breakdown', text, known),
+  backupNow: () => ipcRenderer.invoke('backup.now'),
+  backupPickFolder: () => ipcRenderer.invoke('backup.pickFolder'),
+  backupRestore: () => ipcRenderer.invoke('backup.restore'),
   onAiProgress: (fn) => ipcRenderer.on('ai.progress', (_e, p) => fn(p as { chars: number; done?: boolean }))
 }
 

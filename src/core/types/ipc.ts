@@ -19,6 +19,7 @@ export type ProjectConfig = {
   }
   roles: Record<AdoptRole, string[]> // carpetas por rol (adopción, Pieza 1); Writter lee desde aquí
   characterSliders: { id: string; label: string; lo: string; hi: string; color: string }[] // sliders personalizados del proyecto
+  backups: { folder: string; everyMinutes: number; keep: number; lastTs: number } // respaldo automático a carpeta
 }
 
 export type FileKind = 'script' | 'character' | 'location' | 'prop' | 'outline' | 'knowledge' | 'other'
@@ -78,6 +79,8 @@ export type AiTest = { ok: boolean; model?: string; ms?: number; error?: string 
 // Desglose con IA (propuestas: nada se escribe sin aceptación explícita, I2).
 export type BreakdownItem = { kind: 'character' | 'location' | 'prop'; name: string; aliases: string[]; description: string; group?: string; exists: boolean }
 export type BreakdownProposal = { items: BreakdownItem[]; model: string; tokensIn: number; tokensOut: number }
+export type BackupInfo = { file: string; bytes: number; files: number; ts: number }
+export type RestoreSummary = { files: number; names: string[] }
 
 export type GraphStatus = { available: boolean; reason?: string; nodes?: number; edges?: number; stale?: boolean }
 export type GraphNode = { id: string; kind: FileKind | 'scene'; label: string }
@@ -130,6 +133,11 @@ export type Api = {
   aiCancel(): void
   aiTest(): Promise<AiTest>
   aiBreakdown(text: string, known: string[]): Promise<BreakdownProposal>
+  backupNow(): Promise<BackupInfo | null>
+  backupPickFolder(): Promise<string | null>
+  backupRestore(): Promise<RestoreSummary | null>
+  keysClear(): Promise<number>
+  appVersion(): Promise<string>
   onAiProgress(fn: (p: { chars: number; done?: boolean }) => void): void
   usageReset(): Promise<void>
 }
@@ -163,7 +171,8 @@ export const DEFAULT_CONFIG: ProjectConfig = {
     knowledge: ['knowledge'],
     assets: ['assets']
   },
-  characterSliders: []
+  characterSliders: [],
+  backups: { folder: '', everyMinutes: 0, keep: 5, lastTs: 0 }
 }
 
 export const KIND_DIR: Record<Exclude<FileKind, 'other'>, string> = {

@@ -2,12 +2,13 @@ import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron'
 import { buildMenu, type MenuSetup } from './menu'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, extname, join, resolve } from 'node:path'
+import { backupName, createBackup, readBackup, restoreBackup, rotate, scheduleAuto } from './backup'
 import { readSwx } from './swx'
 import { fdxToMd, fountainToMd } from '../core/convert'
 import type { AdoptRole, AiRequest, Analysis, FileEntry, OpenResult, ProjectConfig, VaultChange, Version } from '../core/types/ipc'
 import { aiText, analyze, breakdownAi, cancelAi, devDoc, doctorAi, runAi, setAiProgress, testAi } from './ai'
 import { getGraph, graphBuild, graphStatus, markStale } from './graph'
-import { keyStatus, setKey } from './keys'
+import { clearKeys, keyStatus, setKey } from './keys'
 import * as V from './vault'
 
 let win: BrowserWindow | null = null
@@ -25,25 +26,28 @@ const notify = (e: VaultChange) => {
 // Menú nativo: el renderer manda idioma, recientes y estado de los conmutadores; se reconstruye entero (barato).
 ipcMain.on('menu.setup', (_e, setup: MenuSetup) => { if (alive()) buildMenu(win!, setup) })
 
+// Abre el vault y rearma el respaldo automático con los ajustes de ese proyecto.
+const opened = (dir: string): OpenResult => { const summary = V.openVault(dir, notify); armBackups(); return { kind: 'opened', summary } }
+
 ipcMain.handle('vault.open', async (): Promise<OpenResult> => {
   const r = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] })
   const dir = r.filePaths[0]
   if (!dir) return null
   markStale()
-  if (V.hasProject(dir)) return { kind: 'opened', summary: V.openVault(dir, notify) }
+  if (V.hasProject(dir)) return opened(dir)
   const folders = V.scanFolder(dir)
   // Carpeta con contenido y sin proyecto -> proponer adopción; vacía -> crear layout por defecto directo.
   if (folders.length > 0) return { kind: 'adopt', root: dir, folders }
-  return { kind: 'opened', summary: V.openVault(dir, notify) }
+  return opened(dir)
 })
 // Abre un vault por ruta (Recientes) con la misma lógica que el diálogo.
 ipcMain.handle('vault.openPath', (_e, dir: string): OpenResult => {
   if (!existsSync(dir)) return null
   markStale()
-  if (V.hasProject(dir)) return { kind: 'opened', summary: V.openVault(dir, notify) }
+  if (V.hasProject(dir)) return opened(dir)
   const folders = V.scanFolder(dir)
   if (folders.length > 0) return { kind: 'adopt', root: dir, folders }
-  return { kind: 'opened', summary: V.openVault(dir, notify) }
+  return opened(dir)
 })
 // Elige y lee un archivo de texto (import JSON del proyecto).
 ipcMain.handle('pick.text', async (_e, exts: string[]): Promise<string | null> => {
@@ -64,7 +68,24 @@ ipcMain.handle('folder.pick', async (_e, root: string) => {
 })
 ipcMain.handle('vault.list', () => V.listFiles())
 ipcMain.handle('vault.readAll', () => V.readAll())
-ipcMain.handle('config.write', (_e, c: ProjectConfig) => V.writeConfig(c))
+ipcMain.handle('config.write', (_e, c: ProjectConfig) => { const out = V.writeConfig(c); armBackups(); return out })
+
+// Respaldo automático: se rearma al abrir vault y al guardar ajustes; nunca interrumpe el trabajo.
+function armBackups() {
+  scheduleAuto(
+    () => {
+      let root: string | null = null
+      try { root = V.vaultRoot() } catch { root = null }
+      const c = root ? V.readConfig() : null
+      return { root, folder: c?.backups.folder, everyMinutes: c?.backups.everyMinutes ?? 0, keep: c?.backups.keep ?? 5 }
+    },
+    (info) => {
+      const c = V.readConfig()
+      V.writeConfig({ ...c, backups: { ...c.backups, lastTs: info.ts } })
+      send('backup.done', info)
+    }
+  )
+}
 ipcMain.handle('file.read', (_e, rel: string) => V.readFile(rel))
 ipcMain.handle('file.write', (_e, rel: string, content: string, expectedHash?: string, origin?: Version['origin']) => {
   const r = V.writeFile(rel, content, expectedHash, origin)
@@ -78,6 +99,8 @@ ipcMain.handle('file.create', (_e, rel: string, content: string) => {
 })
 ipcMain.handle('keys.set', (_e, provider: string, key: string) => setKey(provider, key))
 ipcMain.handle('keys.status', (_e, provider: string) => keyStatus(provider))
+ipcMain.handle('keys.clear', () => clearKeys())
+ipcMain.handle('app.version', () => app.getVersion())
 ipcMain.handle('version.list', (_e, rel: string) => V.listVersions(rel))
 ipcMain.handle('version.read', (_e, rel: string, id: string) => V.readVersion(rel, id))
 ipcMain.handle('version.snapshot', (_e, rel: string, label: string) => V.snapshot(rel, label))
@@ -147,6 +170,37 @@ ipcMain.handle('export.bytes', async (_e, base64: string, suggested: string) => 
 ipcMain.on('ai.cancel', () => cancelAi())
 ipcMain.handle('ai.test', () => testAi(V.readConfig()))
 ipcMain.handle('ai.breakdown', (_e, text: string, known: string[]) => breakdownAi(text, known, V.readConfig()))
+// Respaldos (ScriptWriterX §51-53): copia completa del vault, manual o periódica, y restauración con aviso.
+ipcMain.handle('backup.now', async () => {
+  const root = V.vaultRoot()
+  const r = await dialog.showSaveDialog({ defaultPath: backupName(root), filters: [{ name: 'Respaldo', extensions: ['zip'] }] })
+  if (!r.filePath) return null
+  const info = createBackup(root, r.filePath)
+  const cfg = V.readConfig()
+  V.writeConfig({ ...cfg, backups: { ...cfg.backups, lastTs: info.ts } })
+  return info
+})
+ipcMain.handle('backup.pickFolder', async () => {
+  const r = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] })
+  return r.filePaths[0] ?? null
+})
+ipcMain.handle('backup.restore', async () => {
+  const r = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: 'Respaldo', extensions: ['zip'] }] })
+  const src = r.filePaths[0]
+  if (!src) return null
+  const preview = readBackup(src)
+  const answer = await dialog.showMessageBox({
+    type: 'warning', buttons: ['Cancelar', 'Restaurar'], defaultId: 0, cancelId: 0,
+    message: `Restaurar ${preview.files} archivo(s) sobre el vault abierto`,
+    detail: `Los archivos del respaldo sobrescriben los actuales (los .md quedan versionados). No se borra nada que no venga en el respaldo.
+
+${preview.names.slice(0, 8).join('\n')}`
+  })
+  if (answer.response !== 1) return null
+  const out = restoreBackup(V.vaultRoot(), src)
+  markStale()
+  return out
+})
 ipcMain.handle('usage.get', () => V.usageStats())
 ipcMain.handle('usage.reset', () => V.usageReset())
 // Importar un proyecto de ScriptWriterX: devuelve el project.json crudo; el renderer lo traduce con core/swx.

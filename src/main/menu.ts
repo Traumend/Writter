@@ -33,6 +33,7 @@ export function buildMenu(win: BrowserWindow, setup: MenuSetup): void {
         sep,
         { label: L('Importar', 'Import'), submenu: [cmd('file.importScript', 'Guion .fountain / .fdx…', 'Script .fountain / .fdx…'), cmd('file.importJson', 'Proyecto (JSON)…', 'Project (JSON)…'), cmd('file.importSwx', 'Proyecto de ScriptWriterX (.swx)…', 'ScriptWriterX project (.swx)…')] },
         { label: L('Exportar', 'Export'), submenu: [cmd('file.exportCurrent', 'Episodio actual (PDF, DOCX, FDX, Fountain, TXT)…', 'Current episode (PDF, DOCX, FDX, Fountain, TXT)…'), cmd('file.exportJson', 'Proyecto (JSON)…', 'Project (JSON)…'), cmd('file.exportSwx', 'Proyecto a ScriptWriterX (.swx)…', 'Project to ScriptWriterX (.swx)…')] },
+        { label: L('Respaldo', 'Backup'), submenu: [cmd('file.backupNow', 'Copia de seguridad ahora…', 'Back up now…'), cmd('file.backupRestore', 'Restaurar desde respaldo…', 'Restore from backup…')] },
         sep,
         cmd('file.projectSettings', 'Ajustes del proyecto', 'Project settings'),
         cmd('file.prefs', 'Preferencias…', 'Preferences…', 'CmdOrCtrl+,'),

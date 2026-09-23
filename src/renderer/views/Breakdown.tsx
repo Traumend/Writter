@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { breakdown, extractMissing, toCsv, type Appearance, type EntityCard } from '../../core/breakdown'
+import { ELEMENT_CATEGORIES, breakdown, categoryColor, extractMissing, toCsv, type Appearance, type EntityCard } from '../../core/breakdown'
 import { readFrontmatter, writeFrontmatter } from '../../core/frontmatter'
 import { extractLinks, parseFountain } from '../../core/parser/fountain'
 import { project } from '../../core/projection'
@@ -59,6 +59,7 @@ function Card({ c, groups, epOf, places = [], refs = 0, siblings = [] }: { c: En
   const [expand, setExpand] = useState(false)
   const [sheet, setSheet] = useState(false)
   const [merging, setMerging] = useState(false)
+  const [cont, setCont] = useState(false)
   const doc = docs.find((d) => d.path === c.path)
   const data = doc ? readFrontmatter(doc.content).data : {}
   const patch = (p: Record<string, unknown>) => doc && void writeOther(c.path, writeFrontmatter(doc.content, p))
@@ -125,6 +126,15 @@ function Card({ c, groups, epOf, places = [], refs = 0, siblings = [] }: { c: En
           <button className="mini ghost" onClick={() => setMerging(false)}>{t('Cancelar')}</button>
         </div>
       )}
+      {c.kind !== 'character' && (
+        <div className="row tiny">
+          <span className="cdot" style={{ background: categoryColor(c.category) }} />
+          <select value={c.category} onChange={(e) => patch({ category: e.target.value })} title={t('Categoría de desglose')}>
+            <option value="">{t('Sin categoría')}</option>
+            {ELEMENT_CATEGORIES.map(([id, label]) => <option key={id} value={id}>{t(label)}</option>)}
+          </select>
+        </div>
+      )}
       <BlurInput textarea rows={2} value={c.description} placeholder={t('Descripción')} onCommit={(v) => patch({ description: v })} />
       <BlurInput value={c.aliases.join(', ')} placeholder={t('Alias separados por comas')} onCommit={(v) => patch({ aliases: v.split(',').map((x) => x.trim()).filter(Boolean) })} />
       {c.kind === 'location' && (
@@ -139,6 +149,25 @@ function Card({ c, groups, epOf, places = [], refs = 0, siblings = [] }: { c: En
             <button className="mini ghost" onClick={() => setSheet((s) => !s)}>{t('Ficha de lugar')}</button>
           </div>
           {sheet && LOC_FIELDS.map(([k, ph]) => <BlurInput key={k} value={String(data[k] ?? '')} placeholder={t(ph)} onCommit={(v) => patch({ [k]: v })} />)}
+        </>
+      )}
+      {c.kind === 'prop' && c.appearances.length > 0 && (
+        <>
+          <button className="mini ghost" onClick={() => setCont((v) => !v)} title={t('Estado del objeto escena a escena (continuidad)')}>{t('Continuidad')}</button>
+          {cont && (
+            <div className="cont">
+              {c.appearances.map((a, i) => {
+                const key = `${a.script.split('/').pop()!.replace(/\.md$/, '')}#${a.scene + 1}`
+                const map = (data['continuity'] as Record<string, string> | undefined) ?? {}
+                return (
+                  <div className="row tiny" key={i}>
+                    <span className="muted" style={{ minWidth: 76 }}>{key}</span>
+                    <BlurInput value={map[key] ?? ''} placeholder={t('Estado tras esta escena (intacto, roto…)')} onCommit={(v) => patch({ continuity: { ...map, [key]: v } })} />
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </>
       )}
       <div className="tiny muted">{c.appearances.length} {t('escenas')} · {episodes} {t('episodios')}{c.kind === 'character' ? ` · ${c.words} ${t('palabras')}` : ''}</div>
@@ -170,6 +199,7 @@ export function Breakdown() {
   const [episode, setEpisode] = useState('')
   const [sortBy, setSortBy] = useState('added')
   const [listView, setListView] = useState(false)
+  const [catFilter, setCatFilter] = useState('')
   const [over, setOver] = useState<string | null>(null)
   const [status, setStatus] = useState('')
   // Desglose con IA (ScriptWriterX §22): propuestas que el usuario aprueba una a una; nada se escribe antes.
@@ -223,6 +253,7 @@ export function Breakdown() {
     let l = ofKind.filter((c) =>
       (group === 'all' || (group === 'none' ? !c.group || c.group === 'none' : c.group === group)) &&
       (!orphansOnly || c.appearances.length === 0) &&
+      (!catFilter || c.category === catFilter) &&
       inScope(c) &&
       (!q || c.name.toLowerCase().includes(q.toLowerCase())))
     if (sortBy === 'az') l = [...l].sort((a, b) => a.name.localeCompare(b.name))
@@ -230,7 +261,7 @@ export function Breakdown() {
     else if (sortBy === 'group') l = [...l].sort((a, b) => a.group.localeCompare(b.group))
     else if (sortBy === 'tree' && kind === 'location') return tree(l)
     return l.map((c) => ({ c, depth: 0 }))
-  }, [ofKind, group, orphansOnly, season, episode, q, sortBy, kind, docs])
+  }, [ofKind, group, orphansOnly, season, episode, q, sortBy, kind, docs, catFilter])
 
   const runAiBreakdown = async () => {
     setAiBusy(true); setAiErr('')
@@ -331,6 +362,12 @@ export function Breakdown() {
             <button key={k} className={kind === k ? 'on' : 'ghost'} onClick={() => { setKind(k); setGroup('all') }}>{t({ character: 'Personajes', location: 'Locaciones', prop: 'Ítems' }[k as 'character'])} ({cards.filter((c) => c.kind === k).length})</button>
           ))}
           <span className="sep" />
+          {kind !== 'character' && (
+            <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} title={t('Categoría de desglose')}>
+              <option value="">{t('Todas las categorías')}</option>
+              {ELEMENT_CATEGORIES.map(([id, label]) => <option key={id} value={id}>{t(label)} ({ofKind.filter((x) => x.category === id).length})</option>)}
+            </select>
+          )}
           <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} title={t('Orden')}>
             <option value="added">{t('Orden de adición')}</option>
             <option value="az">A-Z</option>

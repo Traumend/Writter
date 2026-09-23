@@ -75,7 +75,7 @@ test('breakdown: apariciones, alias, locaciones, csv, extracción', () => {
   expect(summer.words).toBe(1)
   expect(cards.find((c) => c.name === 'Titanic 2')!.appearances.map((a) => a.scene)).toEqual([1])
   expect(cards.find((c) => c.name === 'Rick')!.appearances.length).toBe(1)
-  expect(toCsv(cards)).toContain('"character","Summer","protagonist"')
+  expect(toCsv(cards)).toContain('"character","Summer","","protagonist"') // categoría vacía entre nombre y grupo
   const miss = extractMissing(files, docs)
   expect(miss.characters).toEqual(['JERRY'])
   expect(miss.locations).toEqual(['COCINA', 'GARAJE'])

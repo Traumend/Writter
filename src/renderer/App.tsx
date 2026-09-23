@@ -259,6 +259,11 @@ export function App() {
       <QuickNote />
       <NewEntity />
       <Shortcuts />
+      {s.toasts.length > 0 && (
+        <div className="toasts">
+          {s.toasts.map((x) => <div key={x.id} className={`toast ${x.kind}`}>{x.text}</div>)}
+        </div>
+      )}
       <footer>
         <span>{s.status ? t(s.status) : '—'}</span>
         <span className="grow" />

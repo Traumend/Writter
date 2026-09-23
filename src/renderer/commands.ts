@@ -28,6 +28,8 @@ export const COMMANDS: Record<string, Command> = {
   'file.exportCurrent': { label: 'Exportar episodio actual…', run: () => { S().setTab('desk'); S().setDeskPanel('export') } },
   'file.exportJson': { label: 'Exportar proyecto (JSON)…', run: () => void exportProjectJson() },
   'file.exportSwx': { label: 'Exportar a ScriptWriterX (.swx)…', run: () => void exportSwxProject() },
+  'file.backupNow': { label: 'Copia de seguridad ahora…', run: () => void window.api.backupNow().then((i) => i && S().toast(`Respaldo creado: ${i.files} archivos`)) },
+  'file.backupRestore': { label: 'Restaurar desde respaldo…', run: () => void window.api.backupRestore().then((r) => r && useStore.getState().refreshFiles().then(() => useStore.getState().refreshDocs()).then(() => S().toast(`${r.files} archivo(s) restaurados`))) },
   'file.projectSettings': { label: 'Ajustes del proyecto', run: () => S().setTab('settings') },
   'file.prefs': { label: 'Preferencias…', shortcut: 'Ctrl+,', free: true, run: () => S().openPrefs() },
 

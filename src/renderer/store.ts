@@ -107,6 +107,7 @@ type State = {
   recents: string[] // vaults recientes (localStorage)
   pomo: { mode: 'focus' | 'short' | 'long'; left: number; running: boolean; done: number } // Pomodoro (segundos restantes)
   stats: WriteLog // palabras por día del proyecto abierto (localStorage, sin contenido)
+  toasts: { id: number; text: string; kind: 'ok' | 'err' }[] // avisos efímeros (ScriptWriterX §83)
 }
 
 type Actions = {
@@ -165,6 +166,7 @@ type Actions = {
   setDeskPanel(p: 'ai' | 'versions' | 'export' | null): void
   cycleTab(dir: 1 | -1): void
   recordStats(): void
+  toast(text: string, kind?: 'ok' | 'err'): void
   pomoToggle(): void
   pomoReset(mode?: 'focus' | 'short' | 'long'): void
   pomoSkip(): void
@@ -268,6 +270,7 @@ export const useStore = create<State & Actions>((set, get) => ({
   recents: loadRecents(),
   pomo: { mode: 'focus', left: 25 * 60, running: false, done: 0 },
   stats: {},
+  toasts: [],
   rename: null,
   lastRenamed: null,
 
@@ -370,6 +373,13 @@ export const useStore = create<State & Actions>((set, get) => ({
   setTab: (tab) => { saveWorkspace(get().vault?.root, { tab }); set({ tab }) },
   setDevTab: (devTab) => { saveWorkspace(get().vault?.root, { devTab }); set({ devTab }) },
   setPlanTab: (planTab) => { saveWorkspace(get().vault?.root, { planTab }); set({ planTab }) },
+
+  // Aviso efímero: lo importante sigue en la barra de estado; esto solo llama la atención un momento.
+  toast(text, kind = 'ok') {
+    const id = Date.now() + Math.random()
+    set({ toasts: [...get().toasts, { id, text, kind }] })
+    setTimeout(() => set({ toasts: get().toasts.filter((x) => x.id !== id) }), 4000)
+  },
 
   // Anota el total de palabras del proyecto en el registro del día (al abrir y tras cada guardado).
   recordStats() {

@@ -1,6 +1,10 @@
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { basename, join } from 'node:path'
 import { deflateRawSync } from 'node:zlib'
 import { expect, test } from 'vitest'
 import { zipStore } from '../../src/core/docx'
+import { createBackup, readBackup, restoreBackup, rotate } from '../../src/main/backup'
 import { readSwx, zipEntries } from '../../src/main/swx'
 
 const enc = (s: string) => new TextEncoder().encode(s)
@@ -58,4 +62,37 @@ test('readSwx acepta JSON suelto, backup.json y detecta cifrados o ilegibles', (
   expect(readSwx(Buffer.from('no soy un zip', 'utf8')).kind).toBe('invalid')
   expect(readSwx(Buffer.from('{ roto', 'utf8')).kind).toBe('invalid')
   expect(readSwx(Buffer.from(zipStore([{ name: 'a.txt', data: enc('hola') }]))).kind).toBe('invalid')
+})
+
+test('backup: rotación conserva las N copias más recientes del mismo vault', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'writter-backup-'))
+  const names = ['MiVault-2026-09-20-10-00.zip', 'MiVault-2026-09-21-10-00.zip', 'MiVault-2026-09-22-10-00.zip', 'OtroVault-2026-09-22-10-00.zip', 'notas.txt']
+  names.forEach((n, i) => { writeFileSync(join(dir, n), 'x'); utimesSync(join(dir, n), new Date(2026, 8, 20 + i), new Date(2026, 8, 20 + i)) })
+  expect(rotate(dir, 'MiVault-', 2)).toBe(1)
+  const left = readdirSync(dir).sort()
+  expect(left).toContain('MiVault-2026-09-22-10-00.zip')
+  expect(left).toContain('OtroVault-2026-09-22-10-00.zip') // otro proyecto: intacto
+  expect(left).toContain('notas.txt') // lo que no es respaldo no se toca
+  expect(left.filter((f) => f.startsWith('MiVault-')).length).toBe(2)
+  rmSync(dir, { recursive: true, force: true })
+})
+
+test('backup: crear y restaurar deja el vault como estaba', () => {
+  const vault = mkdtempSync(join(tmpdir(), 'writter-vault-'))
+  mkdirSync(join(vault, 'scripts'), { recursive: true })
+  writeFileSync(join(vault, 'scripts', 'E1.md'), '---\ntype: script\n---\n\nINT. A - DÍA\n')
+  writeFileSync(join(vault, 'proyecto.txt'), 'hola')
+  const dest = join(vault, '..', `${basename(vault)}-copia.zip`)
+  const info = createBackup(vault, dest)
+  expect(info.files).toBe(2)
+
+  writeFileSync(join(vault, 'scripts', 'E1.md'), 'destrozado')
+  rmSync(join(vault, 'proyecto.txt'))
+  const out = restoreBackup(vault, dest)
+  expect(out.files).toBe(2)
+  expect(readFileSync(join(vault, 'scripts', 'E1.md'), 'utf8')).toContain('INT. A - DÍA')
+  expect(readFileSync(join(vault, 'proyecto.txt'), 'utf8')).toBe('hola')
+  expect(readBackup(dest).files).toBe(2)
+  rmSync(vault, { recursive: true, force: true })
+  rmSync(dest, { force: true })
 })

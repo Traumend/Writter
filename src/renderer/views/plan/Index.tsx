@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
+import { categoryLabel } from '../../../core/breakdown'
 import { readFrontmatter } from '../../../core/frontmatter'
 import { SCENE_STATUS, SCENE_STATUS_ES as STATUS_LABEL, type SceneStatus } from '../../../core/planning'
 import { t } from '../../i18n'
@@ -69,7 +70,7 @@ export function Index() {
       }
       case 'characters': return { cols: ['Nombre', 'Grupo', 'Actor', 'Escenas', 'Alias', 'Palabras'], rows: cards.filter((c) => c.kind === 'character').map((c) => ({ id: c.path, cells: [c.name, c.group, c.actor, c.appearances.length, c.aliases.join(', '), c.words], open: open(c.path) })) }
       case 'locations': return { cols: ['Nombre', 'Escenas', 'Alias'], rows: cards.filter((c) => c.kind === 'location').map((c) => ({ id: c.path, cells: [c.name, c.appearances.length, c.aliases.join(', ')], open: open(c.path) })) }
-      case 'props': return { cols: ['Nombre', 'Escenas', 'Alias'], rows: cards.filter((c) => c.kind === 'prop').map((c) => ({ id: c.path, cells: [c.name, c.appearances.length, c.aliases.join(', ')], open: open(c.path) })) }
+      case 'props': return { cols: ['Nombre', 'Categoría', 'Escenas', 'Alias'], rows: cards.filter((c) => c.kind === 'prop').map((c) => ({ id: c.path, cells: [c.name, categoryLabel(c.category), c.appearances.length, c.aliases.join(', ')], open: open(c.path) })) }
       case 'questions': return { cols: ['Pregunta', 'Estado', 'Importancia', 'Se plantea', 'Hitos', 'Se resuelve', 'Personajes'], rows: planning.questions.map((x) => ({ id: x.id, cells: [x.text, x.status, x.importance, refLabel(x.introduced, scripts), x.beats.length, refLabel(x.resolved, scripts), x.characters.join(', ')], open: () => openScene(scripts, x.introduced) })) }
       case 'plants': return { cols: ['Plant', 'Tipo', 'Se planta', 'Payoffs', 'Personajes'], rows: planning.plants.map((x) => ({ id: x.id, cells: [x.title, x.type, refLabel(x.plant, scripts), x.payoffs.map((p) => refLabel(p, scripts)).join(', '), x.characters.join(', ')], open: () => openScene(scripts, x.plant) })) }
       case 'ideas': return { cols: ['Idea', 'Sinopsis', 'Personajes', 'Track'], rows: planning.ideas.map((x) => ({ id: x.id, cells: [x.title, x.summary, x.characters.join(', '), planning.tracks.find((tr) => tr.id === x.track)?.name ?? ''] })) }
