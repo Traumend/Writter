@@ -11,6 +11,7 @@ import { t } from '../i18n'
 import { DEFAULT_SECTIONS, useStore } from '../store'
 import { Icon, useAsset } from '../ui'
 import { SceneSheet } from './SceneSheet'
+import { Revisions, changedOnly, useRevisionMarks } from './Revisions'
 
 const KIND_LABEL: Record<FileKind, string> = { script: 'Episodios', character: 'Personajes', location: 'Locaciones', prop: 'Props', outline: 'Escaleta', knowledge: 'Conocimiento', other: 'Otros' }
 export const TEMPLATE: Record<Exclude<FileKind, 'other'>, (name: string, extra?: Record<string, unknown>) => string> = {
@@ -113,6 +114,7 @@ function LeftPanel() {
   const [fChar, setFChar] = useState('')
   const [fStatus, setFStatus] = useState('')
   const lines = useMemo(() => useStore.getState().text.split('\n'), [projection])
+  const marks = useRevisionMarks() // revisión activa: marcas de escena modificada o nueva
   if (!vault) return <p className="muted">{t('Abre una carpeta como vault.')}</p>
   const scene = projection.scenes.find((s) => cursorLine >= s.startLine && cursorLine < s.endLine)
   const resolved = new Set(files.map((f) => f.name.toLowerCase()))
@@ -139,7 +141,20 @@ function LeftPanel() {
   })
   const filtered = !!(fInt || fTime || fChar || fStatus)
   const toggleSel = (i: number) => setSel((prev) => { const n = new Set(prev); n.has(i) ? n.delete(i) : n.add(i); return n })
-  const runDelete = () => { deleteScenes([...sel]); setSel(new Set()) }
+  // Con una revisión activa la numeración está bloqueada: las escenas no se borran, se marcan OMITIDAS.
+  const outlinePath = path ? `${roleDir('outline')}/${path.split('/').pop()!}` : null
+  const runDelete = () => {
+    const list = [...sel]
+    if (marks && outlinePath) {
+      if (!window.confirm(t('Hay una revisión activa: las escenas se marcarán como OMITIDAS y conservarán su número en vez de borrarse. ¿Continuar?'))) return
+      const next = { ...sceneMeta }
+      for (const i of list) { const sc = projection.scenes[i]; if (sc) next[sc.heading] = { ...(next[sc.heading] ?? {}), omitida: true } }
+      const doc = docs.find((d) => d.path === outlinePath)
+      if (doc) void useStore.getState().writeOther(outlinePath, writeFrontmatter(doc.content, { sceneMeta: next }))
+      else void useStore.getState().createFile(outlinePath, writeFrontmatter(TEMPLATE.outline(path!.split('/').pop()!.replace(/\.md$/, '')), { sceneMeta: next }), false)
+    } else deleteScenes(list)
+    setSel(new Set())
+  }
 
   // Cuerpo de cada sección de biblioteca por id.
   const body = (id: string) => {
@@ -223,7 +238,9 @@ function LeftPanel() {
                   {!groupFilter && newGroupHere && s.group && <li className="grouphead muted tiny"><span className="ell">{s.group}</span></li>}
                   <li className={s === scene ? 'active' : ''} onClick={() => (multi ? toggleSel(s.index) : setCursor(s.startLine, null))} title={`${s.wordCount} ${t('palabras')} · ≈${estimateTokens(lines.slice(s.startLine, s.endLine).join('\n'))} ${t('tokens')} · ${t('pág.')} ${pagination.lineToPage[s.startLine] ?? 1}\n${s.characters.join(', ')}`}>
                     {multi && <input type="checkbox" checked={sel.has(s.index)} onChange={() => toggleSel(s.index)} onClick={(e) => e.stopPropagation()} />}
-                    <span className="muted">{s.index + 1}.</span> <span className="grow ell">{s.heading}</span>
+                    <span className="muted">{sceneMeta[s.heading]?.numero ?? s.index + 1}.</span>
+                    {marks && (marks.modified.has(s.heading) || marks.added.has(s.heading)) && <span className="revdot" style={{ background: marks.color }} title={marks.added.has(s.heading) ? t('Nueva desde la revisión activa') : t('Modificada desde la revisión activa')} />}
+                    <span className={`grow ell ${sceneMeta[s.heading]?.omitida ? 'omitida' : ''}`}>{s.heading}</span>
                     {!multi && <>
                       <span className="mv" onClick={(e) => { e.stopPropagation(); moveScene(s.index, s.index - 1) }}>▲</span>
                       <span className="mv" onClick={(e) => { e.stopPropagation(); moveScene(s.index, s.index + 1) }}>▼</span>
@@ -312,6 +329,8 @@ function RightPanel() {
   const [allowLocked, setAllowLocked] = useState(false)
   const [label, setLabel] = useState('')
   const [compare, setCompare] = useState<{ id: string; content: string } | null>(null)
+  const [onlyChanged, setOnlyChanged] = useState(false)
+  const exportMarks = useRevisionMarks()
   const cfg = s.vault?.config
   const coverImg = useAsset(cfg?.cover.image ?? '')
   // Ficha de la escena bajo el cursor: vive en sceneMeta de la escaleta del episodio abierto.
@@ -330,6 +349,7 @@ function RightPanel() {
 
   const locked = s.frontmatter['locked'] === true
   const name = s.path ? s.path.split('/').pop()!.replace(/\.md$/, '') : 'guion'
+  const exportText = onlyChanged && exportMarks ? changedOnly(s.text, s.projection.scenes, exportMarks) : s.text
   const TAB_LABEL = { scene: t('Escena'), ai: t('Script Assistant'), versions: t('Versiones'), export: t('Exportar') }
 
   return (
@@ -381,6 +401,7 @@ function RightPanel() {
         </>
       )}
 
+      {tab === 'versions' && <Revisions />}
       {tab === 'versions' && (
         <div className="block">
           <h2>{t('Historial')} · {name}</h2>
@@ -414,19 +435,24 @@ function RightPanel() {
         <div className="block">
           <h2>{t('Exportar')} {name}</h2>
           <div className="col">
+            {exportMarks && (
+              <label className="check" title={t('Emite solo las escenas modificadas o nuevas desde la revisión activa')}>
+                <input type="checkbox" checked={onlyChanged} onChange={(e) => setOnlyChanged(e.target.checked)} /> {t('Solo escenas modificadas (revisión activa)')}
+              </label>
+            )}
             <button disabled={!s.path} onClick={() => {
               const vars = { title: cfg?.cover.title || name, episode: name, author: cfg?.cover.author }
               void window.api.exportPdf(
-                mdToHtml(s.text, name, cfg ? { ...cfg.cover, imageDataUrl: coverImg } : undefined, cfg?.pdf),
+                mdToHtml(exportText, name, cfg ? { ...cfg.cover, imageDataUrl: coverImg } : undefined, cfg?.pdf),
                 `${name}.pdf`,
                 { paper: cfg?.pdf.paper ?? 'Letter', headerTemplate: pdfVars(cfg?.pdf.header ?? '', vars), footerTemplate: pdfVars(cfg?.pdf.footer ?? '', vars) }
               )
             }}>{t('PDF (formato industria')}{cfg?.cover.title ? t(' + portada') : ''})</button>
             <div className="row">
-              <button disabled={!s.path} className="ghost" onClick={() => void window.api.exportBytes(toB64(mdToDocx(s.text)), `${name}.docx`)}>DOCX</button>
-              <button disabled={!s.path} className="ghost" onClick={() => void window.api.exportText(mdToFdx(s.text), `${name}.fdx`)}>FDX</button>
-              <button disabled={!s.path} className="ghost" onClick={() => void window.api.exportText(mdToFountain(s.text), `${name}.fountain`)}>Fountain</button>
-              <button disabled={!s.path} className="ghost" onClick={() => void window.api.exportText(mdToTxt(s.text), `${name}.txt`)}>TXT</button>
+              <button disabled={!s.path} className="ghost" onClick={() => void window.api.exportBytes(toB64(mdToDocx(exportText)), `${name}.docx`)}>DOCX</button>
+              <button disabled={!s.path} className="ghost" onClick={() => void window.api.exportText(mdToFdx(exportText), `${name}.fdx`)}>FDX</button>
+              <button disabled={!s.path} className="ghost" onClick={() => void window.api.exportText(mdToFountain(exportText), `${name}.fountain`)}>Fountain</button>
+              <button disabled={!s.path} className="ghost" onClick={() => void window.api.exportText(mdToTxt(exportText), `${name}.txt`)}>TXT</button>
             </div>
             <button className="ghost" onClick={() => void window.api.importScript().then((f) => f && s.refreshFiles().then(() => s.openFile(f.path)))}>{t('Importar .fountain / .fdx')}</button>
           </div>
