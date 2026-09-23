@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron'
 import { buildMenu, type MenuSetup } from './menu'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, extname, join, resolve } from 'node:path'
+import { readSwx } from './swx'
 import { fdxToMd, fountainToMd } from '../core/convert'
 import type { AdoptRole, AiRequest, Analysis, FileEntry, OpenResult, ProjectConfig, VaultChange, Version } from '../core/types/ipc'
 import { aiText, analyze, devDoc, doctorAi, runAi } from './ai'
@@ -145,6 +146,16 @@ ipcMain.handle('export.bytes', async (_e, base64: string, suggested: string) => 
 })
 ipcMain.handle('usage.get', () => V.usageStats())
 ipcMain.handle('usage.reset', () => V.usageReset())
+// Importar un proyecto de ScriptWriterX: devuelve el project.json crudo; el renderer lo traduce con core/swx.
+ipcMain.handle('import.swx', async (): Promise<{ name: string; json: string; media: number } | { error: 'encrypted' | 'invalid' } | null> => {
+  const r = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: 'ScriptWriterX', extensions: ['swx', 'swxbackup', 'zip', 'json'] }] })
+  const src = r.filePaths[0]
+  if (!src) return null
+  const read = readSwx(readFileSync(src))
+  if (read.kind !== 'project') return { error: read.kind === 'encrypted' ? 'encrypted' : 'invalid' }
+  return { name: basename(src, extname(src)), json: read.json, media: read.media }
+})
+
 ipcMain.handle('import.script', async (): Promise<FileEntry | null> => {
   const r = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: 'Guión', extensions: ['fountain', 'fdx', 'txt'] }] })
   const src = r.filePaths[0]

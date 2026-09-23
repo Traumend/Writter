@@ -47,6 +47,7 @@ const api: Api = {
   exportText: (content, name) => ipcRenderer.invoke('export.text', content, name),
   exportBytes: (base64, name) => ipcRenderer.invoke('export.bytes', base64, name),
   importScript: () => ipcRenderer.invoke('import.script'),
+  importSwx: () => ipcRenderer.invoke('import.swx'),
   usageGet: () => ipcRenderer.invoke('usage.get'),
   usageReset: () => ipcRenderer.invoke('usage.reset')
 }

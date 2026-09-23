@@ -22,7 +22,7 @@ import { Index } from './views/plan/Index'
 import { Library } from './views/plan/Library'
 import { Palette } from './views/Palette'
 import { QuickNote } from './views/QuickNote'
-import { exportProjectJson, importProjectJson } from './portable'
+import { exportProjectJson, exportSwxProject, importProjectJson, importSwxProject } from './portable'
 import { PLANNING_PATH, readPlanning } from '../core/planning'
 import { Icon } from './ui'
 import { estimateTokens } from '../core/safeguards'
@@ -72,6 +72,8 @@ function AppMenu() {
           {vault && item(t('Nota rápida…') + '  Ctrl+Shift+N', () => setQuickNoteOpen(true))}
           {vault && item(t('Exportar proyecto (JSON)'), () => void exportProjectJson())}
           {vault && item(t('Importar proyecto (JSON)'), () => void importProjectJson())}
+          {vault && item(t('Importar de ScriptWriterX (.swx)'), () => void importSwxProject())}
+          {vault && item(t('Exportar a ScriptWriterX (.swx)'), () => void exportSwxProject())}
           <div className="menu-sep" />
           <div className="menu-label">{t('Idioma')}</div>
           <button className={`menu-item ${lang === 'en' ? 'sel' : ''}`} onClick={() => setLanguage('en')}><span className="chk">{lang === 'en' && <Icon name="check" size={12} />}</span>{t('Inglés')}</button>
