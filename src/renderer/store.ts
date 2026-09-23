@@ -229,6 +229,10 @@ export function entityNames(files: FileEntry[], docs: Doc[]): string[] {
   return [...out].filter((n) => n.length >= 3)
 }
 
+let saving: Promise<void> = Promise.resolve()
+const ownHashes = new Set<string>() // escrituras propias: el watcher no debe tomarlas por conflicto
+let writing = false // guardado en vuelo: su evento del watcher llega antes que el hash
+
 export const useStore = create<State & Actions>((set, get) => ({
   tab: 'desk',
   devTab: 'characters',
@@ -521,19 +525,31 @@ export const useStore = create<State & Actions>((set, get) => ({
 
   setCursor: (cursorLine, selection) => set({ cursorLine, selection }),
 
+  // Guardados en cola: dos escrituras solapadas (un slider arrastrado) mandaban la segunda con el
+  // hash viejo y el main la rechazaba como conflicto, bloqueando la ficha.
   async save(force = false) {
-    const { path, text, diskHash, dirty, conflict } = get()
-    if (!path || !dirty || (conflict && !force)) return
-    try {
-      const { hash } = await window.api.fileWrite(path, text, force ? undefined : (diskHash ?? undefined), 'user')
-      set({ diskHash: hash, dirty: false, conflict: false, status: 'Guardado' })
-      set({ versions: await window.api.versionList(path) })
-      await get().refreshDocs()
-      get().recordStats()
-    } catch (e) {
-      if (String(e).includes('conflict')) set({ conflict: true, status: 'Conflicto: el archivo cambió en disco' })
-      else set({ status: `Error al guardar: ${String(e)}` })
+    // En cola: dos guardados solapados (un slider arrastrado) mandaban el segundo con el hash viejo,
+    // el main lo rechazaba como conflicto y la ficha quedaba bloqueada.
+    const run = async () => {
+      const { path, text, diskHash, dirty, conflict } = get()
+      if (!path || !dirty || (conflict && !force)) return
+      writing = true
+      try {
+        const { hash } = await window.api.fileWrite(path, text, force ? undefined : (diskHash ?? undefined), 'user')
+        ownHashes.add(hash)
+        set({ diskHash: hash, dirty: get().text !== text, conflict: false, status: 'Guardado' })
+        set({ versions: await window.api.versionList(path) })
+        await get().refreshDocs()
+        get().recordStats()
+      } catch (e) {
+        if (String(e).includes('conflict')) set({ conflict: true, status: 'Conflicto: el archivo cambió en disco' })
+        else set({ status: `Error al guardar: ${String(e)}` })
+      } finally {
+        writing = false
+      }
     }
+    saving = saving.then(run, run)
+    return saving
   },
 
   async reloadFromDisk() {
@@ -734,7 +750,7 @@ window.api.onVaultChange((e) => {
   const s = useStore.getState()
   void s.refreshFiles()
   void s.refreshDocs()
-  if (e.path !== s.path || e.hash === s.diskHash) return
+  if (e.path !== s.path || e.hash === s.diskHash || writing || (e.hash !== null && ownHashes.has(e.hash))) return
   if (!s.dirty) void s.reloadFromDisk()
   else useStore.setState({ conflict: true, status: 'Conflicto: el archivo cambió en disco' })
 })
