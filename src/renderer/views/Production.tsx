@@ -3,6 +3,11 @@ import { readFrontmatter, writeFrontmatter } from '../../core/frontmatter'
 import { t } from '../i18n'
 import { useStore } from '../store'
 import { Icon, BlurInput, EpisodeSelect, useAsset, useDoc, useProjection } from '../ui'
+import { Budget } from './prod/Budget'
+import { CallSheets } from './prod/CallSheets'
+import { Plan } from './prod/Plan'
+import { Reports } from './prod/Reports'
+import { Team } from './prod/Team'
 
 // Producción (Fase 2, resolución mínima): shot list por escena en assets/shots/<episodio>.md; imagen de storyboard adjunta.
 type Shot = { id: string; scene: number; size: string; angle: string; movement: string; lens: string; description: string; status: string; image: string }
@@ -19,12 +24,24 @@ const DEPTS: [string, string][] = [
 ]
 const uid = () => Math.random().toString(36).slice(2, 8)
 
+function ProdTabs({ tab, setTab }: { tab: ProdTab; setTab: (t: ProdTab) => void }) {
+  return (
+    <div className="toolbar wrap prodtabs">
+      {PROD_TABS.map(([k, l]) => <button key={k} className={tab === k ? 'mini on' : 'mini ghost'} onClick={() => setTab(k)}>{t(l)}</button>)}
+    </div>
+  )
+}
+
 function Thumb({ rel, onPick }: { rel: string; onPick: () => void }) {
   const url = useAsset(rel)
   return <div className="thumb" onClick={onPick} title={t('Adjuntar storyboard')}>{url ? <img src={url} alt="" /> : <span className="muted tiny">+ img</span>}</div>
 }
 
+const PROD_TABS: [ProdTab, string][] = [['shots', 'Shot list'], ['notes', 'Notas por departamento'], ['plan', 'Plan de rodaje'], ['calls', 'Llamados'], ['reports', 'Reportes'], ['team', 'Equipo'], ['budget', 'Presupuesto']]
+type ProdTab = 'shots' | 'notes' | 'plan' | 'calls' | 'reports' | 'team' | 'budget'
+
 export function Production() {
+  const [prodTab, setProdTab] = useState<ProdTab>('shots')
   const { files, createFile, writeOther } = useStore()
   const scripts = files.filter((f) => f.kind === 'script')
   const [ep, setEp] = useState<string | null>(scripts[0]?.path ?? null)
@@ -33,7 +50,7 @@ export function Production() {
   const shotsPath = script ? `assets/shots/${script.split('/').pop()!}` : null
   const shotsDoc = useDoc(shotsPath)
   const [scene, setScene] = useState(0)
-  const [panel, setPanel] = useState<'shots' | 'notes'>('shots')
+
 
   useEffect(() => {
     if (shotsPath && !files.some((f) => f.path === shotsPath)) void createFile(shotsPath, `---\ntype: shotlist\nshots: []\n---\n`, false)
@@ -48,9 +65,23 @@ export function Production() {
   const notes = adNotes[heading] ?? {}
   const setNote = (k: string, v: string) => shotsDoc && void writeOther(shotsDoc.path, writeFrontmatter(shotsDoc.content, { adNotes: { ...adNotes, [heading]: { ...notes, [k]: v } } }))
 
+  if (prodTab !== 'shots' && prodTab !== 'notes') {
+    return (
+      <main className="page prod">
+        <ProdTabs tab={prodTab} setTab={setProdTab} />
+        {prodTab === 'plan' && <Plan />}
+        {prodTab === 'calls' && <CallSheets />}
+        {prodTab === 'reports' && <Reports />}
+        {prodTab === 'team' && <Team />}
+        {prodTab === 'budget' && <Budget />}
+      </main>
+    )
+  }
+
   return (
     <main className="split two">
       <aside>
+        <ProdTabs tab={prodTab} setTab={setProdTab} />
         <EpisodeSelect value={script} onChange={setEp} />
         <h2>{t('Escenas')}</h2>
         <ul>
@@ -63,15 +94,12 @@ export function Production() {
       </aside>
       <section className="scroll">
         <div className="toolbar">
-          <div className="segmented" role="group">
-            <button className={panel === 'shots' ? 'on' : ''} onClick={() => setPanel('shots')}>{t('Shot list')}</button>
-            <button className={panel === 'notes' ? 'on' : ''} onClick={() => setPanel('notes')}>{t('Notas por departamento')}</button>
-          </div>
+
           <strong className="ell">{heading || '—'}</strong>
           <span className="grow" />
-          {panel === 'shots' && <button disabled={!shotsDoc || !proj.scenes.length} onClick={() => save([...shots, { id: uid(), scene, size: SIZES[0]!, angle: ANGLES[0]!, movement: MOVES[0]!, lens: '35mm', description: '', status: STATUS[0]!, image: '' }])} ><Icon name="plus" size={12} />{t('Toma')}</button>}
+          {prodTab === 'shots' && <button disabled={!shotsDoc || !proj.scenes.length} onClick={() => save([...shots, { id: uid(), scene, size: SIZES[0]!, angle: ANGLES[0]!, movement: MOVES[0]!, lens: '35mm', description: '', status: STATUS[0]!, image: '' }])} ><Icon name="plus" size={12} />{t('Toma')}</button>}
         </div>
-        {panel === 'notes' && (
+        {prodTab === 'notes' && (
           <div className="grid2">
             {DEPTS.map(([k, label]) => (
               <label className="field" key={k}><span>{t(label)}</span>
@@ -80,7 +108,7 @@ export function Production() {
             ))}
           </div>
         )}
-        {panel === 'shots' && (<>
+        {prodTab === 'shots' && (<>
         <table className="table">
           <thead><tr><th>#</th><th>Storyboard</th><th>{t('Tamaño')}</th><th>{t('Ángulo')}</th><th>{t('Movimiento')}</th><th>{t('Lente')}</th><th>{t('Descripción')}</th><th>{t('Estado')}</th><th /></tr></thead>
           <tbody>

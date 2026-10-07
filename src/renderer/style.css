@@ -137,6 +137,8 @@ h1, .card strong, .table td { overflow-wrap: anywhere; } /* una palabra intermin
 /* Breakdown: panel de grupos + menú de tarjeta + vista lista */
 main.split.bd { grid-template-columns: 216px 1fr; }
 main.split.two { grid-template-columns: 256px 1fr; } /* vistas sin panel derecho: la tabla usa todo el ancho */
+.prod-plan { display: grid; grid-template-columns: 256px 1fr; gap: 16px; align-items: start; } /* jornadas | escenas, dentro de Producción */
+.prod-plan > * { min-width: 0; }
 .bd-groups { display: flex; flex-direction: column; }
 .bd-groups ul li { display: flex; align-items: center; gap: 8px; }
 .bd-groups li.dragover { outline: 2px dashed var(--accent); outline-offset: -2px; }
