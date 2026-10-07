@@ -229,9 +229,23 @@ export function entityNames(files: FileEntry[], docs: Doc[]): string[] {
   return [...out].filter((n) => n.length >= 3)
 }
 
+// Escrituras del archivo abierto, en cola: dos solapadas (un slider arrastrado) mandaban la segunda con
+// el hash viejo, el main la rechazaba como conflicto y la ficha quedaba bloqueada.
 let saving: Promise<void> = Promise.resolve()
-const ownHashes = new Set<string>() // escrituras propias: el watcher no debe tomarlas por conflicto
-let writing = false // guardado en vuelo: su evento del watcher llega antes que el hash
+let writing = false // escritura en vuelo: su evento del watcher llega antes que el hash nuevo
+const ownHashes = new Set<string>() // hashes propios recientes: el watcher no debe tomarlos por conflicto
+function queued(fn: () => Promise<void>): Promise<void> {
+  const run = async () => {
+    writing = true
+    try { await fn() } finally { writing = false }
+  }
+  saving = saving.then(run, run)
+  return saving
+}
+function wrote(hash: string) {
+  ownHashes.add(hash)
+  if (ownHashes.size > 50) ownHashes.delete(ownHashes.values().next().value!)
+}
 
 export const useStore = create<State & Actions>((set, get) => ({
   tab: 'desk',
@@ -525,18 +539,13 @@ export const useStore = create<State & Actions>((set, get) => ({
 
   setCursor: (cursorLine, selection) => set({ cursorLine, selection }),
 
-  // Guardados en cola: dos escrituras solapadas (un slider arrastrado) mandaban la segunda con el
-  // hash viejo y el main la rechazaba como conflicto, bloqueando la ficha.
-  async save(force = false) {
-    // En cola: dos guardados solapados (un slider arrastrado) mandaban el segundo con el hash viejo,
-    // el main lo rechazaba como conflicto y la ficha quedaba bloqueada.
-    const run = async () => {
+  save(force = false) {
+    return queued(async () => {
       const { path, text, diskHash, dirty, conflict } = get()
       if (!path || !dirty || (conflict && !force)) return
-      writing = true
       try {
         const { hash } = await window.api.fileWrite(path, text, force ? undefined : (diskHash ?? undefined), 'user')
-        ownHashes.add(hash)
+        wrote(hash)
         set({ diskHash: hash, dirty: get().text !== text, conflict: false, status: 'Guardado' })
         set({ versions: await window.api.versionList(path) })
         await get().refreshDocs()
@@ -544,12 +553,8 @@ export const useStore = create<State & Actions>((set, get) => ({
       } catch (e) {
         if (String(e).includes('conflict')) set({ conflict: true, status: 'Conflicto: el archivo cambió en disco' })
         else set({ status: `Error al guardar: ${String(e)}` })
-      } finally {
-        writing = false
       }
-    }
-    saving = saving.then(run, run)
-    return saving
+    })
   },
 
   async reloadFromDisk() {
@@ -634,8 +639,16 @@ export const useStore = create<State & Actions>((set, get) => ({
     lines.splice(proposal.from, proposal.to - proposal.from, ...proposal.replacement.split('\n'))
     const next = lines.join('\n')
     set((s) => ({ text: next, ...reproject(next, get().vault), proposal: null, externalSeq: s.externalSeq + 1, dirty: true }))
-    const { hash } = await window.api.fileWrite(path, next, diskHash ?? undefined, 'ai')
-    set({ diskHash: hash, dirty: false, status: 'Propuesta aplicada y guardada', versions: await window.api.versionList(path) })
+    await queued(async () => {
+      try {
+        const { hash } = await window.api.fileWrite(path, next, get().diskHash ?? undefined, 'ai')
+        wrote(hash)
+        set({ diskHash: hash, dirty: get().text !== next, status: 'Propuesta aplicada y guardada', versions: await window.api.versionList(path) })
+      } catch (e) {
+        if (String(e).includes('conflict')) set({ conflict: true, status: 'Conflicto: el archivo cambió en disco' })
+        else set({ status: `Error al guardar: ${String(e)}` })
+      }
+    })
   },
 
   rejectProposal: () => set({ proposal: null }),
