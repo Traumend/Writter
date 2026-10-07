@@ -292,8 +292,10 @@ main.page.bt { min-height: 0; gap: 8px; }
 .pip { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%; color: #0c0c0c; }
 .bt-tension svg { display: block; overflow: visible; }
 .toasts { position: fixed; right: 18px; bottom: 44px; display: flex; flex-direction: column; gap: 8px; z-index: 60; pointer-events: none; }
-.toast { background: var(--panel); color: var(--fg); border-left: 3px solid var(--accent); border-radius: var(--r-sm); padding: 8px 14px; box-shadow: var(--raise); font-size: 12px; max-width: 360px; }
-.toast.err { border-left-color: #e8437f; }
+.toast { display: flex; align-items: center; gap: 8px; background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 8px 14px; box-shadow: var(--raise); font-size: 12px; max-width: 360px; }
+.toast::before { content: ''; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.toast.err { border-color: #e8437f; }
+.toast.err::before { background: #e8437f; }
 /* visor paginado (Vista PDF) */
 .pdfview { display: flex; flex-direction: column; min-height: 0; flex: 1; gap: 8px; }
 .pdfpages { flex: 1; min-height: 0; padding: 8px 0 40px; display: flex; flex-direction: column; align-items: center; gap: 22px; }
