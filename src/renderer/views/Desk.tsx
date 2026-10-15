@@ -5,6 +5,7 @@ import { SCENE_STATUS, SCENE_STATUS_ES, readSceneMeta, type SceneMeta } from '..
 import { mdToDocx } from '../../core/docx'
 import { readFrontmatter, writeFrontmatter } from '../../core/frontmatter'
 import { estimateTokens } from '../../core/safeguards'
+import { trajectory } from '../../core/trajectory'
 import { type FileKind, type Scope } from '../../core/types/ipc'
 import { Editor } from '../editor/Editor'
 import { t } from '../i18n'
@@ -13,6 +14,7 @@ import { Icon, useAsset } from '../ui'
 import { SceneSheet } from './SceneSheet'
 import { Revisions, changedOnly, useRevisionMarks } from './Revisions'
 import { PdfView } from './PdfView'
+import { usePlanning } from './plan/data'
 
 const KIND_LABEL: Record<FileKind, string> = { script: 'Episodios', character: 'Personajes', location: 'Locaciones', prop: 'Props', outline: 'Escaleta', knowledge: 'Conocimiento', other: 'Otros' }
 export const TEMPLATE: Record<Exclude<FileKind, 'other'>, (name: string, extra?: Record<string, unknown>) => string> = {
@@ -322,6 +324,28 @@ function ScopeBar({ pdfView, setPdfView }: { pdfView: boolean; setPdfView: (v: b
   )
 }
 
+// Encaminar hacia lo planeado (núcleo): la IA lee lo que el autor ya decidió para después de esta
+// escena (arcos, pagos, escenas planeadas) y propone el guiño o detonante como diff.
+const GUIDE = 'Encamina esta escena hacia lo planeado (sección LO QUE VIENE del contexto): introduce un guiño, detonante o motivo sutil que haga verosímil el siguiente hito, sin adelantarlo ni resolverlo. Respeta el estilo, el tono y lo que ya pasó. Si algo FALTA SEMBRAR, siémbralo aquí con discreción.'
+function Planned({ scene, heading, allowLocked }: { scene: number; heading: string; allowLocked: boolean }) {
+  const s = useStore()
+  const { planning, save } = usePlanning()
+  const tr = useMemo(() => (s.path ? trajectory(s.files, s.docs, { script: s.path, scene }, s.roleDir('outline')) : null), [s.files, s.docs, s.path, scene]) // eslint-disable-line react-hooks/exhaustive-deps
+  const sow = (id: string) => void save({ plants: planning.plants.map((p) => (p.id === id ? { ...p, plant: { script: s.path!, heading } } : p)) })
+  return (
+    <div className="block">
+      <h2>{t('Lo ya planeado')}</h2>
+      {tr?.text.includes('LO QUE VIENE') ? (
+        <details><summary className="tiny link">{t('Qué sabe la IA')}</summary><pre className="tiny" style={{ whiteSpace: 'pre-wrap' }}>{tr.text}</pre></details>
+      ) : <p className="muted tiny">{t('Nada planeado después de esta escena para quien está en ella: añade puntos de arco, pagos o escenas planeadas.')}</p>}
+      {tr?.missing.map((m) => (
+        <div key={m.id} className="row tiny"><span className="grow">{t('Falta sembrar')}: <b>{m.title}</b></span><button className="mini ghost" onClick={() => sow(m.id)}>{t('Esta escena lo siembra')}</button></div>
+      ))}
+      <button disabled={!s.path || s.aiBusy} onClick={() => void s.runAi(GUIDE, allowLocked)}>{t('Encaminar hacia lo planeado')}</button>
+    </div>
+  )
+}
+
 function RightPanel() {
   const s = useStore()
   const [tab, setTab] = useState<'scene' | 'ai' | 'versions' | 'export'>('ai')
@@ -392,6 +416,7 @@ function RightPanel() {
             {s.aiError && <p className="err">{s.aiError}</p>}
             {!s.keyStatus?.present && cfg?.byok.provider !== 'ollama' && <p className="muted tiny">{t('Sin clave BYOK: configúrala en Ajustes.')}</p>}
           </div>
+          {sceneNow && <Planned scene={sceneNow.index} heading={sceneNow.heading} allowLocked={allowLocked} />}
           {s.proposal && (
             <div className="block">
               <h2>{t('Propuesta')} · {t('líneas')} {s.proposal.from + 1}-{s.proposal.to} · {s.proposal.tokensIn}→{s.proposal.tokensOut} {t('tokens')} · {s.proposal.model}</h2>

@@ -6,6 +6,7 @@ import { project, type Projection } from '../core/projection'
 import { duplicateScene as duplicateSceneText, insertScene as insertSceneText, moveScene as moveSceneText } from '../core/scenes'
 import { guessesToRoleMap } from '../core/adopt'
 import { renameEntity } from '../core/rename'
+import { trajectory } from '../core/trajectory'
 import { writeFrontmatter } from '../core/frontmatter'
 import { roleDir as roleDirOf } from '../core/types/ipc'
 import { record as recordDay, type WriteLog } from '../core/stats'
@@ -600,7 +601,8 @@ export const useStore = create<State & Actions>((set, get) => ({
     const s = get()
     if (!s.path || !instruction.trim()) return
     const lines = s.text.split('\n')
-    const scene = s.projection.scenes.find((sc) => s.cursorLine >= sc.startLine && s.cursorLine < sc.endLine)
+    // Cursor fuera de toda escena (frontmatter): la primera, la misma que muestra el panel de escena.
+    const scene = s.projection.scenes.find((sc) => s.cursorLine >= sc.startLine && s.cursorLine < sc.endLine) ?? s.projection.scenes[0]
     let from = s.cursorLine
     let to = s.cursorLine + 1
     let context = ''
@@ -624,6 +626,12 @@ export const useStore = create<State & Actions>((set, get) => ({
         const edges = g.edges.map((e) => `${byId.get(e.source) ?? e.source} -${e.kind}-> ${byId.get(e.target) ?? e.target}`).join('\n')
         context += `\n\nGRAFO DEL VAULT (${g.nodes.length} nodos):\n${edges}`
       }
+    }
+    // Trayectoria (núcleo): lo ya planeado por el autor a partir de esta escena, desde el índice en memoria.
+    if (scene) {
+      const docs = s.docs.map((d) => (d.path === s.path ? { ...d, content: s.text } : d))
+      const tr = trajectory(s.files, docs, { script: s.path, scene: scene.index }, s.roleDir('outline')).text
+      if (tr) context = `${tr}\n\n${context}`
     }
     const target = lines.slice(from, to).join('\n')
     const locked = s.frontmatter['locked'] === true
