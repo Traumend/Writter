@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { budgetTotals, dayCast, dood, eighths, itemTotal, sceneKey, type BudgetItem, type ShootingDay } from '../../src/core/preproduction'
+import { dayCast, dood, eighths, sceneKey, type ShootingDay } from '../../src/core/preproduction'
 
 const day = (id: string, scenes: string[]): ShootingDay => ({ id, date: '', call: '', location: '', scenes, notes: '' })
 
@@ -20,19 +20,4 @@ test('dood marca SW, W, H, WF, SWF y D por personaje y jornada', () => {
   expect(byName['CARLA']).toEqual(['D', 'SWF', 'D', 'D']) // un solo día: empieza, trabaja y termina
   expect(dayCast(days[0]!, (k) => cast[k] ?? [])).toEqual(['ANA', 'BETO'])
   expect(sceneKey('e1', 'A')).toBe('e1#A')
-})
-
-test('budgetTotals suma por grupo y aplica la contingencia', () => {
-  const items: BudgetItem[] = [
-    { id: '1', group: 'ATL', category: '1300', description: 'Dirección', qty: 1, unit: 'semana', rate: 1000, days: 4 },
-    { id: '2', group: 'BTL', category: '3300', description: 'Cámara', qty: 2, unit: 'día', rate: 250, days: 10 },
-    { id: '3', group: 'POST', category: '5200', description: 'Montaje', qty: 1, unit: 'global', rate: 3000, days: 1 }
-  ]
-  expect(itemTotal(items[0]!)).toBe(4000)
-  const t = budgetTotals(items, 10)
-  expect(t.byGroup).toEqual({ ATL: 4000, BTL: 5000, POST: 3000 })
-  expect(t.subtotal).toBe(12000)
-  expect(t.contingency).toBe(1200)
-  expect(t.total).toBe(13200)
-  expect(budgetTotals([], 10).total).toBe(0)
 })

@@ -3,7 +3,6 @@ import { readFrontmatter, writeFrontmatter } from '../../core/frontmatter'
 import { t } from '../i18n'
 import { useStore } from '../store'
 import { Icon, BlurInput, EpisodeSelect, useAsset, useDoc, useProjection } from '../ui'
-import { Budget } from './prod/Budget'
 import { CallSheets } from './prod/CallSheets'
 import { Plan } from './prod/Plan'
 import { Reports } from './prod/Reports'
@@ -37,8 +36,8 @@ function Thumb({ rel, onPick }: { rel: string; onPick: () => void }) {
   return <div className="thumb" onClick={onPick} title={t('Adjuntar storyboard')}>{url ? <img src={url} alt="" /> : <span className="muted tiny">+ img</span>}</div>
 }
 
-const PROD_TABS: [ProdTab, string][] = [['shots', 'Shot list'], ['notes', 'Notas por departamento'], ['plan', 'Plan de rodaje'], ['calls', 'Llamados'], ['reports', 'Reportes'], ['team', 'Equipo'], ['budget', 'Presupuesto']]
-type ProdTab = 'shots' | 'notes' | 'plan' | 'calls' | 'reports' | 'team' | 'budget'
+const PROD_TABS: [ProdTab, string][] = [['shots', 'Shot list'], ['notes', 'Notas por departamento'], ['plan', 'Plan de rodaje'], ['calls', 'Llamados'], ['reports', 'Reportes'], ['team', 'Equipo']]
+type ProdTab = 'shots' | 'notes' | 'plan' | 'calls' | 'reports' | 'team'
 
 export function Production() {
   const [prodTab, setProdTab] = useState<ProdTab>('shots')
@@ -73,7 +72,6 @@ export function Production() {
         {prodTab === 'calls' && <CallSheets />}
         {prodTab === 'reports' && <Reports />}
         {prodTab === 'team' && <Team />}
-        {prodTab === 'budget' && <Budget />}
       </main>
     )
   }

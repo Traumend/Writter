@@ -1,4 +1,4 @@
-// Preproducción (ScriptWriterX §39-47) adaptada al vault: plan de rodaje, equipo, presupuesto y
+// Preproducción (ScriptWriterX §39-47) adaptada al vault: plan de rodaje, equipo y
 // reportes derivados. Todo puro: los datos viven en `assets/preproduccion/*.md` y aquí solo se calcula.
 
 export type SceneKey = string // `${script}#${heading}`
@@ -8,16 +8,13 @@ export type ShootingDay = { id: string; date: string; call: string; location: st
 export type CrewMember = { id: string; name: string; dept: string; role: string; phone: string; email: string; rate: string }
 export type TalentMember = { id: string; name: string; character: string; agency: string; phone: string; rate: string }
 export type ShootingLocation = { id: string; name: string; set: string; address: string; contact: string; permit: string; notes: string }
-export type BudgetItem = { id: string; group: BudgetGroup; category: string; description: string; qty: number; unit: string; rate: number; days: number }
-export type BudgetGroup = 'ATL' | 'BTL' | 'POST'
 
-// Departamentos con su código de serie (mismo esquema que el presupuesto de industria).
+// Departamentos con su código de serie.
 export const CREW_DEPTS: [string, string][] = [
   ['1100', 'Producción ejecutiva'], ['1300', 'Dirección'], ['2100', 'Producción'], ['2200', 'Arte'], ['2600', 'Maquillaje y peinado'],
   ['2900', 'Vestuario'], ['3100', 'Especialistas'], ['3200', 'Iluminación'], ['3300', 'Cámara'], ['3400', 'Sonido'],
   ['3500', 'Locaciones'], ['3600', 'Extras'], ['3700', 'Transporte'], ['3800', 'Catering'], ['5200', 'Postproducción'], ['5400', 'VFX']
 ]
-export const BUDGET_GROUPS: [BudgetGroup, string][] = [['ATL', 'Sobre la línea'], ['BTL', 'Bajo la línea'], ['POST', 'Postproducción']]
 
 // Páginas en octavos, el estándar del plan de rodaje (1 página ≈ 1 minuto de pantalla).
 export function eighths(minutes: number): string {
@@ -47,16 +44,6 @@ export function dood(days: ShootingDay[], scenesOf: (k: SceneKey) => string[]): 
     })
     return { character, codes }
   })
-}
-
-// Totales del presupuesto: subtotal por partida, por grupo, contingencia y gran total.
-export const itemTotal = (i: BudgetItem): number => (Number(i.qty) || 0) * (Number(i.rate) || 0) * (Number(i.days) || 1)
-export function budgetTotals(items: BudgetItem[], contingencyPct = 0): { byGroup: Record<BudgetGroup, number>; subtotal: number; contingency: number; total: number } {
-  const byGroup: Record<BudgetGroup, number> = { ATL: 0, BTL: 0, POST: 0 }
-  for (const i of items) byGroup[i.group] = (byGroup[i.group] ?? 0) + itemTotal(i)
-  const subtotal = byGroup.ATL + byGroup.BTL + byGroup.POST
-  const contingency = subtotal * (Math.max(0, contingencyPct) / 100)
-  return { byGroup, subtotal, contingency, total: subtotal + contingency }
 }
 
 // Reparto de una jornada a partir de sus escenas (nombres únicos, en orden alfabético).

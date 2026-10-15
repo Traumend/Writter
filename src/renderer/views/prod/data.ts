@@ -3,19 +3,17 @@ import { breakdown } from '../../../core/breakdown'
 import { readFrontmatter, writeFrontmatter } from '../../../core/frontmatter'
 import { sceneMinutes } from '../../../core/paginate'
 import { parseFountain } from '../../../core/parser/fountain'
-import { sceneKey, type BudgetItem, type CrewMember, type ShootingDay, type ShootingLocation, type TalentMember } from '../../../core/preproduction'
+import { sceneKey, type CrewMember, type ShootingDay, type ShootingLocation, type TalentMember } from '../../../core/preproduction'
 import { project } from '../../../core/projection'
 import { useStore } from '../../store'
 
-// Preproducción en el vault: tres archivos legibles en Obsidian con todo en frontmatter. Viven bajo assets/
+// Preproducción en el vault: dos archivos legibles en Obsidian con todo en frontmatter. Viven bajo assets/
 // (como las shot lists) para entrar en el índice por el rol assets.
 export const PLAN_PATH = 'assets/preproduccion/plan-rodaje.md'
 export const TEAM_PATH = 'assets/preproduccion/equipo.md'
-export const BUDGET_PATH = 'assets/preproduccion/presupuesto.md'
 
 export type Plan = { days: ShootingDay[] }
 export type Team = { crew: CrewMember[]; talent: TalentMember[]; locations: ShootingLocation[] }
-export type Budget = { items: BudgetItem[]; contingency: number; currency: string }
 
 const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : [])
 export const uid = () => Math.random().toString(36).slice(2, 9)
@@ -52,4 +50,3 @@ function useDoc<T extends object>(path: string, read: (data: Record<string, unkn
 
 export const usePlan = () => useDoc<Plan>(PLAN_PATH, (d) => ({ days: arr<ShootingDay>(d['days']) }), '---\ntype: plan\ndays: []\n---\n\nPlan de rodaje: jornadas, escenas y llamados.\n')
 export const useTeam = () => useDoc<Team>(TEAM_PATH, (d) => ({ crew: arr<CrewMember>(d['crew']), talent: arr<TalentMember>(d['talent']), locations: arr<ShootingLocation>(d['locations']) }), '---\ntype: equipo\ncrew: []\ntalent: []\nlocations: []\n---\n\nEquipo, talento y locaciones de rodaje.\n')
-export const useBudget = () => useDoc<Budget>(BUDGET_PATH, (d) => ({ items: arr<BudgetItem>(d['items']), contingency: Number(d['contingency'] ?? 0) || 0, currency: String(d['currency'] ?? 'MXN') }), '---\ntype: presupuesto\nitems: []\ncontingency: 10\ncurrency: MXN\n---\n\nPresupuesto por partidas.\n')
