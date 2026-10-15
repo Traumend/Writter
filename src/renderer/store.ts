@@ -123,6 +123,7 @@ type Actions = {
   roleDir(kind: Exclude<FileKind, 'other'>): string
   refreshFiles(): Promise<void>
   refreshDocs(): Promise<void>
+  refreshDoc(path: string): Promise<void>
   openFile(path: string, gotoLine?: number): Promise<void>
   setTextFromEditor(text: string): void
   setTextExternal(text: string): void
@@ -518,6 +519,17 @@ export const useStore = create<State & Actions>((set, get) => ({
     if (get().vault) set({ docs: await window.api.vaultReadAll() })
   },
 
+  // Relee un solo archivo del índice: lo normal tras escribir o tras un cambio externo.
+  async refreshDoc(path) {
+    if (!get().vault) return
+    const content = await window.api.fileRead(path).then((r) => r.content, () => null)
+    set((s) => {
+      if (content === null || !s.files.some((f) => f.path === path)) return { docs: s.docs.filter((d) => d.path !== path) }
+      const doc = { path, content }
+      return { docs: s.docs.some((d) => d.path === path) ? s.docs.map((d) => (d.path === path ? doc : d)) : [...s.docs, doc] }
+    })
+  },
+
   async openFile(path, gotoLine) {
     if (get().dirty) await get().save()
     const { content, hash } = await window.api.fileRead(path)
@@ -548,7 +560,7 @@ export const useStore = create<State & Actions>((set, get) => ({
         wrote(hash)
         set({ diskHash: hash, dirty: get().text !== text, conflict: false, status: 'Guardado' })
         set({ versions: await window.api.versionList(path) })
-        await get().refreshDocs()
+        await get().refreshDoc(path)
         get().recordStats()
       } catch (e) {
         if (String(e).includes('conflict')) set({ conflict: true, status: 'Conflicto: el archivo cambió en disco' })
@@ -568,7 +580,7 @@ export const useStore = create<State & Actions>((set, get) => ({
   async createFile(path, content, open = true) {
     await window.api.fileCreate(path, content)
     await get().refreshFiles()
-    await get().refreshDocs()
+    await get().refreshDoc(path)
     if (open) await get().openFile(path)
   },
 
@@ -579,7 +591,7 @@ export const useStore = create<State & Actions>((set, get) => ({
       return
     }
     await window.api.fileWrite(path, content, undefined, 'user')
-    await get().refreshDocs()
+    await get().refreshDoc(path)
   },
 
   setScope: (scope) => set({ scope }),
@@ -761,8 +773,9 @@ window.addEventListener('vault.adopt', (e) => {
 // Cambios externos (Obsidian u otro editor): recargar si no hay cambios locales; si los hay, marcar conflicto (I10).
 window.api.onVaultChange((e) => {
   const s = useStore.getState()
-  void s.refreshFiles()
-  void s.refreshDocs()
+  // Archivo ya indexado: releer solo ese. Nuevo o borrado: actualizar la lista y luego ese archivo.
+  if (e.hash !== null && s.files.some((f) => f.path === e.path)) void s.refreshDoc(e.path)
+  else void s.refreshFiles().then(() => useStore.getState().refreshDoc(e.path))
   if (e.path !== s.path || e.hash === s.diskHash || writing || (e.hash !== null && ownHashes.has(e.hash))) return
   if (!s.dirty) void s.reloadFromDisk()
   else useStore.setState({ conflict: true, status: 'Conflicto: el archivo cambió en disco' })

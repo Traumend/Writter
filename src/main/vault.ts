@@ -123,9 +123,21 @@ export function scanFolder(dir: string): FolderGuess[] {
 }
 
 
-// ponytail: lee todo el vault en memoria para breakdown/análisis; índice incremental si un vault real lo pide.
+// Lectura para el índice (vault completo y grafo): solo relee lo que cambió de fecha o tamaño.
+// No sirve para detectar conflictos (I10): eso usa readFile, que siempre va a disco.
+const indexed = new Map<string, { mtimeMs: number; size: number; content: string }>()
+export function readIndexed(rel: string): string {
+  const abs = inVault(rel)
+  const st = statSync(abs)
+  const hit = indexed.get(abs)
+  if (hit && hit.mtimeMs === st.mtimeMs && hit.size === st.size) return hit.content
+  const content = readFileSync(abs, 'utf8')
+  indexed.set(abs, { mtimeMs: st.mtimeMs, size: st.size, content })
+  return content
+}
+
 export function readAll(): Doc[] {
-  return listFiles().map((f) => ({ path: f.path, content: readFileSync(inVault(f.path), 'utf8') }))
+  return listFiles().map((f) => ({ path: f.path, content: readIndexed(f.path) }))
 }
 
 export const hasProject = (dir: string) => existsSync(join(resolve(dir), '.narrative/project.yaml'))

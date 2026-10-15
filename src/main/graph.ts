@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { buildGraph } from '../core/graph'
 import type { Graph, GraphStatus } from '../core/types/ipc'
-import { listFiles, readConfig, readFile, vaultRoot } from './vault'
+import { listFiles, readConfig, readIndexed, vaultRoot } from './vault'
 
 // Orquestación de grafo (M2, D6). La capa determinista corre siempre en Node (I11).
 // Graphify (Python) es opcional: si existe, se lanza `graphify` sobre el vault hacia .narrative/graphify-out.
@@ -18,7 +18,7 @@ export function getGraph(): Graph {
   if (!cache || stale) {
     const cfg = readConfig()
     const [open = '[[', close = ']]'] = cfg.tags.entity_link.split(/\s+/)
-    cache = buildGraph(listFiles(), (p) => readFile(p).content, open, close)
+    cache = buildGraph(listFiles(), readIndexed, open, close)
     stale = false
   }
   return cache
