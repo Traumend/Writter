@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { checkSafeguards, estimateTokens } from '../core/safeguards'
-import type { AiProposal, AiRequest, AiText, Analysis, BreakdownItem, BreakdownProposal, ProjectConfig, Provider } from '../core/types/ipc'
+import type { AiProposal, AiRequest, AiText, Analysis, BreakdownItem, BreakdownProposal, ImageProvider, ProjectConfig, Provider } from '../core/types/ipc'
 import { getKey } from './keys'
 import { logUsage } from './vault'
 
@@ -128,6 +128,36 @@ async function call(cfg: ProjectConfig, system: string, prompt: string): Promise
   } finally {
     current = null
     progress?.(0, true)
+  }
+}
+
+// Imagen de storyboard (BYOK, proveedor aparte del de texto). Devuelve el PNG en base64 para la
+// vista previa: no se guarda nada hasta que el usuario acepta (I2).
+const IMG_MODEL: Record<ImageProvider, string> = { openai: 'gpt-image-1', grok: 'grok-2-image', custom: 'default' }
+export async function imageAi(prompt: string, cfg: ProjectConfig): Promise<string> {
+  const im = cfg.images
+  const base = (im.provider === 'custom' ? im.baseUrl : OPENAI_COMPAT[im.provider])?.replace(/\/$/, '')
+  if (!base) throw new Error(`Sin URL base para imágenes (${im.provider})`)
+  const apiKey = getKey(im.provider)
+  if (!apiKey && im.provider !== 'custom') throw new Error(`Sin clave de ${im.provider} para imágenes: añádela en Ajustes`)
+  const model = im.model || IMG_MODEL[im.provider]
+  // gpt-image-* siempre responde en base64 y admite apaisado; el resto pide base64 explícito.
+  const body = { model, prompt, n: 1, ...(model.startsWith('gpt-image') ? { size: '1536x1024' } : { response_format: 'b64_json' }) }
+  const t0 = Date.now()
+  current = new AbortController()
+  try {
+    const r = await fetch(`${base}/images/generations`, { method: 'POST', signal: current.signal, headers: { 'Content-Type': 'application/json', ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) }, body: JSON.stringify(body) })
+    if (!r.ok) throw new Error(`${im.provider} respondió ${r.status}: ${(await r.text()).slice(0, 200)}`)
+    const d = ((await r.json()) as { data?: { b64_json?: string; url?: string }[] }).data?.[0]
+    const b64 = d?.b64_json ?? (d?.url ? Buffer.from(await (await fetch(d.url)).arrayBuffer()).toString('base64') : '')
+    if (!b64) throw new Error(`${im.provider} no devolvió imagen`)
+    logUsage({ provider: im.provider, model, tokensIn: 0, tokensOut: 0, ok: true, ms: Date.now() - t0 })
+    return b64
+  } catch (e) {
+    logUsage({ provider: im.provider, model, tokensIn: 0, tokensOut: 0, ok: false, ms: Date.now() - t0 })
+    throw current?.signal.aborted ? new Error('Llamada cancelada') : e
+  } finally {
+    current = null
   }
 }
 

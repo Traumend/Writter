@@ -9,7 +9,7 @@ import { fdxToMd, fountainToMd } from '../core/convert'
 import { parseFountain } from '../core/parser/fountain'
 import { project } from '../core/projection'
 import type { AdoptRole, AiRequest, Analysis, FileEntry, OpenResult, ProjectConfig, VaultChange, Version } from '../core/types/ipc'
-import { aiText, analyze, breakdownAi, cancelAi, devDoc, doctorAi, runAi, setAiProgress, testAi } from './ai'
+import { aiText, analyze, breakdownAi, cancelAi, devDoc, doctorAi, imageAi, runAi, setAiProgress, testAi } from './ai'
 import { getGraph, graphBuild, graphStatus, markStale } from './graph'
 import { clearKeys, keyStatus, setKey } from './keys'
 import * as V from './vault'
@@ -141,6 +141,8 @@ ipcMain.handle('asset.pick', async () => {
   return r.filePaths[0] ? V.importAsset(r.filePaths[0]) : null
 })
 ipcMain.handle('asset.read', (_e, rel: string) => V.readAsset(rel))
+ipcMain.handle('asset.write', (_e, dir: string, name: string, b64: string) => V.writeAsset(dir, name, b64))
+ipcMain.handle('ai.image', (_e, prompt: string) => imageAi(prompt, V.readConfig()))
 
 // Export PDF: ventana oculta + printToPDF nativo (sin dependencia externa).
 ipcMain.handle('export.pdf', async (_e, html: string, suggested: string, opts: { paper: 'Letter' | 'A4'; headerTemplate?: string; footerTemplate?: string }) => {

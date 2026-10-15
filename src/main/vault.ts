@@ -37,7 +37,8 @@ export function readConfig(): ProjectConfig {
     pdf: { ...DEFAULT_CONFIG.pdf, ...c.pdf },
     roles: { ...DEFAULT_CONFIG.roles, ...c.roles },
     characterSliders: Array.isArray(c.characterSliders) ? c.characterSliders : DEFAULT_CONFIG.characterSliders,
-    backups: { ...DEFAULT_CONFIG.backups, ...c.backups }
+    backups: { ...DEFAULT_CONFIG.backups, ...c.backups },
+    images: { ...DEFAULT_CONFIG.images, ...c.images }
   }
 }
 
@@ -303,6 +304,16 @@ export function readVersion(rel: string, id: string): string {
 }
 
 // --- Assets: copia imágenes a assets/ y las sirve como data URL al renderer (que no toca fs).
+// Imagen aceptada (storyboard con IA): se escribe en assets/ con un nombre que no pisa nada.
+export function writeAsset(dir: string, name: string, b64: string): string {
+  const safe = name.replace(/[^\w\-]+/g, '-').slice(0, 60) || 'img'
+  let rel = `assets/${dir}/${safe}.png`
+  for (let i = 2; existsSync(inVault(rel)); i++) rel = `assets/${dir}/${safe}-${i}.png`
+  mkdirSync(join(inVault(rel), '..'), { recursive: true })
+  writeFileSync(inVault(rel), Buffer.from(b64, 'base64'))
+  return rel
+}
+
 export function importAsset(src: string): string {
   const name = basename(src)
   const rel = `assets/${name}`

@@ -371,6 +371,16 @@ main.page.bt { min-height: 0; gap: 8px; }
 .table input, .table textarea, .table select { margin-bottom: 0; }
 .thumb { width: 66px; height: 42px; border-radius: var(--r-sm); display: grid; place-items: center; overflow: hidden; cursor: pointer; background: var(--sink); box-shadow: var(--inset); }
 .thumb img { width: 100%; height: 100%; object-fit: cover; }
+.thumb { position: relative; cursor: default; }
+.thumb .x { position: absolute; top: 2px; right: 2px; padding: 1px; min-height: 0; opacity: 0; background: var(--panel); }
+.thumb:hover .x, .thumb .x:focus-visible { opacity: 1; }
+.frames { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; max-width: 260px; }
+/* tira de la escena: fotogramas grandes en orden de toma */
+.strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin: 8px 0 16px; }
+.strip figure { margin: 0; }
+.strip .thumb { width: 100%; height: auto; aspect-ratio: 3 / 2; }
+.strip figcaption { margin-top: 4px; }
+img.preview { display: block; max-width: 100%; max-height: 420px; border-radius: var(--r-sm); margin-top: 8px; }
 
 /* ajustes */
 .settings .preview .paper { background: #fff; color: #000; font: 11px "Courier New", monospace; aspect-ratio: 8.5 / 11; padding: 18% 8% 6%; text-align: center; position: relative; border-radius: 6px; box-shadow: var(--raise); }

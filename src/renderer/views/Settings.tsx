@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { validateTags } from '../../core/tags'
 import { estimateCost, fmtCost } from '../../core/ai/prices'
-import { DEFAULT_PROMPTS, type AiTest, type BackupInfo, type ProjectConfig, type Provider, type UsageStats } from '../../core/types/ipc'
+import { DEFAULT_PROMPTS, type AiTest, type BackupInfo, type ImageProvider, type KeyStatus, type ProjectConfig, type Provider, type UsageStats } from '../../core/types/ipc'
 import { t } from '../i18n'
 import { useStore } from '../store'
 import { Field, useAsset } from '../ui'
@@ -12,6 +12,30 @@ const PROVIDERS: [Provider, string][] = [
 ]
 const NEEDS_KEY = (p: Provider) => p !== 'ollama'
 const REASONING: Record<string, string> = { off: 'Apagado', low: 'Bajo', medium: 'Medio', high: 'Alto' }
+const IMAGE_PROVIDERS: [ImageProvider, string][] = [['openai', 'OpenAI (gpt-image-1)'], ['grok', 'Grok (xAI)'], ['custom', 'Custom (compatible OpenAI)']]
+
+// Imágenes del storyboard: proveedor aparte del de texto (Anthropic no genera imágenes), con su propia
+// clave en el keychain del SO.
+function ImageSettings({ c, set }: { c: ProjectConfig; set: (v: Partial<ProjectConfig['images']>) => void }) {
+  const [key, setKey] = useState('')
+  const [st, setSt] = useState<KeyStatus | null>(null)
+  const p = c.images.provider
+  useEffect(() => { void window.api.keysStatus(p).then(setSt) }, [p])
+  return (
+    <>
+      <h2>{t('Imágenes del storyboard')}</h2>
+      <Field label={t('Proveedor')}>
+        <select value={p} onChange={(e) => set({ provider: e.target.value as ImageProvider })}>{IMAGE_PROVIDERS.map(([k, l]) => <option key={k} value={k}>{t(l)}</option>)}</select>
+      </Field>
+      {p === 'custom' && <Field label={t('URL base (compatible OpenAI)')}><input value={c.images.baseUrl ?? ''} placeholder="http://localhost:1234/v1" onChange={(e) => set({ baseUrl: e.target.value || undefined })} /></Field>}
+      <Field label={t('Modelo')}><input value={c.images.model ?? ''} placeholder={t('por defecto del proveedor')} onChange={(e) => set({ model: e.target.value || undefined })} /></Field>
+      <Field label={`${t('Clave')} · ${st?.present ? t('guardada en el keychain del SO') : t('sin clave')}`}>
+        <input type="password" placeholder={t('Pegar clave y Enter')} value={key} onChange={(e) => setKey(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && key) { void window.api.keysSet(p, key).then(setSt); setKey('') } }} />
+      </Field>
+      <p className="muted tiny">{t('Si usas el mismo proveedor para texto e imágenes, la clave es la misma.')}</p>
+    </>
+  )
+}
 
 export function Settings() {
   const { vault, keyStatus, saveKey, saveConfig } = useStore()
@@ -76,6 +100,7 @@ export function Settings() {
           ))}
           <button className="mini ghost" onClick={() => set('byok', { headers: [...(c.byok.headers ?? []), { name: '', value: '' }] })}>+ {t('cabecera')}</button>
           <p className="muted tiny">{t('La clave se guarda en el keychain del SO por proveedor; nunca en el vault ni en el renderer.')} {c.byok.provider === 'openrouter' && t('OpenRouter da modelos gratis (usa uno que termine en :free).')}</p>
+          <ImageSettings c={c} set={(v) => set('images', v)} />
         </div>
         <div className="panelbox">
           <h2>{t('Legal y privacidad')}</h2>

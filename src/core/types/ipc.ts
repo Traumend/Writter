@@ -2,6 +2,7 @@
 export type AdoptRole = 'script' | 'character' | 'location' | 'prop' | 'outline' | 'knowledge' | 'assets'
 
 export type Provider = 'anthropic' | 'ollama' | 'openai' | 'openrouter' | 'gemini' | 'deepseek' | 'grok' | 'custom'
+export type ImageProvider = 'openai' | 'grok' | 'custom'
 
 export type ProjectConfig = {
   format: { default: 'md' | 'fountain'; live_format: boolean }
@@ -20,6 +21,7 @@ export type ProjectConfig = {
   roles: Record<AdoptRole, string[]> // carpetas por rol (adopción, Pieza 1); Writter lee desde aquí
   characterSliders: { id: string; label: string; lo: string; hi: string; color: string }[] // sliders personalizados del proyecto
   backups: { folder: string; everyMinutes: number; keep: number; lastTs: number } // respaldo automático a carpeta
+  images: { provider: ImageProvider; model?: string; baseUrl?: string } // storyboard con IA: proveedor aparte del de texto
 }
 
 export type FileKind = 'script' | 'character' | 'location' | 'prop' | 'outline' | 'knowledge' | 'other'
@@ -125,6 +127,8 @@ export type Api = {
   graphGet(): Promise<Graph>
   assetPick(): Promise<string | null>
   assetRead(rel: string): Promise<string>
+  assetWrite(dir: string, name: string, b64: string): Promise<string>
+  aiImage(prompt: string): Promise<string> // PNG en base64, sin guardar
   exportPdf(html: string, suggestedName: string, opts: { paper: 'Letter' | 'A4'; headerTemplate?: string; footerTemplate?: string }): Promise<string | null>
   exportText(content: string, suggestedName: string): Promise<string | null>
   exportBytes(base64: string, suggestedName: string): Promise<string | null>
@@ -173,7 +177,8 @@ export const DEFAULT_CONFIG: ProjectConfig = {
     assets: ['assets']
   },
   characterSliders: [],
-  backups: { folder: '', everyMinutes: 0, keep: 5, lastTs: 0 }
+  backups: { folder: '', everyMinutes: 0, keep: 5, lastTs: 0 },
+  images: { provider: 'openai' }
 }
 
 export const KIND_DIR: Record<Exclude<FileKind, 'other'>, string> = {
