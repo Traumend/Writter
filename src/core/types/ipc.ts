@@ -57,11 +57,12 @@ export type AiRequest = {
 export type AiProposal = { replacement: string; rationale: string; tokensIn: number; tokensOut: number; model: string; docHash: string }
 export type AiText = { text: string; tokensIn: number; tokensOut: number; model: string }
 
-export type SceneAnalysis = { index: number; summary: string; emotion: string; intensity: number; tension: number; attention: number; commercial: number; notes: string[] }
+export type SceneAnalysis = { index: number; heading?: string; summary: string; emotion: string; intensity: number; tension: number; attention: number; commercial: number; notes: string[] }
 export type Analysis = {
   id: string
   ts: number
   model: string
+  scriptHash?: string // hash del guion analizado (versiones antiguas no lo traen)
   structure: string
   plot: string
   theme: string

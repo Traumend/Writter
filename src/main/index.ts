@@ -6,6 +6,8 @@ import { backupName, createBackup, readBackup, restoreBackup, rotate, scheduleAu
 import { pdfToScript } from './pdfimport'
 import { readSwx } from './swx'
 import { fdxToMd, fountainToMd } from '../core/convert'
+import { parseFountain } from '../core/parser/fountain'
+import { project } from '../core/projection'
 import type { AdoptRole, AiRequest, Analysis, FileEntry, OpenResult, ProjectConfig, VaultChange, Version } from '../core/types/ipc'
 import { aiText, analyze, breakdownAi, cancelAi, devDoc, doctorAi, runAi, setAiProgress, testAi } from './ai'
 import { getGraph, graphBuild, graphStatus, markStale } from './graph'
@@ -120,7 +122,10 @@ ipcMain.handle('file.delete', (_e, rel: string) => {
   return r
 })
 ipcMain.handle('ai.analyze', async (_e, rel: string, text: string): Promise<Analysis> => {
-  const a = await analyze(text, V.readConfig())
+  const r = await analyze(text, V.readConfig())
+  // Encabezado real de cada escena y hash del texto: así dos versiones se comparan escena a escena.
+  const heads = project(parseFountain(text)).scenes.map((s) => s.heading)
+  const a = { ...r, scriptHash: V.sha(text), scenes: r.scenes.map((s) => ({ ...s, heading: heads[s.index] })) }
   const ts = Date.now()
   const id = V.saveAnalysis(rel, { ...a, ts })
   return { ...a, id, ts }
