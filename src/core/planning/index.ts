@@ -1,6 +1,7 @@
 // Planificación narrativa (clean-room): tracks, preguntas dramáticas, plant & payoff, ideas (escenas huérfanas),
 // meta de palabras, metadatos por escena y motor de personaje. Todo vive en frontmatter .md (Obsidian-native).
 import { readFrontmatter } from '../frontmatter'
+import type { Revision, RevisionScope } from '../revisions'
 
 export const PLANNING_PATH = 'outline/Planning.md'
 
@@ -13,10 +14,11 @@ export type Plant = { id: string; title: string; type: string; plant?: SceneRef;
 export type Idea = { id: string; title: string; summary: string; characters: string[]; track: string; created: number }
 export type ProjectStatus = 'idea' | 'planning' | 'drafting' | 'revising' | 'done' | 'archived'
 export const PROJECT_STATUS: [ProjectStatus, string][] = [['idea', 'Idea'], ['planning', 'Planificando'], ['drafting', 'Escribiendo'], ['revising', 'Revisando'], ['done', 'Terminado'], ['archived', 'Archivado']]
-export type Planning = { goal: number; dailyGoal: number; logline: string; synopsis: string; genre: string; status: ProjectStatus; tracks: Track[]; questions: Question[]; plants: Plant[]; ideas: Idea[] }
+export type Planning = { goal: number; dailyGoal: number; logline: string; synopsis: string; genre: string; status: ProjectStatus; tracks: Track[]; questions: Question[]; plants: Plant[]; ideas: Idea[]; revisions: Revision[] }
 
 export type SceneStatus = 'idea' | 'outline' | 'planned' | 'draft' | 'revision' | 'revised' | 'final' | 'cut'
 export const SCENE_STATUS: SceneStatus[] = ['idea', 'outline', 'planned', 'draft', 'revision', 'revised', 'final', 'cut']
+export const SCENE_STATUS_ES: Record<SceneStatus, string> = { idea: 'Idea', outline: 'Escaleta', planned: 'Planeada', draft: 'Borrador', revision: 'Necesita revisión', revised: 'Revisada', final: 'Final', cut: 'Cortada' }
 export const QUESTION_STATUS: QuestionStatus[] = ['open', 'developing', 'partial', 'answered', 'abandoned']
 // Campos narrativos de la escena (PRD §16): el texto sigue en el guion; esto es la ficha de planificación.
 // `numero`/`omitida`/`presencia` son la parte de industria (compatibilidad con ScriptWriterX): número de escena
@@ -64,6 +66,11 @@ export function readPlanning(content: string | undefined): Planning {
     plants: arr<Partial<Plant>>(d['plants']).map((p, i) => ({
       id: String(p.id ?? `p${i}`), title: String(p.title ?? ''), type: String(p.type ?? ''), plant: ref(p.plant), payoffs: arr<unknown>(p.payoffs).map(ref).filter((x): x is SceneRef => !!x),
       characters: arr<string>(p.characters).map(String), notes: String(p.notes ?? '')
+    })),
+    revisions: arr<Partial<Revision>>(d['revisions']).map((r, i) => ({
+      id: String(r.id ?? `r${i}`), numero: Number(r.numero ?? i + 1) || i + 1, color: String(r.color ?? 'Blue'), fecha: String(r.fecha ?? ''), motivo: String(r.motivo ?? ''),
+      alcance: (r.alcance === 'proyecto' ? 'proyecto' : 'episodio') as RevisionScope, script: r.script ? String(r.script) : undefined,
+      base: r.base && typeof r.base === 'object' ? Object.fromEntries(Object.entries(r.base as Record<string, unknown>).map(([k, v]) => [k, String(v)])) : {}
     })),
     ideas: arr<Partial<Idea>>(d['ideas']).map((x, i) => ({ id: String(x.id ?? `i${i}`), title: String(x.title ?? ''), summary: String(x.summary ?? ''), characters: arr<string>(x.characters).map(String), track: String(x.track ?? ''), created: Number(x.created ?? 0) }))
   }

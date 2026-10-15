@@ -16,6 +16,7 @@ export async function exportProjectJson(): Promise<void> {
   const name = `${data.vault}-${new Date().toISOString().slice(0, 10)}.writter.json`
   await window.api.exportText(JSON.stringify(data, null, 1), name)
   useStore.setState({ status: 'Copia de seguridad exportada' })
+  useStore.getState().toast('Copia de seguridad exportada')
 }
 
 // Importa en el vault abierto: crea los archivos que no existen y sobrescribe los existentes (con snapshot previo vía versionado).
@@ -70,6 +71,7 @@ export async function importSwxProject(): Promise<void> {
   await s.refreshFiles()
   await s.refreshDocs()
   useStore.setState({ status: `ScriptWriterX importado: ${resumen}` })
+  useStore.getState().toast(`ScriptWriterX importado: ${report.scripts} guion(es), ${report.characters + report.locations + report.items} fichas`)
 }
 
 // Exporta el vault como .swx (ZIP con project.json) para abrirlo en ScriptWriterX.
@@ -93,4 +95,5 @@ export async function exportSwxProject(): Promise<void> {
   const zip = zipStore([{ name: 'project.json', data: new TextEncoder().encode(json) }])
   await window.api.exportBytes(b64(zip), `${title}.swx`)
   useStore.setState({ status: `Exportado a .swx: ${scripts.length} guion(es), ${entities.length} ficha(s)` })
+  useStore.getState().toast(`Exportado a .swx: ${scripts.length} guion(es)`)
 }

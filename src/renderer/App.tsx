@@ -193,6 +193,7 @@ export function App() {
     return () => window.removeEventListener('keydown', h)
   }, [])
   // Menú nativo: ejecuta sus comandos y le manda idioma, recientes y estado de los conmutadores de Ver.
+  useEffect(() => { window.api.onAiProgress((p) => useStore.setState({ aiChars: p.done ? 0 : p.chars })) }, [])
   useEffect(() => { window.api.onMenu((id) => (id.startsWith('openPath:') ? void useStore.getState().openVaultPath(id.slice(9)) : runCommand(id))) }, [])
   useEffect(() => { window.api.menuSetup({ lang: getLang(), recents: s.recents, focus: s.prefs.focus, page: s.prefs.page, tags: s.showTags }) }, [s.recents, s.prefs.focus, s.prefs.page, s.showTags])
   // Migas (PRD 193): proyecto / vista / subvista, para saber donde se esta sin leer las pestanas.
@@ -258,6 +259,11 @@ export function App() {
       <QuickNote />
       <NewEntity />
       <Shortcuts />
+      {s.toasts.length > 0 && (
+        <div className="toasts">
+          {s.toasts.map((x) => <div key={x.id} className={`toast ${x.kind}`}>{x.text}</div>)}
+        </div>
+      )}
       <footer>
         <span>{s.status ? t(s.status) : '—'}</span>
         <span className="grow" />

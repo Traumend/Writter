@@ -17,6 +17,14 @@ export function setKey(provider: string, key: string): KeyStatus {
 
 export const keyStatus = (provider: string): KeyStatus => ({ provider, present: provider in read() })
 
+// Zona de peligro (ScriptWriterX §63): borrar las claves guardadas en este equipo.
+export function clearKeys(): number {
+  const keys = read()
+  const n = Object.keys(keys).length
+  writeFileSync(file(), JSON.stringify({}))
+  return n
+}
+
 // Solo para uso interno de main/ai.ts. Nunca cruza IPC.
 export function getKey(provider: string): string | null {
   const enc = read()[provider]

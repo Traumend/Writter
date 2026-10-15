@@ -36,7 +36,9 @@ export function readConfig(): ProjectConfig {
     cover: { ...DEFAULT_CONFIG.cover, ...c.cover },
     pdf: { ...DEFAULT_CONFIG.pdf, ...c.pdf },
     roles: { ...DEFAULT_CONFIG.roles, ...c.roles },
-    characterSliders: Array.isArray(c.characterSliders) ? c.characterSliders : DEFAULT_CONFIG.characterSliders
+    characterSliders: Array.isArray(c.characterSliders) ? c.characterSliders : DEFAULT_CONFIG.characterSliders,
+    backups: { ...DEFAULT_CONFIG.backups, ...c.backups },
+    images: { ...DEFAULT_CONFIG.images, ...c.images }
   }
 }
 
@@ -122,9 +124,21 @@ export function scanFolder(dir: string): FolderGuess[] {
 }
 
 
-// ponytail: lee todo el vault en memoria para breakdown/análisis; índice incremental si un vault real lo pide.
+// Lectura para el índice (vault completo y grafo): solo relee lo que cambió de fecha o tamaño.
+// No sirve para detectar conflictos (I10): eso usa readFile, que siempre va a disco.
+const indexed = new Map<string, { mtimeMs: number; size: number; content: string }>()
+export function readIndexed(rel: string): string {
+  const abs = inVault(rel)
+  const st = statSync(abs)
+  const hit = indexed.get(abs)
+  if (hit && hit.mtimeMs === st.mtimeMs && hit.size === st.size) return hit.content
+  const content = readFileSync(abs, 'utf8')
+  indexed.set(abs, { mtimeMs: st.mtimeMs, size: st.size, content })
+  return content
+}
+
 export function readAll(): Doc[] {
-  return listFiles().map((f) => ({ path: f.path, content: readFileSync(inVault(f.path), 'utf8') }))
+  return listFiles().map((f) => ({ path: f.path, content: readIndexed(f.path) }))
 }
 
 export const hasProject = (dir: string) => existsSync(join(resolve(dir), '.narrative/project.yaml'))
@@ -290,6 +304,16 @@ export function readVersion(rel: string, id: string): string {
 }
 
 // --- Assets: copia imágenes a assets/ y las sirve como data URL al renderer (que no toca fs).
+// Imagen aceptada (storyboard con IA): se escribe en assets/ con un nombre que no pisa nada.
+export function writeAsset(dir: string, name: string, b64: string): string {
+  const safe = name.replace(/[^\w\-]+/g, '-').slice(0, 60) || 'img'
+  let rel = `assets/${dir}/${safe}.png`
+  for (let i = 2; existsSync(inVault(rel)); i++) rel = `assets/${dir}/${safe}-${i}.png`
+  mkdirSync(join(inVault(rel), '..'), { recursive: true })
+  writeFileSync(inVault(rel), Buffer.from(b64, 'base64'))
+  return rel
+}
+
 export function importAsset(src: string): string {
   const name = basename(src)
   const rel = `assets/${name}`
@@ -307,7 +331,7 @@ export function readAsset(rel: string): string {
 // --- Análisis IA (D): derivado, en .narrative/analysis/<script>/<ts>.json
 // --- Medidor de uso de IA (JSONL en .narrative/usage.log, agregado local; nunca guarda la clave).
 const usageFile = () => join(vaultRoot(), '.narrative/usage.log')
-type UsageRow = { ts: number; provider: string; model: string; tokensIn: number; tokensOut: number; ok: boolean }
+type UsageRow = { ts: number; provider: string; model: string; tokensIn: number; tokensOut: number; ok: boolean; ms?: number }
 export function logUsage(r: Omit<UsageRow, 'ts'>) {
   if (!root) return
   try {
@@ -317,7 +341,7 @@ export function logUsage(r: Omit<UsageRow, 'ts'>) {
   }
 }
 export function usageStats() {
-  const empty = { calls: 0, fails: 0, tokensIn: 0, tokensOut: 0, byModel: [] as { model: string; calls: number; tokensIn: number; tokensOut: number }[] }
+  const empty = { calls: 0, fails: 0, tokensIn: 0, tokensOut: 0, byModel: [] as { model: string; calls: number; tokensIn: number; tokensOut: number }[], recent: [] as UsageRow[] }
   if (!existsSync(usageFile())) return empty
   const per = new Map<string, { model: string; calls: number; tokensIn: number; tokensOut: number }>()
   for (const line of readFileSync(usageFile(), 'utf8').split('\n')) {
@@ -332,8 +356,10 @@ export function usageStats() {
     const m = per.get(key) ?? { model: key, calls: 0, tokensIn: 0, tokensOut: 0 }
     m.calls++; m.tokensIn += r.tokensIn || 0; m.tokensOut += r.tokensOut || 0
     per.set(key, m)
+    empty.recent.push(r)
   }
   empty.byModel = [...per.values()].sort((a, b) => b.calls - a.calls)
+  empty.recent = empty.recent.slice(-25).reverse() // historial de llamadas (solo metadatos)
   return empty
 }
 export function usageReset() {

@@ -1,11 +1,13 @@
 import { useMemo, useState, type ReactNode } from 'react'
+import { categoryLabel } from '../../../core/breakdown'
 import { readFrontmatter } from '../../../core/frontmatter'
-import { SCENE_STATUS, type SceneStatus } from '../../../core/planning'
+import { SCENE_STATUS, SCENE_STATUS_ES as STATUS_LABEL, type SceneStatus } from '../../../core/planning'
 import { t } from '../../i18n'
 import { useStore } from '../../store'
 import { BlurInput, Icon } from '../../ui'
 import { refLabel, useCards, usePlanning, useScripts, useSceneMetaWriter } from './data'
 import { useOpenScene } from './shared'
+import { Summaries } from './Summaries'
 
 type Cat = 'scenes' | 'beats' | 'characters' | 'locations' | 'props' | 'questions' | 'plants' | 'ideas' | 'tags' | 'notes'
 // Una celda es su valor (orden, búsqueda y CSV) y, si es editable, el control que la pinta.
@@ -13,7 +15,6 @@ type Cell = string | number | { v: string | number; node: ReactNode }
 type Row = { id: string; cells: Cell[]; open?: () => void }
 const val = (c: Cell): string | number => (typeof c === 'object' ? c.v : c)
 
-const STATUS_LABEL: Record<SceneStatus, string> = { idea: 'Idea', outline: 'Escaleta', planned: 'Planeada', draft: 'Borrador', revision: 'Necesita revisión', revised: 'Revisada', final: 'Final', cut: 'Cortada' }
 
 // Index: navegador tabular de toda la información del proyecto (una historia, muchas vistas),
 // con edición en línea de los campos simples de escena (PRD §71) y filtros (PRD §96).
@@ -32,6 +33,7 @@ export function Index() {
   const [sortCol, setSortCol] = useState(0)
   const [asc, setAsc] = useState(true)
   const [colsOpen, setColsOpen] = useState(false)
+  const [sumOpen, setSumOpen] = useState(false)
   const [hidden, setHidden] = useState<Record<string, string[]>>(() => { try { return JSON.parse(localStorage.getItem('writter.index.cols') || '{}') as Record<string, string[]> } catch { return {} } })
   const isHidden = (c: string) => (hidden[cat] ?? []).includes(c)
   const toggleCol = (c: string) => setHidden((h) => { const cur = h[cat] ?? []; const next = { ...h, [cat]: cur.includes(c) ? cur.filter((x) => x !== c) : [...cur, c] }; localStorage.setItem('writter.index.cols', JSON.stringify(next)); return next })
@@ -41,7 +43,7 @@ export function Index() {
   const { cols, rows } = useMemo((): { cols: string[]; rows: Row[] } => {
     switch (cat) {
       case 'scenes': return {
-        cols: ['#', 'Escena', 'Episodio', 'Estado', 'POV', 'Track', 'Etiquetas', 'Personajes', 'Palabras', 'Min'],
+        cols: ['#', 'Escena', 'Episodio', 'Sinopsis', 'Estado', 'POV', 'Track', 'Etiquetas', 'Personajes', 'Palabras', 'Min'],
         rows: scripts.flatMap((s) => s.scenes.map((sc, i) => {
           const m = s.sceneMeta[sc.heading] ?? {}
           const track = planning.tracks.find((tr) => tr.id === m.track)
@@ -50,6 +52,7 @@ export function Index() {
             cells: [
               // Número de industria si lo hay (5A, 34B); OMITIDA se marca junto al encabezado.
               m.numero ?? i + 1, `${m.omitida ? 'OMITIDA · ' : ''}${sc.heading}`, s.name,
+              { v: m.summary ?? '', node: <span onClick={(e) => e.stopPropagation()}><BlurInput textarea rows={2} value={m.summary ?? ''} onCommit={(v) => void writeMeta(s, sc.heading, { summary: v || undefined })} /></span> },
               // Edición en línea: escribe en outline/<guion>.md sin abrir el Planner.
               { v: m.status ? t(STATUS_LABEL[m.status]) : '', node: <select value={m.status ?? ''} onClick={(e) => e.stopPropagation()} onChange={(e) => void writeMeta(s, sc.heading, { status: (e.target.value || undefined) as SceneStatus | undefined })}><option value="">—</option>{SCENE_STATUS.map((st) => <option key={st} value={st}>{t(STATUS_LABEL[st])}</option>)}</select> },
               { v: m.pov ?? '', node: <select value={m.pov ?? ''} onClick={(e) => e.stopPropagation()} onChange={(e) => void writeMeta(s, sc.heading, { pov: e.target.value })}><option value="">—</option>{[...new Set([...sc.characters, ...chars])].map((c) => <option key={c} value={c}>{c}</option>)}</select> },
@@ -70,7 +73,7 @@ export function Index() {
       }
       case 'characters': return { cols: ['Nombre', 'Grupo', 'Actor', 'Escenas', 'Alias', 'Palabras'], rows: cards.filter((c) => c.kind === 'character').map((c) => ({ id: c.path, cells: [c.name, c.group, c.actor, c.appearances.length, c.aliases.join(', '), c.words], open: open(c.path) })) }
       case 'locations': return { cols: ['Nombre', 'Escenas', 'Alias'], rows: cards.filter((c) => c.kind === 'location').map((c) => ({ id: c.path, cells: [c.name, c.appearances.length, c.aliases.join(', ')], open: open(c.path) })) }
-      case 'props': return { cols: ['Nombre', 'Escenas', 'Alias'], rows: cards.filter((c) => c.kind === 'prop').map((c) => ({ id: c.path, cells: [c.name, c.appearances.length, c.aliases.join(', ')], open: open(c.path) })) }
+      case 'props': return { cols: ['Nombre', 'Categoría', 'Escenas', 'Alias'], rows: cards.filter((c) => c.kind === 'prop').map((c) => ({ id: c.path, cells: [c.name, categoryLabel(c.category), c.appearances.length, c.aliases.join(', ')], open: open(c.path) })) }
       case 'questions': return { cols: ['Pregunta', 'Estado', 'Importancia', 'Se plantea', 'Hitos', 'Se resuelve', 'Personajes'], rows: planning.questions.map((x) => ({ id: x.id, cells: [x.text, x.status, x.importance, refLabel(x.introduced, scripts), x.beats.length, refLabel(x.resolved, scripts), x.characters.join(', ')], open: () => openScene(scripts, x.introduced) })) }
       case 'plants': return { cols: ['Plant', 'Tipo', 'Se planta', 'Payoffs', 'Personajes'], rows: planning.plants.map((x) => ({ id: x.id, cells: [x.title, x.type, refLabel(x.plant, scripts), x.payoffs.map((p) => refLabel(p, scripts)).join(', '), x.characters.join(', ')], open: () => openScene(scripts, x.plant) })) }
       case 'ideas': return { cols: ['Idea', 'Sinopsis', 'Personajes', 'Track'], rows: planning.ideas.map((x) => ({ id: x.id, cells: [x.title, x.summary, x.characters.join(', '), planning.tracks.find((tr) => tr.id === x.track)?.name ?? ''] })) }
@@ -108,8 +111,11 @@ export function Index() {
           <select value={fTrack} onChange={(e) => setFTrack(e.target.value)}><option value="">{t('Todos los tracks')}</option>{planning.tracks.map((tr) => <option key={tr.id} value={tr.name}>{tr.name}</option>)}</select>
           <select value={fChar} onChange={(e) => setFChar(e.target.value)}><option value="">{t('Todos los personajes')}</option>{chars.map((c) => <option key={c} value={c}>{c}</option>)}</select>
           {(fStatus || fTrack || fChar) && <button className="mini ghost" onClick={() => { setFStatus(''); setFTrack(''); setFChar('') }}>{t('Limpiar')}</button>}
+          <span className="grow" />
+          <button className={sumOpen ? 'mini on' : 'mini ghost'} onClick={() => setSumOpen((v) => !v)}>✦ {t('Resúmenes con IA')}</button>
         </div>
       )}
+      {cat === 'scenes' && sumOpen && <Summaries />}
       <table className="table">
         <thead><tr>{keep.map(([c, i]) => <th key={c} className="link" onClick={() => { if (sortCol === i) setAsc(!asc); else { setSortCol(i); setAsc(true) } }}>{t(c)}{sortCol === i ? (asc ? ' ▲' : ' ▼') : ''}</th>)}</tr></thead>
         <tbody>{list.map((r) => <tr key={r.id} className={r.open ? 'link' : ''} onClick={r.open}>{keep.map(([c, i]) => { const cell = r.cells[i] ?? ''; return <td key={c}>{typeof cell === 'object' ? cell.node : cell}</td> })}</tr>)}</tbody>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { METRICS, compareAnalyses, type CompareRow, type Metric } from '../../core/analysis'
 import { doctor } from '../../core/doctor'
 import { readFrontmatter } from '../../core/frontmatter'
 import { parseFountain } from '../../core/parser/fountain'
@@ -8,7 +9,6 @@ import { t } from '../i18n'
 import { cleanErr, useStore } from '../store'
 import { Icon, EpisodeSelect, useDoc } from '../ui'
 
-type Metric = 'intensity' | 'tension' | 'attention' | 'commercial'
 const SERIES: [Metric, string, string][] = [
   ['intensity', 'Intensidad emocional', '#e8437f'],
   ['tension', 'Tensión dramática', '#c47d1a'],
@@ -77,6 +77,31 @@ function EditList({ title, items, onChange }: { title: string; items: string[]; 
       </ul>
       <input placeholder={t('Añadir nota · Enter')} value={add} onChange={(e) => setAdd(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && add.trim()) { onChange([...items, add.trim()]); setAdd('') } }} />
     </div>
+  )
+}
+
+// Diferencias escena a escena entre la versión comparada (antes) y la actual (después).
+const STATUS_LABEL: Record<CompareRow['status'], string> = { same: '', moved: 'movida', new: 'nueva', cut: 'cortada' }
+function CompareTable({ before, after }: { before: A; after: A }) {
+  const rows = compareAnalyses(before.scenes, after.scenes)
+  const fmt = (d: number) => <span style={{ color: d > 0 ? '#3ddc97' : d < 0 ? '#ff7a6b' : 'var(--dim)' }}>{d > 0 ? `+${d}` : d}</span>
+  const sameText = before.scriptHash && before.scriptHash === after.scriptHash
+  return (
+    <>
+      <h2>{t('Diferencias por escena')} <span className="muted tiny">{new Date(before.ts).toLocaleString()} → {new Date(after.ts).toLocaleString()}{sameText ? ` · ${t('mismo texto: solo cambia la lectura del modelo')}` : ''}</span></h2>
+      <table className="table">
+        <thead><tr><th>#</th><th>{t('Escena')}</th><th>{t('Estado')}</th>{METRICS.map((m) => <th key={m}>Δ {t(SERIES.find(([k]) => k === m)?.[1] ?? m)}</th>)}<th>{t('Emoción')}</th></tr></thead>
+        <tbody>{rows.map((r, i) => (
+          <tr key={i} className={r.status === 'cut' ? 'muted' : ''}>
+            <td>{r.to === null ? '—' : r.to + 1}</td>
+            <td className="ell">{r.heading}</td>
+            <td className="tiny">{STATUS_LABEL[r.status] && t(STATUS_LABEL[r.status])}{r.status === 'moved' ? ` (${r.from! + 1}→${r.to! + 1})` : ''}</td>
+            {METRICS.map((m) => <td key={m}>{r.status === 'new' || r.status === 'cut' ? '—' : fmt(r.delta[m])}</td>)}
+            <td className="tiny">{r.emotion[0] === r.emotion[1] ? r.emotion[1] : `${r.emotion[0] || '—'} → ${r.emotion[1] || '—'}`}</td>
+          </tr>
+        ))}</tbody>
+      </table>
+    </>
   )
 }
 
@@ -195,6 +220,7 @@ export function Analysis() {
           </div>
           <h2>{t('Timeline — métricas del guion')}</h2>
           <Chart a={cur} cmp={cmp} markers={beats} chars={charsAt} on={on} onPick={setPick} onGo={goScene} svgRef={svgRef} zoom={zoom} />
+          {cmp && <CompareTable before={cmp} after={cur} />}
 
           <h2>{t('Paleta de emociones')}</h2>
           <div className="palette">

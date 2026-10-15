@@ -69,14 +69,14 @@ export function Field({ label, children }: { label: string; children: React.Reac
 }
 
 // Texto que se guarda al salir del campo (evita una escritura por tecla).
-export function BlurInput({ value, onCommit, textarea, placeholder, rows }: { value: string; onCommit: (v: string) => void; textarea?: boolean; placeholder?: string; rows?: number }) {
+export function BlurInput({ value, onCommit, textarea, placeholder, rows, type }: { value: string; onCommit: (v: string) => void; textarea?: boolean; placeholder?: string; rows?: number; type?: 'date' | 'time' }) {
   const [v, setV] = useState(value)
   useEffect(() => setV(value), [value])
   const commit = () => v !== value && onCommit(v)
   return textarea ? (
     <textarea value={v} rows={rows ?? 3} placeholder={placeholder} onChange={(e) => setV(e.target.value)} onBlur={commit} />
   ) : (
-    <input value={v} placeholder={placeholder} onChange={(e) => setV(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === 'Enter' && commit()} />
+    <input type={type} value={v} placeholder={placeholder} onChange={(e) => setV(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === 'Enter' && commit()} />
   )
 }
 

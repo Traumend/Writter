@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react'
-import { breakdown, extractMissing, toCsv, type Appearance, type EntityCard } from '../../core/breakdown'
+import { ELEMENT_CATEGORIES, breakdown, categoryColor, extractMissing, toCsv, type Appearance, type EntityCard } from '../../core/breakdown'
 import { readFrontmatter, writeFrontmatter } from '../../core/frontmatter'
 import { extractLinks, parseFountain } from '../../core/parser/fountain'
 import { project } from '../../core/projection'
 import { mdToHtml } from '../../core/convert'
-import type { FileKind } from '../../core/types/ipc'
+import type { BreakdownProposal, FileKind } from '../../core/types/ipc'
 import { t } from '../i18n'
 import { useStore } from '../store'
 import { Icon, BlurInput, useAsset } from '../ui'
@@ -53,11 +53,13 @@ const LOC_FIELDS: [string, string][] = [
   ['secrets', 'Secretos del lugar']
 ]
 
-function Card({ c, groups, epOf, places = [], refs = 0 }: { c: EntityCard; groups: string[]; epOf: (s: string) => string; places?: string[]; refs?: number }) {
-  const { docs, writeOther, openFile, setTab, files, deleteEntity, openRename } = useStore()
+function Card({ c, groups, epOf, places = [], refs = 0, siblings = [] }: { c: EntityCard; groups: string[]; epOf: (s: string) => string; places?: string[]; refs?: number; siblings?: { path: string; name: string }[] }) {
+  const { docs, writeOther, openFile, setTab, files, deleteEntity, openRename, duplicateEntity, mergeEntity } = useStore()
   const img = useAsset(c.image)
   const [expand, setExpand] = useState(false)
   const [sheet, setSheet] = useState(false)
+  const [merging, setMerging] = useState(false)
+  const [cont, setCont] = useState(false)
   const doc = docs.find((d) => d.path === c.path)
   const data = doc ? readFrontmatter(doc.content).data : {}
   const patch = (p: Record<string, unknown>) => doc && void writeOther(c.path, writeFrontmatter(doc.content, p))
@@ -97,7 +99,7 @@ function Card({ c, groups, epOf, places = [], refs = 0 }: { c: EntityCard; group
           <div className="tiny muted ell">{c.kind}{data['parent'] ? ` · ${t('en')} ${String(data['parent'])}` : ''}</div>
           <strong className="link" onClick={() => { void openFile(c.path); setTab('desk') }}>{c.name}</strong>
         </div>
-        <Menu items={[{ label: t('Abrir .md'), run: () => { void openFile(c.path); setTab('desk') } }, { label: t('Renombrar…'), run: () => openRename(c.path, c.name, [c.name, ...c.aliases]) }, { label: t('Sides (PDF)…'), run: sides, disabled: !c.appearances.length }, 'sep', { label: t('Eliminar'), run: del, danger: true }]} />
+        <Menu items={[{ label: t('Abrir .md'), run: () => { void openFile(c.path); setTab('desk') } }, { label: t('Renombrar…'), run: () => openRename(c.path, c.name, [c.name, ...c.aliases]) }, { label: t('Sides (PDF)…'), run: sides, disabled: !c.appearances.length }, { label: t('Duplicar ficha'), run: () => void duplicateEntity(c.path) }, { label: t('Fusionar con…'), run: () => setMerging(true), disabled: !siblings.length }, 'sep', { label: t('Eliminar'), run: del, danger: true }]} />
       </div>
       {c.kind === 'character' && (
         <div className="row">
@@ -105,6 +107,31 @@ function Card({ c, groups, epOf, places = [], refs = 0 }: { c: EntityCard; group
           <select value={groups.includes(c.group) ? c.group : 'none'} onChange={(e) => patch({ group: e.target.value })}>
             <option value="none">{t('Sin grupo')}</option>
             {groups.map((g) => <option key={g} value={g}>{groupLabel(g)}</option>)}
+          </select>
+        </div>
+      )}
+      {merging && (
+        <div className="row tiny" onClick={(e) => e.stopPropagation()}>
+          <span className="muted">{t('Fusionar en')}</span>
+          <select defaultValue="" onChange={(e) => {
+            const to = e.target.value
+            if (!to) return
+            const name = siblings.find((x) => x.path === to)?.name ?? ''
+            if (window.confirm(`${t('Se fusionará')} "${c.name}" ${t('en')} "${name}": ${t('sus alias y menciones pasan a la otra ficha y esta se elimina (recuperable en Versiones). ¿Continuar?')}`)) void mergeEntity(c.path, to)
+            setMerging(false)
+          }}>
+            <option value="">{t('— ficha destino —')}</option>
+            {siblings.map((x) => <option key={x.path} value={x.path}>{x.name}</option>)}
+          </select>
+          <button className="mini ghost" onClick={() => setMerging(false)}>{t('Cancelar')}</button>
+        </div>
+      )}
+      {c.kind !== 'character' && (
+        <div className="row tiny">
+          <span className="cdot" style={{ background: categoryColor(c.category) }} />
+          <select value={c.category} onChange={(e) => patch({ category: e.target.value })} title={t('Categoría de desglose')}>
+            <option value="">{t('Sin categoría')}</option>
+            {ELEMENT_CATEGORIES.map(([id, label]) => <option key={id} value={id}>{t(label)}</option>)}
           </select>
         </div>
       )}
@@ -122,6 +149,25 @@ function Card({ c, groups, epOf, places = [], refs = 0 }: { c: EntityCard; group
             <button className="mini ghost" onClick={() => setSheet((s) => !s)}>{t('Ficha de lugar')}</button>
           </div>
           {sheet && LOC_FIELDS.map(([k, ph]) => <BlurInput key={k} value={String(data[k] ?? '')} placeholder={t(ph)} onCommit={(v) => patch({ [k]: v })} />)}
+        </>
+      )}
+      {c.kind === 'prop' && c.appearances.length > 0 && (
+        <>
+          <button className="mini ghost" onClick={() => setCont((v) => !v)} title={t('Estado del objeto escena a escena (continuidad)')}>{t('Continuidad')}</button>
+          {cont && (
+            <div className="cont">
+              {c.appearances.map((a, i) => {
+                const key = `${a.script.split('/').pop()!.replace(/\.md$/, '')}#${a.scene + 1}`
+                const map = (data['continuity'] as Record<string, string> | undefined) ?? {}
+                return (
+                  <div className="row tiny" key={i}>
+                    <span className="muted" style={{ minWidth: 76 }}>{key}</span>
+                    <BlurInput value={map[key] ?? ''} placeholder={t('Estado tras esta escena (intacto, roto…)')} onCommit={(v) => patch({ continuity: { ...map, [key]: v } })} />
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </>
       )}
       <div className="tiny muted">{c.appearances.length} {t('escenas')} · {episodes} {t('episodios')}{c.kind === 'character' ? ` · ${c.words} ${t('palabras')}` : ''}</div>
@@ -153,8 +199,14 @@ export function Breakdown() {
   const [episode, setEpisode] = useState('')
   const [sortBy, setSortBy] = useState('added')
   const [listView, setListView] = useState(false)
+  const [catFilter, setCatFilter] = useState('')
   const [over, setOver] = useState<string | null>(null)
   const [status, setStatus] = useState('')
+  // Desglose con IA (ScriptWriterX §22): propuestas que el usuario aprueba una a una; nada se escribe antes.
+  const [aiProps, setAiProps] = useState<BreakdownProposal | null>(null)
+  const [aiSel, setAiSel] = useState<Set<string>>(new Set())
+  const [aiBusy, setAiBusy] = useState(false)
+  const [aiErr, setAiErr] = useState('')
   const cards = useMemo(() => breakdown(files, docs), [files, docs])
   const missing = useMemo(() => extractMissing(files, docs), [files, docs])
   const places = useMemo(() => cards.filter((c) => c.kind === 'location').map((c) => c.name), [cards])
@@ -201,6 +253,7 @@ export function Breakdown() {
     let l = ofKind.filter((c) =>
       (group === 'all' || (group === 'none' ? !c.group || c.group === 'none' : c.group === group)) &&
       (!orphansOnly || c.appearances.length === 0) &&
+      (!catFilter || c.category === catFilter) &&
       inScope(c) &&
       (!q || c.name.toLowerCase().includes(q.toLowerCase())))
     if (sortBy === 'az') l = [...l].sort((a, b) => a.name.localeCompare(b.name))
@@ -208,7 +261,39 @@ export function Breakdown() {
     else if (sortBy === 'group') l = [...l].sort((a, b) => a.group.localeCompare(b.group))
     else if (sortBy === 'tree' && kind === 'location') return tree(l)
     return l.map((c) => ({ c, depth: 0 }))
-  }, [ofKind, group, orphansOnly, season, episode, q, sortBy, kind, docs])
+  }, [ofKind, group, orphansOnly, season, episode, q, sortBy, kind, docs, catFilter])
+
+  const runAiBreakdown = async () => {
+    setAiBusy(true); setAiErr('')
+    try {
+      const scripts = files.filter((f) => f.kind === 'script')
+      const text = scripts.map((f) => docs.find((d) => d.path === f.path)?.content ?? '').join('\n\n').slice(0, 60000)
+      const known = cards.map((c) => c.name)
+      const p = await window.api.aiBreakdown(text, known)
+      setAiProps(p)
+      setAiSel(new Set(p.items.filter((i) => !i.exists).map((i) => `${i.kind}:${i.name}`)))
+    } catch (e) {
+      setAiErr(String(e instanceof Error ? e.message : e).slice(0, 300))
+    } finally { setAiBusy(false) }
+  }
+  const applyAi = async () => {
+    const chosen = (aiProps?.items ?? []).filter((i) => aiSel.has(`${i.kind}:${i.name}`))
+    for (const it of chosen) {
+      const existing = cards.find((c) => c.kind === it.kind && c.name.toLowerCase() === it.name.toLowerCase())
+      if (existing) {
+        const d = docs.find((x) => x.path === existing.path)
+        if (d) await writeOther(existing.path, writeFrontmatter(d.content, {
+          description: it.description || existing.description,
+          aliases: [...new Set([...existing.aliases, ...it.aliases])],
+          ...(it.group ? { group: it.group } : {})
+        }))
+      } else {
+        await createFile(`${roleDir(it.kind)}/${it.name}.md`, writeFrontmatter(TEMPLATE[it.kind](it.name), { description: it.description, aliases: it.aliases, ...(it.group ? { group: it.group } : {}) }), false)
+      }
+    }
+    setStatus(`${chosen.length} ${t('ficha(s) actualizadas desde la propuesta')}`)
+    setAiProps(null)
+  }
 
   const patchGroup = (path: string, g: string) => { const d = docs.find((x) => x.path === path); if (d) void writeOther(path, writeFrontmatter(d.content, { group: g })) }
   const extract = async () => {
@@ -277,6 +362,12 @@ export function Breakdown() {
             <button key={k} className={kind === k ? 'on' : 'ghost'} onClick={() => { setKind(k); setGroup('all') }}>{t({ character: 'Personajes', location: 'Locaciones', prop: 'Ítems' }[k as 'character'])} ({cards.filter((c) => c.kind === k).length})</button>
           ))}
           <span className="sep" />
+          {kind !== 'character' && (
+            <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} title={t('Categoría de desglose')}>
+              <option value="">{t('Todas las categorías')}</option>
+              {ELEMENT_CATEGORIES.map(([id, label]) => <option key={id} value={id}>{t(label)} ({ofKind.filter((x) => x.category === id).length})</option>)}
+            </select>
+          )}
           <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} title={t('Orden')}>
             <option value="added">{t('Orden de adición')}</option>
             <option value="az">A-Z</option>
@@ -298,14 +389,42 @@ export function Breakdown() {
         </div>
         <div className="toolbar wrap tiny">
           {kind === 'character' && <button className="ghost" onClick={() => void autoClassify()}>{t('Auto-clasificar')}</button>}
+          <button className="ghost" disabled={aiBusy} onClick={() => void runAiBreakdown()}>{aiBusy ? t('Analizando…') : t('Desglosar con IA')}</button>
           <button className="ghost" disabled={!missing.characters.length && !missing.locations.length} onClick={() => void extract()} title={[...missing.characters, ...missing.locations].join(', ')}>{t('Extraer del guión')} ({missing.characters.length + missing.locations.length})</button>
           <input placeholder={t('Nuevo…')} value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
           <span className="grow" />
           {status && <span className="muted tiny">{status}</span>}
           <Menu items={[{ label: t('Exportar Excel'), run: toXls }, { label: t('Exportar CSV'), run: () => void window.api.exportText(toCsv(cards), 'breakdown.csv') }, 'sep', { label: t('Eliminar todo'), run: () => void deleteAll(), danger: true, disabled: !list.length }]} />
         </div>
+        {aiErr && <p className="err tiny">{aiErr}</p>}
+        {aiProps && (
+          <div className="modal-backdrop" onClick={() => setAiProps(null)}>
+            <div className="modal" style={{ width: 'min(680px, 94vw)' }} onClick={(e) => e.stopPropagation()}>
+              <div className="row"><h1>{t('Propuesta de desglose')}</h1><span className="grow" /><span className="muted tiny">{aiProps.model} · {aiProps.tokensIn + aiProps.tokensOut} tok</span><button className="mini ghost" onClick={() => setAiProps(null)}>{t('Cerrar')}</button></div>
+              <p className="muted tiny">{t('Marca lo que quieras aplicar. Nada se escribe hasta que pulses aplicar.')}</p>
+              <div className="scroll" style={{ maxHeight: '50vh' }}>
+                {aiProps.items.map((it) => {
+                  const key = `${it.kind}:${it.name}`
+                  return (
+                    <label className="check" key={key}>
+                      <input type="checkbox" checked={aiSel.has(key)} onChange={() => setAiSel((prev) => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n })} />
+                      <b>{it.name}</b> <span className="muted tiny">{t({ character: 'Personaje', location: 'Locación', prop: 'Ítem' }[it.kind])}{it.exists ? ` · ${t('actualiza la ficha existente')}` : ` · ${t('ficha nueva')}`}</span>
+                      {it.description && <span className="tiny"> — {it.description}</span>}
+                      {it.aliases.length > 0 && <span className="muted tiny"> ({it.aliases.join(', ')})</span>}
+                    </label>
+                  )
+                })}
+                {aiProps.items.length === 0 && <p className="muted tiny">{t('La IA no propuso entidades nuevas.')}</p>}
+              </div>
+              <div className="row" style={{ justifyContent: 'flex-end' }}>
+                <button className="ghost" onClick={() => setAiProps(null)}>{t('Cancelar')}</button>
+                <button disabled={!aiSel.size} onClick={() => void applyAi()}>{t('Aplicar')} ({aiSel.size})</button>
+              </div>
+            </div>
+          </div>
+        )}
         <div className={listView ? 'bd-list' : 'cards'}>
-          {list.map(({ c, depth }) => <div key={c.path} style={depth ? { marginLeft: depth * 18 } : undefined}><Card c={c} groups={allGroups} epOf={epOf} places={places} refs={refsOf(c)} /></div>)}
+          {list.map(({ c, depth }) => <div key={c.path} style={depth ? { marginLeft: depth * 18 } : undefined}><Card c={c} groups={allGroups} epOf={epOf} places={places} refs={refsOf(c)} siblings={ofKind.filter((x) => x.path !== c.path).map((x) => ({ path: x.path, name: x.name }))} /></div>)}
           {list.length === 0 && <p className="muted">{t('Sin fichas. Usa "Extraer del guión" o crea una.')}</p>}
         </div>
       </section>

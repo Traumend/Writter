@@ -13,11 +13,13 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.125.0",
+    "@codemirror/autocomplete": "^6.20.3",
     "@codemirror/commands": "^6.11.0",
     "@codemirror/state": "^6.7.4",
     "@codemirror/view": "^6.43.11",
     "diff": "^9.0.0",
     "fast-xml-parser": "^5.11.1",
+    "pdfjs-dist": "^6.3.289",
     "yaml": "^2.5.0",
     "zustand": "^5.0.15"
   },

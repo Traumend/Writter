@@ -137,6 +137,8 @@ h1, .card strong, .table td { overflow-wrap: anywhere; } /* una palabra intermin
 /* Breakdown: panel de grupos + menú de tarjeta + vista lista */
 main.split.bd { grid-template-columns: 216px 1fr; }
 main.split.two { grid-template-columns: 256px 1fr; } /* vistas sin panel derecho: la tabla usa todo el ancho */
+.prod-plan { display: grid; grid-template-columns: 256px 1fr; gap: 16px; align-items: start; } /* jornadas | escenas, dentro de Producción */
+.prod-plan > * { min-width: 0; }
 .bd-groups { display: flex; flex-direction: column; }
 .bd-groups ul li { display: flex; align-items: center; gap: 8px; }
 .bd-groups li.dragover { outline: 2px dashed var(--accent); outline-offset: -2px; }
@@ -289,6 +291,28 @@ main.page.bt { min-height: 0; gap: 8px; }
 .table.planner .cell { cursor: pointer; }
 .pip { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%; color: #0c0c0c; }
 .bt-tension svg { display: block; overflow: visible; }
+.toasts { position: fixed; right: 18px; bottom: 44px; display: flex; flex-direction: column; gap: 8px; z-index: 60; pointer-events: none; }
+.toast { display: flex; align-items: center; gap: 8px; background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 8px 14px; box-shadow: var(--raise); font-size: 12px; max-width: 360px; }
+.toast::before { content: ''; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.toast.err { border-color: #e8437f; }
+.toast.err::before { background: #e8437f; }
+/* visor paginado (Vista PDF) */
+.pdfview { display: flex; flex-direction: column; min-height: 0; flex: 1; gap: 8px; }
+.pdfpages { flex: 1; min-height: 0; padding: 8px 0 40px; display: flex; flex-direction: column; align-items: center; gap: 22px; }
+.pdfpage { position: relative; width: 640px; max-width: 100%; min-height: 860px; background: #f7f6f3; color: #16181c; box-shadow: 0 8px 40px rgba(0,0,0,.45); border-radius: 2px; padding: 56px 64px 56px 88px; font-family: 'Courier Prime', 'Courier New', Courier, monospace; font-size: 13px; line-height: 1.32; cursor: default; }
+.pdfpage .pv-num { position: absolute; top: 24px; right: 40px; color: #6b6b6b; font-size: 12px; }
+.pv-heading { font-weight: 700; text-transform: uppercase; margin: 14px 0 6px; }
+.pv-action { margin: 0 0 6px; }
+.pv-character { text-transform: uppercase; margin: 10px 0 0 200px; }
+.pv-dialogue { margin: 0 120px 0 120px; }
+.pv-paren { margin: 0 140px 0 160px; }
+.pv-transition { text-align: right; text-transform: uppercase; margin: 10px 0; }
+.pv-section { font-weight: 700; color: #7a4b1a; margin: 16px 0 8px; }
+.pv-blank { height: 10px; }
+/* revisiones: marca de escena cambiada y escena omitida */
+.revdot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+.scenes .omitida { text-decoration: line-through; opacity: .65; }
+.scenefilters select { font-size: 11px; padding: 2px 4px; max-width: 92px; }
 .table.cmm th, .table.cmm td { padding: 3px 5px; text-align: center; font-size: 11px; }
 .table.cmm td:first-child, .table.cmm th:first-child { text-align: left; max-width: 140px; }
 .cmmcell .lvl { display: inline-block; min-width: 18px; border-radius: 4px; background: var(--accent); color: var(--on-accent); font-weight: 700; }
@@ -347,6 +371,16 @@ main.page.bt { min-height: 0; gap: 8px; }
 .table input, .table textarea, .table select { margin-bottom: 0; }
 .thumb { width: 66px; height: 42px; border-radius: var(--r-sm); display: grid; place-items: center; overflow: hidden; cursor: pointer; background: var(--sink); box-shadow: var(--inset); }
 .thumb img { width: 100%; height: 100%; object-fit: cover; }
+.thumb { position: relative; cursor: default; }
+.thumb .x { position: absolute; top: 2px; right: 2px; padding: 1px; min-height: 0; opacity: 0; background: var(--panel); }
+.thumb:hover .x, .thumb .x:focus-visible { opacity: 1; }
+.frames { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; max-width: 260px; }
+/* tira de la escena: fotogramas grandes en orden de toma */
+.strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin: 8px 0 16px; }
+.strip figure { margin: 0; }
+.strip .thumb { width: 100%; height: auto; aspect-ratio: 3 / 2; }
+.strip figcaption { margin-top: 4px; }
+img.preview { display: block; max-width: 100%; max-height: 420px; border-radius: var(--r-sm); margin-top: 8px; }
 
 /* ajustes */
 .settings .preview .paper { background: #fff; color: #000; font: 11px "Courier New", monospace; aspect-ratio: 8.5 / 11; padding: 18% 8% 6%; text-align: center; position: relative; border-radius: 6px; box-shadow: var(--raise); }

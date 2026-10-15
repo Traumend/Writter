@@ -1,11 +1,10 @@
 import { useState } from 'react'
-import { SCENE_STATUS, TRACK_COLORS, uid, type SceneStatus } from '../../../core/planning'
+import { SCENE_STATUS, SCENE_STATUS_ES as STATUS_LABEL, TRACK_COLORS, uid, type SceneStatus } from '../../../core/planning'
 import { t } from '../../i18n'
 import { Icon, BlurInput } from '../../ui'
 import { useCards, usePlanning, useSceneMetaWriter, useScripts } from './data'
 import { useOpenScene } from './shared'
 
-const STATUS_LABEL: Record<SceneStatus, string> = { idea: 'Idea', outline: 'Escaleta', planned: 'Planeada', draft: 'Borrador', revision: 'Necesita revisión', revised: 'Revisada', final: 'Final', cut: 'Cortada' }
 const STATUS_COLOR: Record<SceneStatus, string> = { idea: '#8b91a0', outline: '#59c1d6', planned: '#4f8cff', draft: '#c47d1a', revision: '#e8437f', revised: '#b388ff', final: '#3ddc97', cut: '#555' }
 
 // Story Planner: tracks (líneas narrativas) × escenas del guion, con estado y POV por escena.

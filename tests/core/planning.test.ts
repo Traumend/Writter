@@ -51,7 +51,7 @@ test('clinic detecta siembra sin pago, pregunta inmediata y track inactivo', () 
     scripts: [{ path: 's.md', name: 's', scenes, acts: [{ title: 'A1', from: 0, to: 9 }], sceneMeta }],
     characters: [{ name: 'A', group: 'protagonist', appearances: 9, relationships: ['Z'] }],
     planning: {
-      goal: 0, dailyGoal: 0, logline: '', synopsis: '', genre: '', status: 'idea',
+      goal: 0, dailyGoal: 0, logline: '', synopsis: '', genre: '', status: 'idea', revisions: [],
       tracks: [{ id: 't1', name: 'Romance', color: '#fff' }],
       questions: [{ id: 'q', text: '¿Quién?', category: '', status: 'answered', importance: 2, beats: [], introduced: { script: 's.md', heading: 'INT. S1 - DÍA' }, resolved: { script: 's.md', heading: 'INT. S2 - DÍA' }, characters: [], notes: '' }],
       plants: [{ id: 'p', title: 'Reloj roto', type: '', plant: { script: 's.md', heading: 'INT. S0 - DÍA' }, payoffs: [], characters: [], notes: '' }],
@@ -90,7 +90,7 @@ test('clinic avisa de arco sin hitos, locación sin escenas y pregunta sin desar
   const base = {
     scripts: [{ path: 's.md', name: 's', scenes, acts: [{ title: 'A1', from: 0, to: 5 }, { title: 'A2', from: 6, to: 11 }], sceneMeta: {} }],
     planning: {
-      goal: 0, dailyGoal: 0, logline: '', synopsis: '', genre: '', status: 'idea' as const, tracks: [], plants: [], ideas: [],
+      goal: 0, dailyGoal: 0, logline: '', synopsis: '', genre: '', status: 'idea' as const, tracks: [], plants: [], ideas: [], revisions: [],
       questions: [{ id: 'q', text: '¿Vuelve?', category: '', status: 'answered' as const, importance: 2, beats: [], introduced: { script: 's.md', heading: 'INT. S0 - DÍA' }, resolved: { script: 's.md', heading: 'INT. S9 - DÍA' }, characters: [], notes: '' }]
     }
   }
@@ -112,7 +112,7 @@ test('clinic avisa de arco sin hitos, locación sin escenas y pregunta sin desar
 
 test('clinic: escenas fuera de los actos, curva de tensión, motivación vacía y nombres sin ficha', () => {
   const scenes = Array.from({ length: 10 }, (_, i) => ({ heading: `INT. S${i} - DÍA`, characters: ['A'], wordCount: 100, minutes: 1 }))
-  const planning = { goal: 0, dailyGoal: 0, logline: '', synopsis: '', genre: '', status: 'idea' as const, tracks: [], questions: [], plants: [], ideas: [] }
+  const planning = { goal: 0, dailyGoal: 0, logline: '', synopsis: '', genre: '', status: 'idea' as const, tracks: [], questions: [], plants: [], ideas: [], revisions: [] }
   const beats = [{ scene: 0, tension: 9 }, { scene: 2, tension: 8 }, { scene: 6, tension: 3 }, { scene: 9, tension: 2 }]
   const issues = clinic({
     scripts: [{ path: 's.md', name: 's', scenes, acts: [{ title: 'A1', from: 0, to: 6 }], sceneMeta: {}, beats }],

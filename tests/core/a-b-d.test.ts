@@ -5,7 +5,7 @@ import { readFrontmatter, writeFrontmatter } from '../../src/core/frontmatter'
 import { paginate } from '../../src/core/paginate'
 import { parseFountain } from '../../src/core/parser/fountain'
 import { project } from '../../src/core/projection'
-import { moveScene } from '../../src/core/scenes'
+import { duplicateScene, insertScene, moveScene } from '../../src/core/scenes'
 
 const EP = `---
 type: script
@@ -75,7 +75,7 @@ test('breakdown: apariciones, alias, locaciones, csv, extracción', () => {
   expect(summer.words).toBe(1)
   expect(cards.find((c) => c.name === 'Titanic 2')!.appearances.map((a) => a.scene)).toEqual([1])
   expect(cards.find((c) => c.name === 'Rick')!.appearances.length).toBe(1)
-  expect(toCsv(cards)).toContain('"character","Summer","protagonist"')
+  expect(toCsv(cards)).toContain('"character","Summer","","protagonist"') // categoría vacía entre nombre y grupo
   const miss = extractMissing(files, docs)
   expect(miss.characters).toEqual(['JERRY'])
   expect(miss.locations).toEqual(['COCINA', 'GARAJE'])
@@ -99,4 +99,25 @@ test('extractMissing: en prosa no propone secciones como locaciones', () => {
   const m = extractMissing(files, docs)
   expect(m.locations).toEqual(['CATEDRAL'])
   expect(m.characters).toEqual(['ANA'])
+})
+
+test('duplicateScene copia el bloque tras la escena y marca el encabezado', () => {
+  const text = 'INT. A - DÍA\n\nAcción uno.\n\nEXT. B - NOCHE\n\nAcción dos.\n'
+  const scenes = project(parseFountain(text)).scenes
+  const out = duplicateScene(text, scenes, 0)
+  const after = project(parseFountain(out)).scenes.map((s) => s.heading)
+  expect(after).toEqual(['INT. A - DÍA', 'INT. A - DÍA (COPIA)', 'EXT. B - NOCHE'])
+  expect(out).toContain('Acción uno.')
+  expect(duplicateScene(text, scenes, 9)).toBe(text)
+})
+
+test('insertScene coloca una escena vacía antes, después o al final', () => {
+  const text = 'INT. A - DÍA\n\nAcción uno.\n\nEXT. B - NOCHE\n\nAcción dos.\n'
+  const scenes = project(parseFountain(text)).scenes
+  const before = project(parseFountain(insertScene(text, scenes, 1, 'before', 'INT. NUEVA - DÍA'))).scenes.map((s) => s.heading)
+  expect(before).toEqual(['INT. A - DÍA', 'INT. NUEVA - DÍA', 'EXT. B - NOCHE'])
+  const after = project(parseFountain(insertScene(text, scenes, 0, 'after', 'INT. NUEVA - DÍA'))).scenes.map((s) => s.heading)
+  expect(after).toEqual(['INT. A - DÍA', 'INT. NUEVA - DÍA', 'EXT. B - NOCHE'])
+  const end = project(parseFountain(insertScene(text, scenes, 0, 'end', 'INT. FINAL - DÍA'))).scenes.map((s) => s.heading)
+  expect(end[end.length - 1]).toBe('INT. FINAL - DÍA')
 })

@@ -27,6 +27,8 @@ const api: Api = {
   },
   keysSet: (provider, key) => ipcRenderer.invoke('keys.set', provider, key),
   keysStatus: (provider) => ipcRenderer.invoke('keys.status', provider),
+  keysClear: () => ipcRenderer.invoke('keys.clear'),
+  appVersion: () => ipcRenderer.invoke('app.version'),
   versionList: (path) => ipcRenderer.invoke('version.list', path),
   versionRead: (path, id) => ipcRenderer.invoke('version.read', path, id),
   versionSnapshot: (path, label) => ipcRenderer.invoke('version.snapshot', path, label),
@@ -43,13 +45,22 @@ const api: Api = {
   graphGet: () => ipcRenderer.invoke('graph.get'),
   assetPick: () => ipcRenderer.invoke('asset.pick'),
   assetRead: (rel) => ipcRenderer.invoke('asset.read', rel),
+  assetWrite: (dir, name, b64) => ipcRenderer.invoke('asset.write', dir, name, b64),
+  aiImage: (prompt) => ipcRenderer.invoke('ai.image', prompt),
   exportPdf: (html, name, opts) => ipcRenderer.invoke('export.pdf', html, name, opts),
   exportText: (content, name) => ipcRenderer.invoke('export.text', content, name),
   exportBytes: (base64, name) => ipcRenderer.invoke('export.bytes', base64, name),
   importScript: () => ipcRenderer.invoke('import.script'),
   importSwx: () => ipcRenderer.invoke('import.swx'),
   usageGet: () => ipcRenderer.invoke('usage.get'),
-  usageReset: () => ipcRenderer.invoke('usage.reset')
+  usageReset: () => ipcRenderer.invoke('usage.reset'),
+  aiCancel: () => ipcRenderer.send('ai.cancel'),
+  aiTest: () => ipcRenderer.invoke('ai.test'),
+  aiBreakdown: (text, known) => ipcRenderer.invoke('ai.breakdown', text, known),
+  backupNow: () => ipcRenderer.invoke('backup.now'),
+  backupPickFolder: () => ipcRenderer.invoke('backup.pickFolder'),
+  backupRestore: () => ipcRenderer.invoke('backup.restore'),
+  onAiProgress: (fn) => ipcRenderer.on('ai.progress', (_e, p) => fn(p as { chars: number; done?: boolean }))
 }
 
 contextBridge.exposeInMainWorld('api', api)

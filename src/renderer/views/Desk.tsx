@@ -1,14 +1,20 @@
 import { diffLines } from 'diff'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { mdToFdx, mdToFountain, mdToHtml, mdToTxt, pdfVars } from '../../core/convert'
+import { SCENE_STATUS, SCENE_STATUS_ES, readSceneMeta, type SceneMeta } from '../../core/planning'
 import { mdToDocx } from '../../core/docx'
-import { readFrontmatter } from '../../core/frontmatter'
+import { readFrontmatter, writeFrontmatter } from '../../core/frontmatter'
 import { estimateTokens } from '../../core/safeguards'
+import { trajectory } from '../../core/trajectory'
 import { type FileKind, type Scope } from '../../core/types/ipc'
 import { Editor } from '../editor/Editor'
 import { t } from '../i18n'
 import { DEFAULT_SECTIONS, useStore } from '../store'
 import { Icon, useAsset } from '../ui'
+import { SceneSheet } from './SceneSheet'
+import { Revisions, changedOnly, useRevisionMarks } from './Revisions'
+import { PdfView } from './PdfView'
+import { usePlanning } from './plan/data'
 
 const KIND_LABEL: Record<FileKind, string> = { script: 'Episodios', character: 'Personajes', location: 'Locaciones', prop: 'Props', outline: 'Escaleta', knowledge: 'Conocimiento', other: 'Otros' }
 export const TEMPLATE: Record<Exclude<FileKind, 'other'>, (name: string, extra?: Record<string, unknown>) => string> = {
@@ -97,7 +103,7 @@ function orderedSections(order: string[]): string[] {
 }
 
 function LeftPanel() {
-  const { vault, files, docs, path, projection, pagination, cursorLine, openFile, createFile, setCursor, moveScene, roleDir, prefs, addGroup, deleteScenes, restoreScene, sceneTrash } = useStore()
+  const { vault, files, docs, path, projection, pagination, cursorLine, openFile, createFile, setCursor, moveScene, duplicateScene, insertScene, roleDir, prefs, addGroup, deleteScenes, restoreScene, sceneTrash } = useStore()
   const [adding, setAdding] = useState<Exclude<FileKind, 'other'> | null>(null)
   const [q, setQ] = useState('')
   const [inContent, setInContent] = useState(false)
@@ -106,7 +112,12 @@ function LeftPanel() {
   const [sel, setSel] = useState<Set<number>>(new Set())
   const [newGroup, setNewGroup] = useState<string | null>(null)
   const [showTrash, setShowTrash] = useState(false)
+  const [fInt, setFInt] = useState('') // INT / EXT
+  const [fTime, setFTime] = useState('') // día / noche
+  const [fChar, setFChar] = useState('')
+  const [fStatus, setFStatus] = useState('')
   const lines = useMemo(() => useStore.getState().text.split('\n'), [projection])
+  const marks = useRevisionMarks() // revisión activa: marcas de escena modificada o nueva
   if (!vault) return <p className="muted">{t('Abre una carpeta como vault.')}</p>
   const scene = projection.scenes.find((s) => cursorLine >= s.startLine && cursorLine < s.endLine)
   const resolved = new Set(files.map((f) => f.name.toLowerCase()))
@@ -118,13 +129,35 @@ function LeftPanel() {
   }
   const ql = q.toLowerCase()
   const groups = [...new Set(projection.scenes.map((s) => s.group).filter(Boolean))]
-  const scenes = projection.scenes.filter(
-    (s) =>
-      (!groupFilter || s.group === groupFilter) &&
+  // Filtros del navegador de escenas (ScriptWriterX §11): INT/EXT, día/noche, personaje y estado.
+  const outline = docs.find((d) => d.path === `${roleDir('outline')}/${(path ?? '').split('/').pop()}`)
+  const sceneMeta = readSceneMeta(outline?.content)
+  const allChars = [...new Set(projection.scenes.flatMap((s) => s.characters))].sort()
+  const scenes = projection.scenes.filter((s) => {
+    const h = s.heading.toUpperCase()
+    return (!groupFilter || s.group === groupFilter) &&
+      (!fInt || (fInt === 'INT' ? /^(INT|I\/E)/.test(h) : /^EXT/.test(h))) &&
+      (!fTime || (fTime === 'DIA' ? /(DÍA|DIA|MAÑANA|TARDE|AMANECER)/.test(h) : /(NOCHE|MADRUGADA|ANOCHECER)/.test(h))) &&
+      (!fChar || s.characters.includes(fChar)) &&
+      (!fStatus || (sceneMeta[s.heading]?.status ?? '') === fStatus) &&
       (!ql || s.heading.toLowerCase().includes(ql) || (inContent && lines.slice(s.startLine, s.endLine).join('\n').toLowerCase().includes(ql)))
-  )
+  })
+  const filtered = !!(fInt || fTime || fChar || fStatus)
   const toggleSel = (i: number) => setSel((prev) => { const n = new Set(prev); n.has(i) ? n.delete(i) : n.add(i); return n })
-  const runDelete = () => { deleteScenes([...sel]); setSel(new Set()) }
+  // Con una revisión activa la numeración está bloqueada: las escenas no se borran, se marcan OMITIDAS.
+  const outlinePath = path ? `${roleDir('outline')}/${path.split('/').pop()!}` : null
+  const runDelete = () => {
+    const list = [...sel]
+    if (marks && outlinePath) {
+      if (!window.confirm(t('Hay una revisión activa: las escenas se marcarán como OMITIDAS y conservarán su número en vez de borrarse. ¿Continuar?'))) return
+      const next = { ...sceneMeta }
+      for (const i of list) { const sc = projection.scenes[i]; if (sc) next[sc.heading] = { ...(next[sc.heading] ?? {}), omitida: true } }
+      const doc = docs.find((d) => d.path === outlinePath)
+      if (doc) void useStore.getState().writeOther(outlinePath, writeFrontmatter(doc.content, { sceneMeta: next }))
+      else void useStore.getState().createFile(outlinePath, writeFrontmatter(TEMPLATE.outline(path!.split('/').pop()!.replace(/\.md$/, '')), { sceneMeta: next }), false)
+    } else deleteScenes(list)
+    setSel(new Set())
+  }
 
   // Cuerpo de cada sección de biblioteca por id.
   const body = (id: string) => {
@@ -192,6 +225,14 @@ function LeftPanel() {
             </div>
           )}
 
+          <div className="row tiny wrap scenefilters">
+            <select value={fInt} onChange={(e) => setFInt(e.target.value)} title={t('Interior / Exterior')}><option value="">INT/EXT</option><option value="INT">INT</option><option value="EXT">EXT</option></select>
+            <select value={fTime} onChange={(e) => setFTime(e.target.value)} title={t('Día / Noche')}><option value="">{t('Día/Noche')}</option><option value="DIA">{t('Día')}</option><option value="NOCHE">{t('Noche')}</option></select>
+            <select value={fChar} onChange={(e) => setFChar(e.target.value)} title={t('Personaje')}><option value="">{t('Personaje')}</option>{allChars.map((c) => <option key={c} value={c}>{c}</option>)}</select>
+            <select value={fStatus} onChange={(e) => setFStatus(e.target.value)} title={t('Estado')}><option value="">{t('Estado')}</option>{SCENE_STATUS.map((st) => <option key={st} value={st}>{t(SCENE_STATUS_ES[st])}</option>)}</select>
+            {filtered && <button className="mini ghost" onClick={() => { setFInt(''); setFTime(''); setFChar(''); setFStatus('') }}>{t('Limpiar')}</button>}
+          </div>
+
           <ul className="scenes">
             {scenes.map((s, i) => {
               const newGroupHere = s.group !== (scenes[i - 1]?.group ?? (i === 0 ? null : ''))
@@ -200,10 +241,14 @@ function LeftPanel() {
                   {!groupFilter && newGroupHere && s.group && <li className="grouphead muted tiny"><span className="ell">{s.group}</span></li>}
                   <li className={s === scene ? 'active' : ''} onClick={() => (multi ? toggleSel(s.index) : setCursor(s.startLine, null))} title={`${s.wordCount} ${t('palabras')} · ≈${estimateTokens(lines.slice(s.startLine, s.endLine).join('\n'))} ${t('tokens')} · ${t('pág.')} ${pagination.lineToPage[s.startLine] ?? 1}\n${s.characters.join(', ')}`}>
                     {multi && <input type="checkbox" checked={sel.has(s.index)} onChange={() => toggleSel(s.index)} onClick={(e) => e.stopPropagation()} />}
-                    <span className="muted">{s.index + 1}.</span> <span className="grow ell">{s.heading}</span>
+                    <span className="muted">{sceneMeta[s.heading]?.numero ?? s.index + 1}.</span>
+                    {marks && (marks.modified.has(s.heading) || marks.added.has(s.heading)) && <span className="revdot" style={{ background: marks.color }} title={marks.added.has(s.heading) ? t('Nueva desde la revisión activa') : t('Modificada desde la revisión activa')} />}
+                    <span className={`grow ell ${sceneMeta[s.heading]?.omitida ? 'omitida' : ''}`}>{s.heading}</span>
                     {!multi && <>
                       <span className="mv" onClick={(e) => { e.stopPropagation(); moveScene(s.index, s.index - 1) }}>▲</span>
                       <span className="mv" onClick={(e) => { e.stopPropagation(); moveScene(s.index, s.index + 1) }}>▼</span>
+                      <span className="mv" title={t('Duplicar escena')} onClick={(e) => { e.stopPropagation(); duplicateScene(s.index) }}>⧉</span>
+                      <span className="mv" title={t('Insertar escena debajo')} onClick={(e) => { e.stopPropagation(); insertScene(s.index, 'after') }}>+</span>
                     </>}
                   </li>
                 </div>
@@ -252,7 +297,7 @@ const toB64 = (u8: Uint8Array) => {
 
 const SCOPES: [Scope, string][] = [['cursor', 'Cursor'], ['node', 'Nodo'], ['scene', 'Escena'], ['range', 'Rango'], ['outline', 'Escaleta'], ['full', 'Guión completo']]
 
-function ScopeBar() {
+function ScopeBar({ pdfView, setPdfView }: { pdfView: boolean; setPdfView: (v: boolean) => void }) {
   const { scope, setScope, selection, text, cursorLine, projection, showTags, toggleTags, prefs, setPref, setTab, setDevTab } = useStore()
   const lines = text.split('\n')
   const scene = projection.scenes.find((s) => cursorLine >= s.startLine && cursorLine < s.endLine)
@@ -268,6 +313,7 @@ function ScopeBar() {
       <span className="grow" />
       <button className={prefs.focus ? 'on mini' : 'mini ghost'} onClick={() => setPref('focus', !prefs.focus)} title={t('Modo enfoque: atenúa lo demás')}>{t('Enfoque')}</button>
       <button className={prefs.page ? 'on mini' : 'mini ghost'} onClick={() => setPref('page', !prefs.page)} title={t('Modo página: aspecto de hoja de guion')}>{t('Página')}</button>
+      <button className={pdfView ? 'on mini' : 'mini ghost'} onClick={() => setPdfView(!pdfView)} title={t('Vista PDF: el guion tal y como se imprimirá, con sus quiebres de página')}>{t('Vista PDF')}</button>
       <button className={showTags ? 'on mini' : 'mini ghost'} onClick={toggleTags} title={t('Etiquetas de elemento')}>ABC</button>
       <span className="sep" />
       <button className="mini ghost" onClick={() => { setTab('dev'); setDevTab('beats') }} title="Beat Timeline">Beats</button>
@@ -278,28 +324,79 @@ function ScopeBar() {
   )
 }
 
+// Encaminar hacia lo planeado (núcleo): la IA lee lo que el autor ya decidió para después de esta
+// escena (arcos, pagos, escenas planeadas) y propone el guiño o detonante como diff.
+const GUIDE = 'Encamina esta escena hacia lo planeado (sección LO QUE VIENE del contexto): introduce un guiño, detonante o motivo sutil que haga verosímil el siguiente hito, sin adelantarlo ni resolverlo. Respeta el estilo, el tono y lo que ya pasó. Si algo FALTA SEMBRAR, siémbralo aquí con discreción.'
+function Planned({ scene, heading, allowLocked }: { scene: number; heading: string; allowLocked: boolean }) {
+  const s = useStore()
+  const { planning, save } = usePlanning()
+  const tr = useMemo(() => (s.path ? trajectory(s.files, s.docs, { script: s.path, scene }, s.roleDir('outline')) : null), [s.files, s.docs, s.path, scene]) // eslint-disable-line react-hooks/exhaustive-deps
+  const sow = (id: string) => void save({ plants: planning.plants.map((p) => (p.id === id ? { ...p, plant: { script: s.path!, heading } } : p)) })
+  return (
+    <div className="block">
+      <h2>{t('Lo ya planeado')}</h2>
+      {tr?.text.includes('LO QUE VIENE') ? (
+        <details><summary className="tiny link">{t('Qué sabe la IA')}</summary><pre className="tiny" style={{ whiteSpace: 'pre-wrap' }}>{tr.text}</pre></details>
+      ) : <p className="muted tiny">{t('Nada planeado después de esta escena para quien está en ella: añade puntos de arco, pagos o escenas planeadas.')}</p>}
+      {tr?.missing.map((m) => (
+        <div key={m.id} className="row tiny"><span className="grow">{t('Falta sembrar')}: <b>{m.title}</b></span><button className="mini ghost" onClick={() => sow(m.id)}>{t('Esta escena lo siembra')}</button></div>
+      ))}
+      <button disabled={!s.path || s.aiBusy} onClick={() => void s.runAi(GUIDE, allowLocked)}>{t('Encaminar hacia lo planeado')}</button>
+    </div>
+  )
+}
+
 function RightPanel() {
   const s = useStore()
-  const [tab, setTab] = useState<'ai' | 'versions' | 'export'>('ai')
+  const [tab, setTab] = useState<'scene' | 'ai' | 'versions' | 'export'>('ai')
   // Petición externa (menú Archivo → Exportar): abrir un panel concreto.
   useEffect(() => { if (s.deskPanel) { setTab(s.deskPanel); s.setDeskPanel(null) } }, [s.deskPanel]) // eslint-disable-line react-hooks/exhaustive-deps
   const [instruction, setInstruction] = useState('')
   const [allowLocked, setAllowLocked] = useState(false)
   const [label, setLabel] = useState('')
   const [compare, setCompare] = useState<{ id: string; content: string } | null>(null)
+  const [onlyChanged, setOnlyChanged] = useState(false)
+  const exportMarks = useRevisionMarks()
   const cfg = s.vault?.config
   const coverImg = useAsset(cfg?.cover.image ?? '')
+  // Ficha de la escena bajo el cursor: vive en sceneMeta de la escaleta del episodio abierto.
+  const sceneNow = s.projection.scenes.find((sc) => s.cursorLine >= sc.startLine && s.cursorLine < sc.endLine) ?? s.projection.scenes[0]
+  const outlinePath = s.path ? `${s.roleDir('outline')}/${s.path.split('/').pop()!}` : null
+  const outlineDoc = s.docs.find((d) => d.path === outlinePath)
+  const sceneMetaAll = readSceneMeta(outlineDoc?.content)
+  const sceneMetaNow = (sceneNow && sceneMetaAll[sceneNow.heading]) || {}
+  const vaultChars = s.files.filter((f) => f.kind === 'character').map((f) => f.name)
+  const patchSceneMeta = (patch: Partial<SceneMeta>) => {
+    if (!sceneNow || !outlinePath) return
+    const next = { ...sceneMetaAll, [sceneNow.heading]: { ...sceneMetaNow, ...patch } }
+    if (outlineDoc) void s.writeOther(outlinePath, writeFrontmatter(outlineDoc.content, { sceneMeta: next }))
+    else void s.createFile(outlinePath, writeFrontmatter(TEMPLATE.outline(name), { sceneMeta: next }), false)
+  }
+
   const locked = s.frontmatter['locked'] === true
   const name = s.path ? s.path.split('/').pop()!.replace(/\.md$/, '') : 'guion'
-  const TAB_LABEL = { ai: t('Script Assistant'), versions: t('Versiones'), export: t('Exportar') }
+  const exportText = onlyChanged && exportMarks ? changedOnly(s.text, s.projection.scenes, exportMarks) : s.text
+  const TAB_LABEL = { scene: t('Escena'), ai: t('Script Assistant'), versions: t('Versiones'), export: t('Exportar') }
 
   return (
     <>
       <div className="tabs">
-        {(['ai', 'versions', 'export'] as const).map((tb) => (
+        {(['scene', 'ai', 'versions', 'export'] as const).map((tb) => (
           <button key={tb} className={tab === tb ? 'on' : 'ghost'} onClick={() => setTab(tb)}>{TAB_LABEL[tb]}</button>
         ))}
       </div>
+
+      {tab === 'scene' && (
+        <div className="block">
+          {sceneNow ? (
+            <>
+              <h2 className="ell">#{sceneNow.index + 1} {sceneNow.heading}</h2>
+              <p className="muted tiny">{sceneNow.wordCount} {t('palabras')} · {t('pág.')} {s.pagination.lineToPage[sceneNow.startLine] ?? 1} · {sceneNow.characters.join(', ') || '—'}</p>
+              <SceneSheet meta={sceneMetaNow} index={sceneNow.index} chars={[...new Set([...sceneNow.characters, ...vaultChars])]} onChange={patchSceneMeta} />
+            </>
+          ) : <p className="muted tiny">{t('Coloca el cursor en una escena para ver su ficha.')}</p>}
+        </div>
+      )}
 
       {tab === 'ai' && (
         <>
@@ -309,10 +406,17 @@ function RightPanel() {
             {locked && (
               <label className="check"><input type="checkbox" checked={allowLocked} onChange={(e) => setAllowLocked(e.target.checked)} /> {t('Autorizo editar este archivo')} <code>locked</code></label>
             )}
-            <button disabled={!s.path || s.aiBusy || !instruction.trim()} onClick={() => void s.runAi(instruction, allowLocked)}>{s.aiBusy ? t('Pensando…') : t('Proponer diff')}</button>
+            <div className="row">
+              <button disabled={!s.path || s.aiBusy || !instruction.trim()} onClick={() => void s.runAi(instruction, allowLocked)}>{s.aiBusy ? t('Pensando…') : t('Proponer diff')}</button>
+              {s.aiBusy && <button className="ghost" onClick={() => s.cancelAi()}>{t('Cancelar')}</button>}
+              {s.aiBusy && <span className="muted tiny">{s.aiChars} {t('car. recibidos')}</span>}
+            </div>
+            {/* Alcance explícito (ScriptWriterX §33): qué lee la IA y qué puede cambiar. */}
+            <p className="muted tiny">{t('Lee')}: {t(SCOPES.find(([k]) => k === s.scope)?.[1] ?? '')} · {t('Modifica')}: {t('solo lo que aceptes en la propuesta')}</p>
             {s.aiError && <p className="err">{s.aiError}</p>}
             {!s.keyStatus?.present && cfg?.byok.provider !== 'ollama' && <p className="muted tiny">{t('Sin clave BYOK: configúrala en Ajustes.')}</p>}
           </div>
+          {sceneNow && <Planned scene={sceneNow.index} heading={sceneNow.heading} allowLocked={allowLocked} />}
           {s.proposal && (
             <div className="block">
               <h2>{t('Propuesta')} · {t('líneas')} {s.proposal.from + 1}-{s.proposal.to} · {s.proposal.tokensIn}→{s.proposal.tokensOut} {t('tokens')} · {s.proposal.model}</h2>
@@ -330,6 +434,7 @@ function RightPanel() {
         </>
       )}
 
+      {tab === 'versions' && <Revisions />}
       {tab === 'versions' && (
         <div className="block">
           <h2>{t('Historial')} · {name}</h2>
@@ -363,19 +468,24 @@ function RightPanel() {
         <div className="block">
           <h2>{t('Exportar')} {name}</h2>
           <div className="col">
+            {exportMarks && (
+              <label className="check" title={t('Emite solo las escenas modificadas o nuevas desde la revisión activa')}>
+                <input type="checkbox" checked={onlyChanged} onChange={(e) => setOnlyChanged(e.target.checked)} /> {t('Solo escenas modificadas (revisión activa)')}
+              </label>
+            )}
             <button disabled={!s.path} onClick={() => {
               const vars = { title: cfg?.cover.title || name, episode: name, author: cfg?.cover.author }
               void window.api.exportPdf(
-                mdToHtml(s.text, name, cfg ? { ...cfg.cover, imageDataUrl: coverImg } : undefined, cfg?.pdf),
+                mdToHtml(exportText, name, cfg ? { ...cfg.cover, imageDataUrl: coverImg } : undefined, cfg?.pdf),
                 `${name}.pdf`,
                 { paper: cfg?.pdf.paper ?? 'Letter', headerTemplate: pdfVars(cfg?.pdf.header ?? '', vars), footerTemplate: pdfVars(cfg?.pdf.footer ?? '', vars) }
               )
             }}>{t('PDF (formato industria')}{cfg?.cover.title ? t(' + portada') : ''})</button>
             <div className="row">
-              <button disabled={!s.path} className="ghost" onClick={() => void window.api.exportBytes(toB64(mdToDocx(s.text)), `${name}.docx`)}>DOCX</button>
-              <button disabled={!s.path} className="ghost" onClick={() => void window.api.exportText(mdToFdx(s.text), `${name}.fdx`)}>FDX</button>
-              <button disabled={!s.path} className="ghost" onClick={() => void window.api.exportText(mdToFountain(s.text), `${name}.fountain`)}>Fountain</button>
-              <button disabled={!s.path} className="ghost" onClick={() => void window.api.exportText(mdToTxt(s.text), `${name}.txt`)}>TXT</button>
+              <button disabled={!s.path} className="ghost" onClick={() => void window.api.exportBytes(toB64(mdToDocx(exportText)), `${name}.docx`)}>DOCX</button>
+              <button disabled={!s.path} className="ghost" onClick={() => void window.api.exportText(mdToFdx(exportText), `${name}.fdx`)}>FDX</button>
+              <button disabled={!s.path} className="ghost" onClick={() => void window.api.exportText(mdToFountain(exportText), `${name}.fountain`)}>Fountain</button>
+              <button disabled={!s.path} className="ghost" onClick={() => void window.api.exportText(mdToTxt(exportText), `${name}.txt`)}>TXT</button>
             </div>
             <button className="ghost" onClick={() => void window.api.importScript().then((f) => f && s.refreshFiles().then(() => s.openFile(f.path)))}>{t('Importar .fountain / .fdx')}</button>
           </div>
@@ -390,6 +500,7 @@ const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v))
 export function Desk() {
   const s = useStore()
   const { prefs, setPref } = s
+  const [pdfView, setPdfView] = useState(false)
   const mainRef = useRef<HTMLElement>(null)
   // Ventana estrecha: el panel derecho cede primero y se pliega si queda por debajo de 240px; luego cede el izquierdo.
   // El editor conserva 360px.
@@ -445,8 +556,8 @@ export function Desk() {
         )}
         {s.path ? (
           <>
-            <ScopeBar />
-            <Editor />
+            <ScopeBar pdfView={pdfView} setPdfView={setPdfView} />
+            {pdfView ? <PdfView /> : <Editor />}
           </>
         ) : (
           <p className="muted center">{t('Selecciona o crea un archivo. Ctrl+clic en un [[enlace]] abre la ficha.')}</p>

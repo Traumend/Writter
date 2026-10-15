@@ -3,9 +3,10 @@ import { readFrontmatter } from '../core/frontmatter'
 import { paginate, type Pagination } from '../core/paginate'
 import { parseFountain } from '../core/parser/fountain'
 import { project, type Projection } from '../core/projection'
-import { moveScene as moveSceneText } from '../core/scenes'
+import { duplicateScene as duplicateSceneText, insertScene as insertSceneText, moveScene as moveSceneText } from '../core/scenes'
 import { guessesToRoleMap } from '../core/adopt'
 import { renameEntity } from '../core/rename'
+import { trajectory } from '../core/trajectory'
 import { writeFrontmatter } from '../core/frontmatter'
 import { roleDir as roleDirOf } from '../core/types/ipc'
 import { record as recordDay, type WriteLog } from '../core/stats'
@@ -87,6 +88,7 @@ type State = {
   scope: Scope
   proposal: Proposal | null
   aiBusy: boolean
+  aiChars: number // caracteres recibidos en la llamada en curso (streaming)
   aiError: string | null
   versions: Version[]
   status: string
@@ -106,6 +108,7 @@ type State = {
   recents: string[] // vaults recientes (localStorage)
   pomo: { mode: 'focus' | 'short' | 'long'; left: number; running: boolean; done: number } // Pomodoro (segundos restantes)
   stats: WriteLog // palabras por día del proyecto abierto (localStorage, sin contenido)
+  toasts: { id: number; text: string; kind: 'ok' | 'err' }[] // avisos efímeros (ScriptWriterX §83)
 }
 
 type Actions = {
@@ -121,6 +124,7 @@ type Actions = {
   roleDir(kind: Exclude<FileKind, 'other'>): string
   refreshFiles(): Promise<void>
   refreshDocs(): Promise<void>
+  refreshDoc(path: string): Promise<void>
   openFile(path: string, gotoLine?: number): Promise<void>
   setTextFromEditor(text: string): void
   setTextExternal(text: string): void
@@ -130,13 +134,18 @@ type Actions = {
   createFile(path: string, content: string, open?: boolean): Promise<void>
   writeOther(path: string, content: string): Promise<void>
   deleteEntity(path: string): Promise<void>
+  duplicateEntity(path: string): Promise<void>
+  mergeEntity(fromPath: string, toPath: string): Promise<void>
   setScope(s: Scope): void
   runAi(instruction: string, allowLocked: boolean): Promise<void>
+  cancelAi(): void
   acceptProposal(): Promise<void>
   rejectProposal(): void
   restoreVersion(id: string): Promise<void>
   snapshot(label: string): Promise<void>
   moveScene(from: number, to: number): void
+  duplicateScene(i: number): void
+  insertScene(i: number, where: 'before' | 'after' | 'end'): void
   addGroup(name: string): void
   deleteScenes(indexes: number[]): void
   restoreScene(i: number): void
@@ -159,6 +168,7 @@ type Actions = {
   setDeskPanel(p: 'ai' | 'versions' | 'export' | null): void
   cycleTab(dir: 1 | -1): void
   recordStats(): void
+  toast(text: string, kind?: 'ok' | 'err'): void
   pomoToggle(): void
   pomoReset(mode?: 'focus' | 'short' | 'long'): void
   pomoSkip(): void
@@ -221,6 +231,24 @@ export function entityNames(files: FileEntry[], docs: Doc[]): string[] {
   return [...out].filter((n) => n.length >= 3)
 }
 
+// Escrituras del archivo abierto, en cola: dos solapadas (un slider arrastrado) mandaban la segunda con
+// el hash viejo, el main la rechazaba como conflicto y la ficha quedaba bloqueada.
+let saving: Promise<void> = Promise.resolve()
+let writing = false // escritura en vuelo: su evento del watcher llega antes que el hash nuevo
+const ownHashes = new Set<string>() // hashes propios recientes: el watcher no debe tomarlos por conflicto
+function queued(fn: () => Promise<void>): Promise<void> {
+  const run = async () => {
+    writing = true
+    try { await fn() } finally { writing = false }
+  }
+  saving = saving.then(run, run)
+  return saving
+}
+function wrote(hash: string) {
+  ownHashes.add(hash)
+  if (ownHashes.size > 50) ownHashes.delete(ownHashes.values().next().value!)
+}
+
 export const useStore = create<State & Actions>((set, get) => ({
   tab: 'desk',
   devTab: 'characters',
@@ -244,6 +272,7 @@ export const useStore = create<State & Actions>((set, get) => ({
   scope: 'scene',
   proposal: null,
   aiBusy: false,
+  aiChars: 0,
   aiError: null,
   versions: [],
   status: '',
@@ -261,6 +290,7 @@ export const useStore = create<State & Actions>((set, get) => ({
   recents: loadRecents(),
   pomo: { mode: 'focus', left: 25 * 60, running: false, done: 0 },
   stats: {},
+  toasts: [],
   rename: null,
   lastRenamed: null,
 
@@ -364,6 +394,13 @@ export const useStore = create<State & Actions>((set, get) => ({
   setDevTab: (devTab) => { saveWorkspace(get().vault?.root, { devTab }); set({ devTab }) },
   setPlanTab: (planTab) => { saveWorkspace(get().vault?.root, { planTab }); set({ planTab }) },
 
+  // Aviso efímero: lo importante sigue en la barra de estado; esto solo llama la atención un momento.
+  toast(text, kind = 'ok') {
+    const id = Date.now() + Math.random()
+    set({ toasts: [...get().toasts, { id, text, kind }] })
+    setTimeout(() => set({ toasts: get().toasts.filter((x) => x.id !== id) }), 4000)
+  },
+
   // Anota el total de palabras del proyecto en el registro del día (al abrir y tras cada guardado).
   recordStats() {
     const { vault, files, docs } = get()
@@ -442,8 +479,56 @@ export const useStore = create<State & Actions>((set, get) => ({
     await get().refreshDocs()
   },
 
+  // Duplicar ficha (ScriptWriterX §16): copia independiente con el nombre libre.
+  async duplicateEntity(path) {
+    const s = get()
+    const doc = s.docs.find((d) => d.path === path)
+    if (!doc) return
+    const dir = path.slice(0, path.lastIndexOf('/'))
+    const base = path.split('/').pop()!.replace(/\.md$/, '')
+    let name = `${base} (copia)`
+    for (let n = 2; s.files.some((f) => f.path === `${dir}/${name}.md`); n++) name = `${base} (copia ${n})`
+    await get().createFile(`${dir}/${name}.md`, writeFrontmatter(doc.content, { name }), false)
+    set({ status: `Ficha duplicada: ${name}` })
+  },
+
+  // Fusionar dos fichas: la origen aporta sus alias y sus menciones, y desaparece.
+  async mergeEntity(fromPath, toPath) {
+    const s = get()
+    const from = s.docs.find((d) => d.path === fromPath)
+    const to = s.docs.find((d) => d.path === toPath)
+    if (!from || !to || fromPath === toPath) return
+    const nameOf = (p: string) => p.split('/').pop()!.replace(/\.md$/, '')
+    const fromName = nameOf(fromPath)
+    const toName = nameOf(toPath)
+    const aliasesOf = (content: string) => { const a = readFrontmatter(content).data['aliases']; return Array.isArray(a) ? a.map(String) : [] }
+    const terms = [fromName, ...aliasesOf(from.content)]
+    const aliases = [...new Set([...aliasesOf(to.content), ...terms])].filter((a) => a.toLowerCase() !== toName.toLowerCase())
+    // Reescribe menciones en todo el vault menos en la ficha que se va a borrar.
+    const results = renameEntity(s.docs.filter((d) => d.path !== fromPath), terms, toName)
+    for (const r of results) if (r.path !== toPath) await window.api.fileWrite(r.path, r.content, undefined, 'user')
+    const target = results.find((r) => r.path === toPath)?.content ?? to.content
+    await window.api.fileWrite(toPath, writeFrontmatter(target, { aliases }), undefined, 'user')
+    await window.api.fileDelete(fromPath)
+    if (get().path === fromPath) set({ path: null, text: '', diskHash: null, dirty: false })
+    await get().refreshFiles()
+    await get().refreshDocs()
+    set({ status: `Fusionadas: ${fromName} -> ${toName}`, lastRenamed: { from: fromPath, to: toPath } })
+  },
+
   async refreshDocs() {
     if (get().vault) set({ docs: await window.api.vaultReadAll() })
+  },
+
+  // Relee un solo archivo del índice: lo normal tras escribir o tras un cambio externo.
+  async refreshDoc(path) {
+    if (!get().vault) return
+    const content = await window.api.fileRead(path).then((r) => r.content, () => null)
+    set((s) => {
+      if (content === null || !s.files.some((f) => f.path === path)) return { docs: s.docs.filter((d) => d.path !== path) }
+      const doc = { path, content }
+      return { docs: s.docs.some((d) => d.path === path) ? s.docs.map((d) => (d.path === path ? doc : d)) : [...s.docs, doc] }
+    })
   },
 
   async openFile(path, gotoLine) {
@@ -467,19 +552,22 @@ export const useStore = create<State & Actions>((set, get) => ({
 
   setCursor: (cursorLine, selection) => set({ cursorLine, selection }),
 
-  async save(force = false) {
-    const { path, text, diskHash, dirty, conflict } = get()
-    if (!path || !dirty || (conflict && !force)) return
-    try {
-      const { hash } = await window.api.fileWrite(path, text, force ? undefined : (diskHash ?? undefined), 'user')
-      set({ diskHash: hash, dirty: false, conflict: false, status: 'Guardado' })
-      set({ versions: await window.api.versionList(path) })
-      await get().refreshDocs()
-      get().recordStats()
-    } catch (e) {
-      if (String(e).includes('conflict')) set({ conflict: true, status: 'Conflicto: el archivo cambió en disco' })
-      else set({ status: `Error al guardar: ${String(e)}` })
-    }
+  save(force = false) {
+    return queued(async () => {
+      const { path, text, diskHash, dirty, conflict } = get()
+      if (!path || !dirty || (conflict && !force)) return
+      try {
+        const { hash } = await window.api.fileWrite(path, text, force ? undefined : (diskHash ?? undefined), 'user')
+        wrote(hash)
+        set({ diskHash: hash, dirty: get().text !== text, conflict: false, status: 'Guardado' })
+        set({ versions: await window.api.versionList(path) })
+        await get().refreshDoc(path)
+        get().recordStats()
+      } catch (e) {
+        if (String(e).includes('conflict')) set({ conflict: true, status: 'Conflicto: el archivo cambió en disco' })
+        else set({ status: `Error al guardar: ${String(e)}` })
+      }
+    })
   },
 
   async reloadFromDisk() {
@@ -493,7 +581,7 @@ export const useStore = create<State & Actions>((set, get) => ({
   async createFile(path, content, open = true) {
     await window.api.fileCreate(path, content)
     await get().refreshFiles()
-    await get().refreshDocs()
+    await get().refreshDoc(path)
     if (open) await get().openFile(path)
   },
 
@@ -504,7 +592,7 @@ export const useStore = create<State & Actions>((set, get) => ({
       return
     }
     await window.api.fileWrite(path, content, undefined, 'user')
-    await get().refreshDocs()
+    await get().refreshDoc(path)
   },
 
   setScope: (scope) => set({ scope }),
@@ -513,7 +601,8 @@ export const useStore = create<State & Actions>((set, get) => ({
     const s = get()
     if (!s.path || !instruction.trim()) return
     const lines = s.text.split('\n')
-    const scene = s.projection.scenes.find((sc) => s.cursorLine >= sc.startLine && s.cursorLine < sc.endLine)
+    // Cursor fuera de toda escena (frontmatter): la primera, la misma que muestra el panel de escena.
+    const scene = s.projection.scenes.find((sc) => s.cursorLine >= sc.startLine && s.cursorLine < sc.endLine) ?? s.projection.scenes[0]
     let from = s.cursorLine
     let to = s.cursorLine + 1
     let context = ''
@@ -537,6 +626,12 @@ export const useStore = create<State & Actions>((set, get) => ({
         const edges = g.edges.map((e) => `${byId.get(e.source) ?? e.source} -${e.kind}-> ${byId.get(e.target) ?? e.target}`).join('\n')
         context += `\n\nGRAFO DEL VAULT (${g.nodes.length} nodos):\n${edges}`
       }
+    }
+    // Trayectoria (núcleo): lo ya planeado por el autor a partir de esta escena, desde el índice en memoria.
+    if (scene) {
+      const docs = s.docs.map((d) => (d.path === s.path ? { ...d, content: s.text } : d))
+      const tr = trajectory(s.files, docs, { script: s.path, scene: scene.index }, s.roleDir('outline')).text
+      if (tr) context = `${tr}\n\n${context}`
     }
     const target = lines.slice(from, to).join('\n')
     const locked = s.frontmatter['locked'] === true
@@ -564,11 +659,20 @@ export const useStore = create<State & Actions>((set, get) => ({
     lines.splice(proposal.from, proposal.to - proposal.from, ...proposal.replacement.split('\n'))
     const next = lines.join('\n')
     set((s) => ({ text: next, ...reproject(next, get().vault), proposal: null, externalSeq: s.externalSeq + 1, dirty: true }))
-    const { hash } = await window.api.fileWrite(path, next, diskHash ?? undefined, 'ai')
-    set({ diskHash: hash, dirty: false, status: 'Propuesta aplicada y guardada', versions: await window.api.versionList(path) })
+    await queued(async () => {
+      try {
+        const { hash } = await window.api.fileWrite(path, next, get().diskHash ?? undefined, 'ai')
+        wrote(hash)
+        set({ diskHash: hash, dirty: get().text !== next, status: 'Propuesta aplicada y guardada', versions: await window.api.versionList(path) })
+      } catch (e) {
+        if (String(e).includes('conflict')) set({ conflict: true, status: 'Conflicto: el archivo cambió en disco' })
+        else set({ status: `Error al guardar: ${String(e)}` })
+      }
+    })
   },
 
   rejectProposal: () => set({ proposal: null }),
+  cancelAi: () => { window.api.aiCancel(); set({ status: 'Llamada de IA cancelada' }) },
 
   async restoreVersion(id) {
     const { path } = get()
@@ -589,6 +693,18 @@ export const useStore = create<State & Actions>((set, get) => ({
     const s = get()
     const next = moveSceneText(s.text, s.projection.scenes, from, to)
     if (next !== s.text) get().setTextExternal(next)
+  },
+
+  // Duplicar e insertar escena (ScriptWriterX §11): operan sobre el texto vivo del guion abierto.
+  duplicateScene(i) {
+    const s = get()
+    const next = duplicateSceneText(s.text, s.projection.scenes, i)
+    if (next !== s.text) { get().setTextExternal(next); set({ status: 'Escena duplicada' }) }
+  },
+  insertScene(i, where) {
+    const s = get()
+    const next = insertSceneText(s.text, s.projection.scenes, i, where, `INT. ${'NUEVA ESCENA'} - DÍA`)
+    if (next !== s.text) { get().setTextExternal(next); set({ status: 'Escena insertada' }) }
   },
 
   // Inserta una sección Fountain (`# name`) antes de la escena bajo el cursor -> nuevo grupo (nativo del .md).
@@ -665,9 +781,10 @@ window.addEventListener('vault.adopt', (e) => {
 // Cambios externos (Obsidian u otro editor): recargar si no hay cambios locales; si los hay, marcar conflicto (I10).
 window.api.onVaultChange((e) => {
   const s = useStore.getState()
-  void s.refreshFiles()
-  void s.refreshDocs()
-  if (e.path !== s.path || e.hash === s.diskHash) return
+  // Archivo ya indexado: releer solo ese. Nuevo o borrado: actualizar la lista y luego ese archivo.
+  if (e.hash !== null && s.files.some((f) => f.path === e.path)) void s.refreshDoc(e.path)
+  else void s.refreshFiles().then(() => useStore.getState().refreshDoc(e.path))
+  if (e.path !== s.path || e.hash === s.diskHash || writing || (e.hash !== null && ownHashes.has(e.hash))) return
   if (!s.dirty) void s.reloadFromDisk()
   else useStore.setState({ conflict: true, status: 'Conflicto: el archivo cambió en disco' })
 })

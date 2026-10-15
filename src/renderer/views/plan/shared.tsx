@@ -29,7 +29,9 @@ export function useOpenScene() {
     if (!r) return
     const s = scripts.find((x) => x.path === r.script)
     const sc = s?.scenes.find((x) => x.heading.trim().toUpperCase() === r.heading.trim().toUpperCase())
-    if (s) { void openFile(s.path, sc?.startLine); setTab('desk') }
+    if (!s) return
+    setTab('desk')
+    return openFile(s.path, sc?.startLine)
   }
 }
 

@@ -16,7 +16,19 @@ export type EntityCard = {
   image: string
   appearances: Appearance[]
   words: number // palabras de diálogo (personajes)
+  category: string // categoría de desglose (utilería, vestuario, vehículos…)
 }
+
+// Categorías de desglose de producción (ScriptWriterX §19): catálogo cerrado con color, guardado
+// en `category` del frontmatter de la ficha. La asignación a escenas sale de las menciones del guion.
+export const ELEMENT_CATEGORIES: [string, string, string][] = [
+  ['cast', 'Reparto', '#4f8cff'], ['extras', 'Extras', '#7a9cc6'], ['props', 'Utilería', '#c47d1a'], ['set', 'Ambientación', '#b3873a'],
+  ['wardrobe', 'Vestuario', '#e8437f'], ['makeup', 'Maquillaje', '#ff8fb1'], ['vehicles', 'Vehículos', '#59c1d6'], ['animals', 'Animales', '#9bd659'],
+  ['stunts', 'Especialistas', '#e8506b'], ['sfx', 'Efectos especiales', '#ff7a6b'], ['vfx', 'VFX', '#b388ff'], ['music', 'Música', '#3ddc97'],
+  ['sound', 'Sonido', '#2fc784'], ['equipment', 'Equipo', '#8b91a0'], ['other', 'Otros', '#6b7280']
+]
+export const categoryLabel = (id: string) => ELEMENT_CATEGORIES.find(([k]) => k === id)?.[1] ?? id
+export const categoryColor = (id: string) => ELEMENT_CATEGORIES.find(([k]) => k === id)?.[2] ?? '#6b7280'
 
 export type Doc = { path: string; content: string }
 
@@ -38,6 +50,7 @@ export function breakdown(files: FileEntry[], docs: Doc[]): EntityCard[] {
         actor: String(fm['actor'] ?? ''),
         description: String(fm['description'] ?? ''),
         image: String(fm['image'] ?? ''),
+        category: String(fm['category'] ?? ''),
         appearances: [],
         words: 0
       }
@@ -96,6 +109,6 @@ export function extractMissing(files: FileEntry[], docs: Doc[]): { characters: s
 
 export function toCsv(cards: EntityCard[]): string {
   const esc = (s: string) => `"${s.replace(/"/g, '""')}"`
-  const rows = cards.map((c) => [c.kind, c.name, c.group, c.actor, c.aliases.join('; '), String(c.appearances.length), c.appearances.map((a) => `${a.script.split('/').pop()}#${a.scene + 1}`).join('; ')].map(esc).join(','))
-  return ['kind,name,group,actor,aliases,scenes,appearances', ...rows].join('\n')
+  const rows = cards.map((c) => [c.kind, c.name, c.category, c.group, c.actor, c.aliases.join('; '), String(c.appearances.length), c.appearances.map((a) => `${a.script.split('/').pop()}#${a.scene + 1}`).join('; ')].map(esc).join(','))
+  return ['kind,name,category,group,actor,aliases,scenes,appearances', ...rows].join('\n')
 }

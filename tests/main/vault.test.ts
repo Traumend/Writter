@@ -29,6 +29,14 @@ test('listFiles: los .md de assets entran como other (shot lists) y los de fuera
   expect(V.readAll().find((d) => d.path === 'assets/shots/Ep.md')?.content).toContain('shotlist')
 })
 
+test('readIndexed relee un archivo solo cuando cambia en disco', () => {
+  writeFileSync(join(dir, 'assets/shots/Ep.md'), 'uno')
+  expect(V.readIndexed('assets/shots/Ep.md')).toBe('uno')
+  writeFileSync(join(dir, 'assets/shots/Ep.md'), 'dos, más largo')
+  expect(V.readIndexed('assets/shots/Ep.md')).toBe('dos, más largo')
+  expect(V.readAll().find((d) => d.path === 'assets/shots/Ep.md')?.content).toBe('dos, más largo')
+})
+
 test('writeFile guarda versión del contenido previo, detecta conflicto y no versiona escrituras idénticas', () => {
   const rel = 'scripts/Prueba.md'
   const { hash } = V.createFile(rel, 'v1')
@@ -74,3 +82,4 @@ test('adopt: mapa de roles propio y carpetas creadas; scanFolder propone roles p
   expect(readFileSync(join(other, '.narrative/project.yaml'), 'utf8')).toContain('Capitulos')
   try { rmSync(other, { recursive: true, force: true }) } catch { /* watcher */ }
 })
+
