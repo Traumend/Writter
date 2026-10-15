@@ -702,6 +702,7 @@ export const EN: Record<string, string> = {
   Payoffs: 'Payoffs',
   Sinopsis: 'Synopsis',
   etiquetas: 'tags',
+  "Arreglar con IA": "Fix with AI",
   "Lo ya planeado": "Already planned",
   "Qué sabe la IA": "What the AI knows",
   "Nada planeado después de esta escena para quien está en ella: añade puntos de arco, pagos o escenas planeadas.": "Nothing planned after this scene for who is in it: add arc points, payoffs or planned scenes.",

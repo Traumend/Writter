@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { type Area, type Severity } from '../../../core/clinic'
+import { type Area, type Issue, type Severity } from '../../../core/clinic'
 import { byId } from '../../../core/library'
 import { t } from '../../i18n'
-import { useStore } from '../../store'
+import { cleanErr, useStore } from '../../store'
 import { Icon } from '../../ui'
 import { useClinicIssues, usePlanning, useScripts } from './data'
 import { SEV_COLOR, SEV_LABEL, useOpenScene } from './shared'
@@ -22,6 +22,35 @@ export function Clinic() {
   const shown = issues.filter((i) => (area === 'all' || i.area === area) && !dismissed.has(i.title))
   const count = (a: Area | 'all') => issues.filter((i) => (a === 'all' || i.area === a) && !dismissed.has(i.title)).length
   const entry = lib ? byId(lib) : null
+  const [advice, setAdvice] = useState<Record<string, string>>({})
+  const [busy, setBusy] = useState<string | null>(null)
+
+  // Arreglo con IA (I2: nada se escribe sin aceptar). Con escena: abre la escena y propone un diff
+  // con el Script Assistant, que ya lleva el contexto de trayectoria. Sin escena: consejo concreto.
+  const fix = async (i: Issue) => {
+    const why = `La Clínica señala: «${i.title}». ${i.detail}`
+    // Una siembra que falta va ANTES de su pago: no se abre la escena del pago, se pide dónde sembrar.
+    const ref = i.area === 'plants' ? undefined : i.refs.find((r) => r.heading)
+    setBusy(i.id)
+    try {
+      if (ref) {
+        await openScene(scripts, ref)
+        const s = useStore.getState()
+        s.setScope('scene')
+        await s.runAi(`${why} Propón el cambio mínimo en esta escena que lo resuelva, coherente con lo ya planeado (LO QUE VIENE).`, false)
+      } else {
+        // ponytail: índice de escenas recortado a 80 líneas; por capítulo si el proyecto crece mucho.
+        const index = scripts.flatMap((s) => s.scenes.map((x, k) => `${s.name} esc. ${k + 1} ${x.heading}${s.sceneMeta[x.heading]?.summary ? `: ${s.sceneMeta[x.heading]!.summary}` : ''}`)).slice(0, 80).join('\n')
+        const ctx = [why, planning.logline && `Logline: ${planning.logline}`, planning.synopsis && `Sinopsis: ${planning.synopsis}`, `Escenas:\n${index}`, i.techniques.length ? `Técnicas sugeridas: ${i.techniques.map((id) => byId(id)?.title ?? id).join(', ')}` : ''].filter(Boolean).join('\n')
+        const r = await window.api.aiText('Propón un arreglo concreto para este problema: qué cambiar, dónde y por qué, en 3-5 viñetas. En el idioma del proyecto, sin preámbulos.', ctx)
+        setAdvice((a) => ({ ...a, [i.id]: r.text.trim() }))
+      }
+    } catch (e) {
+      setAdvice((a) => ({ ...a, [i.id]: cleanErr(e) }))
+    } finally {
+      setBusy(null)
+    }
+  }
 
   // Matriz track × escena (vista Clinic → Tracks).
   const trackMatrix = scripts.map((s) => ({ s, rows: planning.tracks.map((tr) => ({ tr, pres: s.scenes.map((x) => s.sceneMeta[x.heading]?.track === tr.id) })) }))
@@ -48,8 +77,10 @@ export function Clinic() {
               {i.area === 'tracks' && <button className="mini ghost" onClick={() => setPlanTab('planner')}>{t('Abrir Planner')}</button>}
               {(i.area === 'motivation' || i.area === 'continuity') && <button className="mini ghost" onClick={() => { const s = useStore.getState(); s.setTab(i.area === 'motivation' ? 'dev' : 'breakdown'); if (i.area === 'motivation') s.setDevTab('characters') }}>{t(i.area === 'motivation' ? 'Abrir personajes' : 'Abrir Breakdown')}</button>}
               <span className="grow" />
+              <button className="mini" disabled={busy !== null} onClick={() => void fix(i)}>{busy === i.id ? '…' : `✦ ${t('Arreglar con IA')}`}</button>
               <button className="mini ghost" onClick={() => setDismissed((s) => new Set([...s, i.title]))}>{t('Descartar')}</button>
             </div>
+            {advice[i.id] && <div className="proposal tiny" style={{ whiteSpace: 'pre-wrap' }}>{advice[i.id]}</div>}
             <div className="chips">{i.techniques.map((id) => byId(id)).filter(Boolean).map((e) => <button key={e!.id} className="chip" onClick={() => setLib(e!.id)}><Icon name="book" size={11} />{e!.title}</button>)}</div>
           </div>
         ))}
