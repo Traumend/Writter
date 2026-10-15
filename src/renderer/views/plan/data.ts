@@ -44,15 +44,21 @@ export function usePlanning(): { planning: Planning; save: (patch: Partial<Plann
   return { planning, save }
 }
 
-// Escribe metadatos de una escena (track/estado/POV/tags/overrides) en el outline del guion, creándolo si falta.
-export function useSceneMetaWriter() {
+// Escribe un parche de frontmatter en el outline (escaleta) del guion, creándolo si falta.
+export function useOutlinePatch() {
   const { docs, files, writeOther, createFile } = useStore()
-  return async (script: ScriptInfo, heading: string, patch: Partial<SceneMeta>) => {
-    const meta = { ...script.sceneMeta, [heading]: { ...(script.sceneMeta[heading] ?? {}), ...patch } }
+  return async (script: ScriptInfo, patch: Record<string, unknown>) => {
     const od = docs.find((x) => x.path === script.outlinePath)
-    if (od && files.some((f) => f.path === script.outlinePath)) await writeOther(script.outlinePath, writeFrontmatter(od.content, { sceneMeta: meta }))
-    else await createFile(script.outlinePath, `---\ntype: outline\ntitle: "${script.name}"\nacts: []\nbeats: []\nnotes: []\nsceneMeta: {}\n---\n\n`.replace('sceneMeta: {}', `sceneMeta: ${JSON.stringify(meta)}`), false)
+    if (od && files.some((f) => f.path === script.outlinePath)) await writeOther(script.outlinePath, writeFrontmatter(od.content, patch))
+    else await createFile(script.outlinePath, writeFrontmatter(`---\ntype: outline\ntitle: ${JSON.stringify(script.name)}\nacts: []\nbeats: []\nnotes: []\n---\n\n`, patch), false)
   }
+}
+
+// Escribe metadatos de una escena (track/estado/POV/tags/overrides) en el outline del guion.
+export function useSceneMetaWriter() {
+  const patchOutline = useOutlinePatch()
+  return (script: ScriptInfo, heading: string, patch: Partial<SceneMeta>) =>
+    patchOutline(script, { sceneMeta: { ...script.sceneMeta, [heading]: { ...(script.sceneMeta[heading] ?? {}), ...patch } } })
 }
 
 export const refLabel = (r: SceneRef | undefined, scripts: ScriptInfo[]) => {
