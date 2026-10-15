@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
 import { breakdown, extractMissing, toCsv, type Appearance, type EntityCard } from '../../core/breakdown'
 import { readFrontmatter, writeFrontmatter } from '../../core/frontmatter'
-import { extractLinks } from '../../core/parser/fountain'
+import { extractLinks, parseFountain } from '../../core/parser/fountain'
+import { project } from '../../core/projection'
+import { mdToHtml } from '../../core/convert'
 import type { FileKind } from '../../core/types/ipc'
 import { t } from '../i18n'
 import { useStore } from '../store'
@@ -68,6 +70,23 @@ function Card({ c, groups, epOf, places = [], refs = 0 }: { c: EntityCard; group
     const detail = uses ? `${t('Referenciado en')} ${c.appearances.length} ${t('escena(s)')}${refs ? ` ${t('y')} ${refs} ${t('ficha(s)')}` : ''}. ` : ''
     if (window.confirm(`${t('¿Eliminar')} "${c.name}"? ${detail}${t('(recuperable en Versiones)')}`)) void deleteEntity(c.path)
   }
+  // Sides (separata): las escenas donde aparece la ficha, en formato de guion, listas para imprimir.
+  const sides = () => {
+    const st = useStore.getState()
+    const parts: string[] = []
+    for (const a of c.appearances) {
+      const d = st.docs.find((x) => x.path === a.script)
+      if (!d) continue
+      const scenes = project(parseFountain(d.content)).scenes
+      const sc = scenes[a.scene]
+      if (!sc || sc.heading.toUpperCase() !== a.heading.toUpperCase()) continue
+      const lines = d.content.split('\n').slice(sc.startLine, sc.endLine).join('\n').trim()
+      parts.push(`${a.script.split('/').pop()!.replace(/\.md$/, '')} · #${a.scene + 1}\n\n${lines}`)
+    }
+    if (!parts.length) { useStore.setState({ status: `${c.name}: sin escenas para sides` }); return }
+    const md = `${c.name} — sides (${parts.length} ${t('escenas')})\n\n${parts.join('\n\n')}\n`
+    void window.api.exportPdf(mdToHtml(md, `Sides ${c.name}`), `sides-${c.name}.pdf`, { paper: 'Letter' })
+  }
   return (
     <div className="card" draggable onDragStart={() => (dragCard = c.path)} onDragEnd={() => (dragCard = null)}>
       <div className="row">
@@ -78,7 +97,7 @@ function Card({ c, groups, epOf, places = [], refs = 0 }: { c: EntityCard; group
           <div className="tiny muted ell">{c.kind}{data['parent'] ? ` · ${t('en')} ${String(data['parent'])}` : ''}</div>
           <strong className="link" onClick={() => { void openFile(c.path); setTab('desk') }}>{c.name}</strong>
         </div>
-        <Menu items={[{ label: t('Abrir .md'), run: () => { void openFile(c.path); setTab('desk') } }, { label: t('Renombrar…'), run: () => openRename(c.path, c.name, [c.name, ...c.aliases]) }, 'sep', { label: t('Eliminar'), run: del, danger: true }]} />
+        <Menu items={[{ label: t('Abrir .md'), run: () => { void openFile(c.path); setTab('desk') } }, { label: t('Renombrar…'), run: () => openRename(c.path, c.name, [c.name, ...c.aliases]) }, { label: t('Sides (PDF)…'), run: sides, disabled: !c.appearances.length }, 'sep', { label: t('Eliminar'), run: del, danger: true }]} />
       </div>
       {c.kind === 'character' && (
         <div className="row">

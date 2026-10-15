@@ -2,8 +2,47 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { EditorState } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
 import { useEffect, useMemo, useRef } from 'react'
+import { cycleBlock, lineType, smartEnter, type Block } from '../../core/editor/blocks'
 import { delims, entityNames, useStore } from '../store'
 import { fountainExtension, landingField, setLanding, setNames } from './fountain'
+
+
+// Teclado de guion (paridad con ScriptWriterX): Enter abre el bloque que toca y Tab cicla el tipo de la línea.
+// El frontmatter YAML no es guion: el teclado de bloques no debe tocarlo.
+function inFrontmatter(view: EditorView, lineNo: number): boolean {
+  if (view.state.doc.line(1).text.trim() !== '---') return false
+  for (let n = 2; n <= Math.min(view.state.doc.lines, 80); n++) if (view.state.doc.line(n).text.trim() === '---') return lineNo <= n
+  return true
+}
+
+function prevType(view: EditorView, lineNo: number): Block {
+  let prev: Block = 'blank'
+  for (let n = Math.max(1, lineNo - 6); n < lineNo; n++) prev = lineType(view.state.doc.line(n).text, prev)
+  return prev
+}
+const scriptKeymap = keymap.of([
+  {
+    key: 'Enter',
+    run: (view) => {
+      const { head, empty } = view.state.selection.main
+      const line = view.state.doc.lineAt(head)
+      if (!empty || head !== line.to || !line.text.trim() || inFrontmatter(view, line.number)) return false // solo en el flujo normal de escritura
+      const insert = smartEnter(lineType(line.text, prevType(view, line.number)))
+      view.dispatch({ changes: { from: head, insert }, selection: { anchor: head + insert.length }, scrollIntoView: true })
+      return true
+    }
+  },
+  ...([[1, 'Tab'], [-1, 'Shift-Tab']] as [1 | -1, string][]).map(([dir, key]) => ({
+    key,
+    run: (view: EditorView) => {
+      const line = view.state.doc.lineAt(view.state.selection.main.head)
+      if (!line.text.trim() || inFrontmatter(view, line.number)) return false
+      const { text } = cycleBlock(line.text, prevType(view, line.number), dir)
+      view.dispatch({ changes: { from: line.from, to: line.to, insert: text }, selection: { anchor: line.from + text.length } })
+      return true
+    }
+  }))
+])
 
 export function Editor() {
   const host = useRef<HTMLDivElement>(null)
@@ -30,6 +69,7 @@ export function Editor() {
         doc: s.text,
         extensions: [
           history(),
+          scriptKeymap,
           keymap.of([...defaultKeymap, ...historyKeymap, { key: 'Mod-s', run: () => (void useStore.getState().save(), true) }]),
           EditorView.lineWrapping,
           EditorView.contentAttributes.of({ spellcheck: 'true', autocapitalize: 'off' }),

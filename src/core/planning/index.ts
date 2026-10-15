@@ -19,7 +19,13 @@ export type SceneStatus = 'idea' | 'outline' | 'planned' | 'draft' | 'revision' 
 export const SCENE_STATUS: SceneStatus[] = ['idea', 'outline', 'planned', 'draft', 'revision', 'revised', 'final', 'cut']
 export const QUESTION_STATUS: QuestionStatus[] = ['open', 'developing', 'partial', 'answered', 'abandoned']
 // Campos narrativos de la escena (PRD §16): el texto sigue en el guion; esto es la ficha de planificación.
-export type SceneMeta = { track?: string; status?: SceneStatus; pov?: string; tags?: string[]; overrides?: Record<string, string>; summary?: string; purpose?: string; conflict?: string; outcome?: string; stakes?: string; value?: string }
+// `numero`/`omitida`/`presencia` son la parte de industria (compatibilidad con ScriptWriterX): número de escena
+// con su gramática (12, 5A, 34BC), escena omitida tras bloquear numeración y presencia manual por entidad.
+export type Presence = 'habla' | 'presente' | 'mencion'
+export const PRESENCE: [Presence, string][] = [['habla', 'Habla'], ['presente', 'Presente'], ['mencion', 'Mención']]
+export type SceneMeta = { track?: string; status?: SceneStatus; pov?: string; tags?: string[]; overrides?: Record<string, string>; summary?: string; purpose?: string; conflict?: string; outcome?: string; stakes?: string; value?: string; numero?: string; omitida?: boolean; presencia?: Record<string, Presence> }
+// Gramática de número de escena de la industria: 12, 5A, 34BC, A1, 20-A, 43-P1, 20.A.
+export const SCENE_NUMBER = /^[A-Z]?\d+[A-Z]*([.-][A-Z0-9]+)?$/i
 export const SCENE_FIELDS: [keyof SceneMeta, string, string][] = [
   ['summary', 'Sinopsis', 'Qué pasa en una línea'],
   ['purpose', 'Propósito', '¿Por qué existe esta escena?'],

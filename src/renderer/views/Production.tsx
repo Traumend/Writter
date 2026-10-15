@@ -10,6 +10,13 @@ const SIZES = ['Plano general', 'Plano medio', 'Primer plano', 'Plano detalle', 
 const ANGLES = ['Normal', 'Picado', 'Contrapicado', 'Cenital', 'Nadir', 'Holandés']
 const MOVES = ['Fijo', 'Paneo', 'Tilt', 'Dolly in', 'Dolly out', 'Travelling', 'Steadicam', 'Grúa', 'Cámara en mano']
 const STATUS = ['Pendiente', 'Aprobada', 'En rodaje', 'Rodada']
+// Notas por departamento (13, como el break-down de dirección de ScriptWriterX), por escena.
+const DEPTS: [string, string][] = [
+  ['arte', 'Arte'], ['vestuario', 'Vestuario'], ['maquillaje', 'Maquillaje y peinado'], ['sonido', 'Sonido'],
+  ['efectos', 'Efectos'], ['vfx', 'VFX'], ['locacion', 'Locación'], ['fotografia', 'Fotografía'],
+  ['iluminacion', 'Iluminación'], ['edicion', 'Edición'], ['direccion', 'Dirección de escena'],
+  ['rodaje', 'Sugerencias de rodaje'], ['generales', 'Notas generales']
+]
 const uid = () => Math.random().toString(36).slice(2, 8)
 
 function Thumb({ rel, onPick }: { rel: string; onPick: () => void }) {
@@ -26,6 +33,7 @@ export function Production() {
   const shotsPath = script ? `assets/shots/${script.split('/').pop()!}` : null
   const shotsDoc = useDoc(shotsPath)
   const [scene, setScene] = useState(0)
+  const [panel, setPanel] = useState<'shots' | 'notes'>('shots')
 
   useEffect(() => {
     if (shotsPath && !files.some((f) => f.path === shotsPath)) void createFile(shotsPath, `---\ntype: shotlist\nshots: []\n---\n`, false)
@@ -35,6 +43,10 @@ export function Production() {
   const save = (next: Shot[]) => shotsDoc && void writeOther(shotsDoc.path, writeFrontmatter(shotsDoc.content, { shots: next }))
   const upd = (id: string, p: Partial<Shot>) => save(shots.map((s) => (s.id === id ? { ...s, ...p } : s)))
   const list = shots.filter((s) => s.scene === scene)
+  const heading = proj.scenes[scene]?.heading ?? ''
+  const adNotes = (shotsDoc ? (readFrontmatter(shotsDoc.content).data['adNotes'] as Record<string, Record<string, string>> | undefined) : undefined) ?? {}
+  const notes = adNotes[heading] ?? {}
+  const setNote = (k: string, v: string) => shotsDoc && void writeOther(shotsDoc.path, writeFrontmatter(shotsDoc.content, { adNotes: { ...adNotes, [heading]: { ...notes, [k]: v } } }))
 
   return (
     <main className="split two">
@@ -51,10 +63,24 @@ export function Production() {
       </aside>
       <section className="scroll">
         <div className="toolbar">
-          <strong>{t('Shot list')} · {proj.scenes[scene]?.heading ?? '—'}</strong>
+          <div className="segmented" role="group">
+            <button className={panel === 'shots' ? 'on' : ''} onClick={() => setPanel('shots')}>{t('Shot list')}</button>
+            <button className={panel === 'notes' ? 'on' : ''} onClick={() => setPanel('notes')}>{t('Notas por departamento')}</button>
+          </div>
+          <strong className="ell">{heading || '—'}</strong>
           <span className="grow" />
-          <button disabled={!shotsDoc || !proj.scenes.length} onClick={() => save([...shots, { id: uid(), scene, size: SIZES[0]!, angle: ANGLES[0]!, movement: MOVES[0]!, lens: '35mm', description: '', status: STATUS[0]!, image: '' }])}><Icon name="plus" size={12} />{t('Toma')}</button>
+          {panel === 'shots' && <button disabled={!shotsDoc || !proj.scenes.length} onClick={() => save([...shots, { id: uid(), scene, size: SIZES[0]!, angle: ANGLES[0]!, movement: MOVES[0]!, lens: '35mm', description: '', status: STATUS[0]!, image: '' }])} ><Icon name="plus" size={12} />{t('Toma')}</button>}
         </div>
+        {panel === 'notes' && (
+          <div className="grid2">
+            {DEPTS.map(([k, label]) => (
+              <label className="field" key={k}><span>{t(label)}</span>
+                <BlurInput textarea rows={2} value={notes[k] ?? ''} placeholder={t('Sin notas')} onCommit={(v) => setNote(k, v)} />
+              </label>
+            ))}
+          </div>
+        )}
+        {panel === 'shots' && (<>
         <table className="table">
           <thead><tr><th>#</th><th>Storyboard</th><th>{t('Tamaño')}</th><th>{t('Ángulo')}</th><th>{t('Movimiento')}</th><th>{t('Lente')}</th><th>{t('Descripción')}</th><th>{t('Estado')}</th><th /></tr></thead>
           <tbody>
@@ -74,6 +100,7 @@ export function Production() {
           </tbody>
         </table>
         {list.length === 0 && <p className="muted">{t('Sin tomas en esta escena.')}</p>}
+        </>)}
       </section>
     </main>
   )

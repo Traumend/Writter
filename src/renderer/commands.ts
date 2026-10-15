@@ -2,7 +2,7 @@
 // y los comandos ">" de la paleta. Etiquetas en español pasadas por t() al mostrarse.
 import type { FileKind } from '../core/types/ipc'
 import { t } from './i18n'
-import { exportProjectJson, importProjectJson } from './portable'
+import { exportProjectJson, exportSwxProject, importProjectJson, importSwxProject } from './portable'
 import { useStore, type DevTab, type PlanTab } from './store'
 
 export type Command = { label: string; shortcut?: string; run: () => void; free?: boolean /* utilizable sin vault */ }
@@ -24,8 +24,10 @@ export const COMMANDS: Record<string, Command> = {
   'file.link': { label: 'Vincular carpetas…', run: () => S().openLinker() },
   'file.importScript': { label: 'Importar .fountain / .fdx…', run: () => void window.api.importScript().then((f) => f && S().refreshFiles().then(() => { void S().openFile(f.path); S().setTab('desk') })) },
   'file.importJson': { label: 'Importar proyecto (JSON)…', run: () => void importProjectJson() },
+  'file.importSwx': { label: 'Importar proyecto de ScriptWriterX (.swx)…', run: () => void importSwxProject() },
   'file.exportCurrent': { label: 'Exportar episodio actual…', run: () => { S().setTab('desk'); S().setDeskPanel('export') } },
   'file.exportJson': { label: 'Exportar proyecto (JSON)…', run: () => void exportProjectJson() },
+  'file.exportSwx': { label: 'Exportar a ScriptWriterX (.swx)…', run: () => void exportSwxProject() },
   'file.projectSettings': { label: 'Ajustes del proyecto', run: () => S().setTab('settings') },
   'file.prefs': { label: 'Preferencias…', shortcut: 'Ctrl+,', free: true, run: () => S().openPrefs() },
 
